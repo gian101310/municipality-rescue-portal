@@ -10,14 +10,72 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DEMO_ORGANIZATION, DEMO_EMERGENCY_TYPES, DEMO_BARANGAYS } from '@/lib/demo-data'
+import {
+  DEMO_TENANT_GEO_SCOPE,
+  PH_LOCALITIES,
+  PH_PROVINCES,
+  PH_REGIONS,
+  getLocalitiesForProvince,
+  getLocalityLabel,
+  getProvinceName,
+  getRegionName,
+  getScopedLocalities,
+  getScopedProvinces,
+  makeTenantScope,
+  PSGC_VERSION_LABEL,
+} from '@/lib/philippines-geography'
+import type { GeoScopeLevel } from '@/lib/philippines-geography'
 import { toast } from 'sonner'
+
+const SCOPE_LEVEL_LABELS: Record<GeoScopeLevel, string> = {
+  country: 'Entire Philippines',
+  region: 'Single Region',
+  province: 'Single Province',
+  municipality: 'Single City / Municipality',
+}
 
 export default function SettingsPage() {
   const [showToken, setShowToken] = useState(false)
   const [orgName, setOrgName] = useState(DEMO_ORGANIZATION.name)
   const [hotline, setHotline] = useState(DEMO_ORGANIZATION.emergency_hotline)
   const [province, setProvince] = useState(DEMO_ORGANIZATION.province)
+  const [scopeLevel, setScopeLevel] = useState<GeoScopeLevel>(DEMO_TENANT_GEO_SCOPE.level)
+  const [scopeRegionCode, setScopeRegionCode] = useState(DEMO_TENANT_GEO_SCOPE.regionCode ?? '')
+  const [scopeProvinceCode, setScopeProvinceCode] = useState(DEMO_TENANT_GEO_SCOPE.provinceCode ?? '')
+  const [scopeMunicipalityCode, setScopeMunicipalityCode] = useState(DEMO_TENANT_GEO_SCOPE.municipalityCode ?? '')
+
+  const currentScope = makeTenantScope(
+    scopeLevel,
+    scopeLevel === 'region'
+      ? scopeRegionCode
+      : scopeLevel === 'province'
+      ? scopeProvinceCode
+      : scopeLevel === 'municipality'
+      ? scopeMunicipalityCode
+      : undefined
+  )
+  const provinceOptions = scopeRegionCode
+    ? PH_PROVINCES.filter((item) => item.regionCode === scopeRegionCode)
+    : PH_PROVINCES
+  const municipalityOptions = scopeProvinceCode
+    ? getLocalitiesForProvince(scopeProvinceCode)
+    : scopeRegionCode
+    ? PH_LOCALITIES.filter((item) => item.regionCode === scopeRegionCode)
+    : PH_LOCALITIES
+  const coveredProvinces = getScopedProvinces(currentScope)
+  const coveredLocalities = getScopedLocalities(currentScope)
+  const selectedScopeLocality = PH_LOCALITIES.find((item) => item.code === scopeMunicipalityCode)
+  const scopeLabel = scopeLevel === 'country'
+    ? 'Entire Philippines'
+    : scopeLevel === 'region'
+    ? getRegionName(scopeRegionCode)
+    : scopeLevel === 'province'
+    ? getProvinceName(scopeProvinceCode)
+    : selectedScopeLocality
+    ? getLocalityLabel(selectedScopeLocality)
+    : ''
 
   function save() {
     toast.success('Settings saved (demo mode — not persisted)')
@@ -32,7 +90,7 @@ export default function SettingsPage() {
 
       <Tabs defaultValue="general">
         <TabsList className="bg-slate-800 border border-slate-700 flex-wrap h-auto gap-1">
-          {['General', 'Emergency Types', 'Barangays', 'Telegram', 'Notifications'].map((t) => (
+          {['General', 'Coverage Lock', 'Emergency Types', 'Barangays', 'Telegram', 'Notifications'].map((t) => (
             <TabsTrigger key={t} value={t.toLowerCase().replace(' ', '_')} className="data-[active]:bg-slate-700 data-[active]:text-white text-slate-400 text-sm">
               {t}
             </TabsTrigger>
@@ -90,6 +148,136 @@ export default function SettingsPage() {
               </div>
               <Button onClick={save} className="bg-blue-600 hover:bg-blue-700 text-white">
                 <Save className="w-4 h-4 mr-1" /> Save Changes
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Coverage Lock */}
+        <TabsContent value="coverage_lock" className="mt-4">
+          <Card className="bg-slate-900 border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-white text-base">Coverage Lock</CardTitle>
+              <CardDescription className="text-slate-400">Set the geography available to this buyer account.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-slate-300">Buyer Coverage</Label>
+                  <Select
+                    value={SCOPE_LEVEL_LABELS[scopeLevel]}
+                    onValueChange={(value) => {
+                      if (!value) return
+                      const nextLevel = (Object.entries(SCOPE_LEVEL_LABELS)
+                        .find(([, label]) => label === value)?.[0] ?? 'country') as GeoScopeLevel
+                      setScopeLevel(nextLevel)
+                      if (nextLevel === 'country') {
+                        setScopeRegionCode('')
+                        setScopeProvinceCode('')
+                        setScopeMunicipalityCode('')
+                      }
+                    }}
+                  >
+                    <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-600">
+                      {Object.values(SCOPE_LEVEL_LABELS).map((label) => (
+                        <SelectItem key={label} value={label} className="text-white hover:bg-slate-700">{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-slate-300">Region</Label>
+                  <Select
+                    value={getRegionName(scopeRegionCode)}
+                    onValueChange={(value) => {
+                      if (!value) return
+                      setScopeRegionCode(PH_REGIONS.find((item) => item.name === value)?.code ?? '')
+                      setScopeProvinceCode('')
+                      setScopeMunicipalityCode('')
+                    }}
+                    disabled={scopeLevel === 'country'}
+                  >
+                    <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                      <SelectValue placeholder="Select region" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-600">
+                      {PH_REGIONS.map((region) => (
+                        <SelectItem key={region.code} value={region.name} className="text-white hover:bg-slate-700">{region.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-slate-300">Province</Label>
+                  <Select
+                    value={getProvinceName(scopeProvinceCode)}
+                    onValueChange={(value) => {
+                      if (!value) return
+                      setScopeProvinceCode(provinceOptions.find((item) => item.name === value)?.code ?? '')
+                      setScopeMunicipalityCode('')
+                    }}
+                    disabled={scopeLevel === 'country' || scopeLevel === 'region'}
+                  >
+                    <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                      <SelectValue placeholder="Select province" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-600">
+                      {provinceOptions.map((item) => (
+                        <SelectItem key={item.code} value={item.name} className="text-white hover:bg-slate-700">{item.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label className="text-slate-300">City / Municipality</Label>
+                  <Select
+                    value={selectedScopeLocality ? getLocalityLabel(selectedScopeLocality) : ''}
+                    onValueChange={(value) => {
+                      if (!value) return
+                      setScopeMunicipalityCode(municipalityOptions.find((item) => getLocalityLabel(item) === value)?.code ?? '')
+                    }}
+                    disabled={scopeLevel !== 'municipality'}
+                  >
+                    <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                      <SelectValue placeholder="Select city/municipality" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-600">
+                      {municipalityOptions.map((item) => (
+                        <SelectItem key={item.code} value={getLocalityLabel(item)} className="text-white hover:bg-slate-700">{getLocalityLabel(item)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="rounded-lg bg-slate-800 p-3">
+                  <p className="text-xs text-slate-500">Locked To</p>
+                  <p className="mt-1 text-sm font-semibold text-white">{scopeLabel || 'Select coverage'}</p>
+                </div>
+                <div className="rounded-lg bg-slate-800 p-3">
+                  <p className="text-xs text-slate-500">Provinces</p>
+                  <p className="mt-1 text-xl font-bold text-blue-300">{coveredProvinces.length}</p>
+                </div>
+                <div className="rounded-lg bg-slate-800 p-3">
+                  <p className="text-xs text-slate-500">Cities / Municipalities</p>
+                  <p className="mt-1 text-xl font-bold text-green-300">{coveredLocalities.length}</p>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-slate-700 bg-slate-950 p-3">
+                <p className="text-xs font-medium text-slate-300">Dataset</p>
+                <p className="mt-1 text-xs text-slate-500">{PSGC_VERSION_LABEL} · 18 regions · 82 provinces · 1,642 cities/municipalities</p>
+              </div>
+
+              <Button onClick={save} className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Save className="w-4 h-4 mr-1" /> Save Coverage
               </Button>
             </CardContent>
           </Card>

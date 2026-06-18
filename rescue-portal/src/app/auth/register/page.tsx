@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { ArrowLeft, ArrowRight, Check, Shield, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +12,17 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress'
 import { DemoBanner } from '@/components/demo-banner'
 import { DEMO_BARANGAYS } from '@/lib/demo-data'
+import {
+  DEMO_TENANT_GEO_SCOPE,
+  getLocalitiesForProvince,
+  getLocalitiesForRegionWithoutProvince,
+  getLocalityLabel,
+  getProvinceName,
+  getRegionName,
+  getScopedProvinces,
+  getScopedRegions,
+  PSGC_VERSION_LABEL,
+} from '@/lib/philippines-geography'
 import { generateDemoReferenceNumber } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -33,16 +43,17 @@ const ID_TYPES = [
   { value: 'other', label: 'Other Government ID' },
 ]
 
-const PROVINCES = ['Laguna', 'Cavite', 'Rizal', 'Batangas', 'Quezon', 'Bataan', 'Pampanga', 'Bulacan']
-const MUNICIPALITIES = ['Bayani', 'San Pablo City', 'Calamba', 'Sta. Rosa', 'Biñan']
-
 interface FormData {
   full_name: string
   phone: string
   email: string
   date_of_birth: string
+  region: string
+  regionCode: string
   province: string
+  provinceCode: string
   municipality: string
+  municipalityCode: string
   barangay: string
   address: string
   id_type: string
@@ -55,20 +66,69 @@ interface FormData {
 }
 
 export default function RegisterPage() {
-  const router = useRouter()
   const [step, setStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
   const [refNumber, setRefNumber] = useState('')
   const [form, setForm] = useState<FormData>({
     full_name: '', phone: '', email: '', date_of_birth: '',
-    province: '', municipality: '', barangay: '', address: '',
+    region: '', regionCode: '', province: '', provinceCode: '',
+    municipality: '', municipalityCode: '', barangay: '', address: '',
     id_type: '', id_number: '',
     ec_name: '', ec_phone: '', ec_relationship: '',
     privacy_agree: false, false_alert_agree: false,
   })
 
+  const allowedRegions = getScopedRegions(DEMO_TENANT_GEO_SCOPE)
+  const selectedRegionCode = form.regionCode || (allowedRegions.length === 1 ? allowedRegions[0].code : '')
+  const allowedProvinces = getScopedProvinces(DEMO_TENANT_GEO_SCOPE)
+    .filter((province) => !selectedRegionCode || province.regionCode === selectedRegionCode)
+  const provinceLocalities = form.provinceCode
+    ? getLocalitiesForProvince(form.provinceCode, DEMO_TENANT_GEO_SCOPE)
+    : []
+  const metroLocalities = selectedRegionCode && allowedProvinces.length === 0
+    ? getLocalitiesForRegionWithoutProvince(selectedRegionCode, DEMO_TENANT_GEO_SCOPE)
+    : []
+  const municipalityOptions = provinceLocalities.length > 0 ? provinceLocalities : metroLocalities
+  const selectedMunicipality = municipalityOptions.find((item) => item.code === form.municipalityCode)
+  const selectedMunicipalityLabel = selectedMunicipality ? getLocalityLabel(selectedMunicipality) : ''
+
   function update(field: keyof FormData, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  function selectRegion(regionCode: string) {
+    setForm((prev) => ({
+      ...prev,
+      regionCode,
+      region: getRegionName(regionCode),
+      province: '',
+      provinceCode: '',
+      municipality: '',
+      municipalityCode: '',
+      barangay: '',
+    }))
+  }
+
+  function selectProvince(provinceName: string) {
+    const province = allowedProvinces.find((item) => item.name === provinceName)
+    setForm((prev) => ({
+      ...prev,
+      provinceCode: province?.code ?? '',
+      province: province?.name ?? '',
+      municipality: '',
+      municipalityCode: '',
+      barangay: '',
+    }))
+  }
+
+  function selectMunicipality(municipalityLabel: string) {
+    const municipality = municipalityOptions.find((item) => getLocalityLabel(item) === municipalityLabel)
+    setForm((prev) => ({
+      ...prev,
+      municipalityCode: municipality?.code ?? '',
+      municipality: municipality?.name ?? '',
+      barangay: '',
+    }))
   }
 
   function next() {
@@ -153,29 +213,55 @@ export default function RegisterPage() {
                   <CardDescription className="text-slate-400">Your current residential address.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
+                    <p className="text-xs font-semibold text-blue-200">Buyer geography lock</p>
+                    <p className="mt-1 text-xs text-blue-100/80">
+                      Demo scope is open to all Philippines regions, provinces, and cities/municipalities for testing.
+                      Source: {PSGC_VERSION_LABEL}.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <Label className="text-slate-300">Region *</Label>
+                      {allowedRegions.length <= 1 ? (
+                        <div className="rounded-md border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-white">
+                          {allowedRegions[0]?.name ?? 'No region configured'}
+                        </div>
+                      ) : (
+                        <Select value={getRegionName(selectedRegionCode)} onValueChange={(value) => { if (value) selectRegion(allowedRegions.find((region) => region.name === value)?.code ?? '') }}>
+                          <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                            <SelectValue placeholder="Select region" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-slate-800 border-slate-600">
+                            {allowedRegions.map((region) => (
+                              <SelectItem key={region.code} value={region.name} className="text-white hover:bg-slate-700">{region.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      )}
+                    </div>
                     <div className="space-y-1.5">
-                      <Label className="text-slate-300">Province *</Label>
-                      <Select value={form.province} onValueChange={(v) => { if (v) update('province', v) }}>
+                      <Label className="text-slate-300">Province / Area *</Label>
+                      <Select value={form.province} onValueChange={(value) => { if (value) selectProvince(value) }} disabled={allowedProvinces.length === 0}>
                         <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-                          <SelectValue placeholder="Select province" />
+                          <SelectValue placeholder={allowedProvinces.length === 0 ? 'Not applicable' : 'Select province'} />
                         </SelectTrigger>
                         <SelectContent className="bg-slate-800 border-slate-600">
-                          {PROVINCES.map((p) => (
-                            <SelectItem key={p} value={p} className="text-white hover:bg-slate-700">{p}</SelectItem>
+                          {allowedProvinces.map((province) => (
+                            <SelectItem key={province.code} value={province.name} className="text-white hover:bg-slate-700">{province.name}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label className="text-slate-300">Municipality *</Label>
-                      <Select value={form.municipality} onValueChange={(v) => { if (v) update('municipality', v) }}>
+                      <Label className="text-slate-300">City / Municipality *</Label>
+                      <Select value={selectedMunicipalityLabel} onValueChange={(value) => { if (value) selectMunicipality(value) }} disabled={municipalityOptions.length === 0}>
                         <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-                          <SelectValue placeholder="Select municipality" />
+                          <SelectValue placeholder={form.provinceCode || metroLocalities.length > 0 ? 'Select city/municipality' : 'Select province first'} />
                         </SelectTrigger>
                         <SelectContent className="bg-slate-800 border-slate-600">
-                          {MUNICIPALITIES.map((m) => (
-                            <SelectItem key={m} value={m} className="text-white hover:bg-slate-700">{m}</SelectItem>
+                          {municipalityOptions.map((municipality) => (
+                            <SelectItem key={municipality.code} value={getLocalityLabel(municipality)} className="text-white hover:bg-slate-700">{getLocalityLabel(municipality)}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -183,9 +269,9 @@ export default function RegisterPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-slate-300">Barangay *</Label>
-                    <Select value={form.barangay} onValueChange={(v) => { if (v) update('barangay', v) }}>
+                    <Select value={form.barangay} onValueChange={(v) => { if (v) update('barangay', v) }} disabled={!form.municipalityCode}>
                       <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-                        <SelectValue placeholder="Select barangay" />
+                        <SelectValue placeholder={form.municipalityCode ? 'Select barangay' : 'Select city/municipality first'} />
                       </SelectTrigger>
                       <SelectContent className="bg-slate-800 border-slate-600">
                         {DEMO_BARANGAYS.map((b) => (
@@ -193,6 +279,7 @@ export default function RegisterPage() {
                         ))}
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-slate-500">Barangays are still demo records; production should query PSGC barangays by selected city/municipality.</p>
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-slate-300">Full Street Address *</Label>
@@ -254,7 +341,7 @@ export default function RegisterPage() {
                     <div className="w-8 h-8 rounded-full bg-blue-600/20 border border-blue-500/30 flex items-center justify-center text-blue-400 text-sm font-bold">4</div>
                     <CardTitle className="text-white">Emergency Contact</CardTitle>
                   </div>
-                  <CardDescription className="text-slate-400">Who should we contact if you're incapacitated?</CardDescription>
+                  <CardDescription className="text-slate-400">Who should we contact if you&apos;re incapacitated?</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="space-y-1.5">
