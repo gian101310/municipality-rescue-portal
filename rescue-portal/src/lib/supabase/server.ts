@@ -1,4 +1,5 @@
 import { createServerClient } from '@supabase/ssr'
+import { createClient as createJsClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import type { Database } from './database.types'
 
@@ -42,13 +43,13 @@ export async function createClient() {
 }
 
 /**
- * Creates a Supabase server client with the service role key, bypassing RLS.
+ * Creates a Supabase admin client with the service role key, bypassing RLS.
+ * Uses @supabase/supabase-js directly (NOT @supabase/ssr) so the service role
+ * is never overridden by cookie-based user JWTs.
  * Only use server-side in trusted contexts (admin actions, migrations, webhooks).
  * NEVER expose the service role key to the browser.
  */
 export async function createAdminClient() {
-  const cookieStore = await cookies()
-
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
 
@@ -58,21 +59,7 @@ export async function createAdminClient() {
     )
   }
 
-  return createServerClient<Database>(supabaseUrl, serviceRoleKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll()
-      },
-      setAll(cookiesToSet) {
-        try {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            cookieStore.set(name, value, options)
-          })
-        } catch {
-          // Same as above — expected in Server Components
-        }
-      },
-    },
+  return createJsClient<Database>(supabaseUrl, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
