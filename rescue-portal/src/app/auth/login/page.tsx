@@ -12,52 +12,14 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Separator } from '@/components/ui/separator'
-import { DemoBanner } from '@/components/demo-banner'
 import { toast } from 'sonner'
-
-const isDemoMode = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_DEMO_MODE) === 'true'
+import { createClient } from '@/lib/supabase/client'
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
   password: z.string().min(6, 'Password must be at least 6 characters'),
 })
 type LoginForm = z.infer<typeof loginSchema>
-
-const DEMO_ACCOUNTS = [
-  {
-    label: 'Super Admin',
-    email: 'admin@rescueportal.ph',
-    role: 'super_admin',
-    color: 'bg-red-900/30 border-red-700/50 hover:bg-red-900/50',
-    badge: 'bg-red-600',
-    redirect: '/admin',
-  },
-  {
-    label: 'Dispatcher',
-    email: 'dispatcher@rescueportal.ph',
-    role: 'dispatcher',
-    color: 'bg-amber-900/30 border-amber-700/50 hover:bg-amber-900/50',
-    badge: 'bg-amber-600',
-    redirect: '/admin',
-  },
-  {
-    label: 'Team Leader',
-    email: 'teamlead@rescueportal.ph',
-    role: 'team_leader',
-    color: 'bg-blue-900/30 border-blue-700/50 hover:bg-blue-900/50',
-    badge: 'bg-blue-600',
-    redirect: '/admin',
-  },
-  {
-    label: 'Resident',
-    email: 'resident@rescueportal.ph',
-    role: 'resident',
-    color: 'bg-green-900/30 border-green-700/50 hover:bg-green-900/50',
-    badge: 'bg-green-600',
-    redirect: '/resident',
-  },
-]
 
 export default function LoginPage() {
   return (
@@ -82,41 +44,54 @@ function LoginContent() {
   async function onSubmit(data: LoginForm) {
     setLoading(true)
     try {
-      // In demo mode: simulate login
-      if (isDemoMode) {
-        const account = DEMO_ACCOUNTS.find((a) => a.email === data.email)
-        if (account) {
-          sessionStorage.setItem('demo_role', account.role)
-          sessionStorage.setItem('demo_email', account.email)
-          toast.success(`Signed in as ${account.label}`)
-          router.push(account.redirect)
-          return
-        }
-        // Default based on tab
-        const role = activeTab === 'resident' ? 'resident' : 'dispatcher'
-        sessionStorage.setItem('demo_role', role)
-        sessionStorage.setItem('demo_email', data.email)
-        toast.success('Demo login successful')
-        router.push(activeTab === 'resident' ? '/resident' : '/admin')
+      const supabase = createClient()
+
+      // Sign in with Supabase
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password,
+      })
+
+      if (authError) {
+        toast.error(authError.message)
         return
       }
-      // Real Supabase auth would go here
-      toast.error('Supabase not configured. Enable demo mode.')
+
+      if (!authData.user) {
+        toast.error('Login failed. Please try again.')
+        return
+      }
+
+      // Fetch profile to determine role
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, platform_role')
+        .eq('id', authData.user.id)
+        .single() as { data: { role: string; platform_role: string } | null }
+
+      const platformRole = profile?.platform_role
+      const userRole = profile?.role
+
+      // Route based on role
+      if (platformRole === 'super_admin') {
+        toast.success('Welcome back, Boss!')
+        router.push('/super-admin')
+      } else if (userRole === 'admin' || platformRole === 'tenant_admin') {
+        toast.success('Signed in as Admin')
+        router.push('/admin')
+      } else {
+        toast.success('Signed in successfully')
+        router.push('/resident')
+      }
+    } catch {
+      toast.error('An unexpected error occurred')
     } finally {
       setLoading(false)
     }
   }
 
-  function handleDemoLogin(account: (typeof DEMO_ACCOUNTS)[number]) {
-    sessionStorage.setItem('demo_role', account.role)
-    sessionStorage.setItem('demo_email', account.email)
-    toast.success(`Signed in as ${account.label}`)
-    router.push(account.redirect)
-  }
-
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col">
-      <DemoBanner />
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="w-full max-w-md">
           {/* Back */}
@@ -153,7 +128,7 @@ function LoginContent() {
                   <Input
                     id="email"
                     type="email"
-                    placeholder={activeTab === 'resident' ? 'resident@email.com' : 'admin@rescueportal.ph'}
+                    placeholder={activeTab === 'resident' ? 'your@email.com' : 'admin@municipality.gov.ph'}
                     className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
                     {...register('email')}
                   />
@@ -203,31 +178,6 @@ function LoginContent() {
                     Register here
                   </Link>
                 </p>
-              )}
-
-              {isDemoMode && (
-                <>
-                  <div className="flex items-center gap-3">
-                    <Separator className="flex-1 bg-slate-700" />
-                    <span className="text-xs text-slate-500">Demo Accounts</span>
-                    <Separator className="flex-1 bg-slate-700" />
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {DEMO_ACCOUNTS.map((account) => (
-                      <button
-                        key={account.email}
-                        onClick={() => handleDemoLogin(account)}
-                        className={`text-left p-3 rounded-lg border text-xs transition-colors ${account.color}`}
-                      >
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className={`w-2 h-2 rounded-full ${account.badge}`} />
-                          <span className="font-semibold text-white">{account.label}</span>
-                        </div>
-                        <p className="text-slate-400 truncate">{account.email}</p>
-                      </button>
-                    ))}
-                  </div>
-                </>
               )}
             </CardContent>
           </Card>

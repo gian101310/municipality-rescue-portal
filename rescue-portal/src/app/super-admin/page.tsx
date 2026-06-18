@@ -1,21 +1,22 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import {
-  Shield, Building2, MapPin, Users, Plus, Search, MoreVertical,
-  Lock, Unlock, Eye, Trash2, CheckCircle2, XCircle, Clock, AlertTriangle
+  Shield, Building2, Users, Plus, Search,
+  Lock, Eye, CheckCircle2, XCircle, Clock, LogOut, Loader2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import { toast } from 'sonner'
 import Link from 'next/link'
+import { createClient } from '@/lib/supabase/client'
 
 type TenantPlan = 'starter' | 'professional' | 'enterprise' | 'one_time'
 type TenantStatus = 'trial' | 'active' | 'suspended' | 'cancelled'
 
-interface DemoTenant {
+interface Tenant {
   id: string
   name: string
   slug: string
@@ -25,75 +26,8 @@ interface DemoTenant {
   plan: TenantPlan
   status: TenantStatus
   contact_email: string
-  incidents_count: number
-  users_count: number
-  admins_count: number
   created_at: string
 }
-
-// Demo tenants for UI — will be replaced with Supabase queries
-const DEMO_TENANTS: DemoTenant[] = [
-  {
-    id: '1',
-    name: 'Municipality of Bayani',
-    slug: 'bayani',
-    province: 'Laguna',
-    region: 'CALABARZON',
-    municipality: 'Bayani',
-    plan: 'professional' as const,
-    status: 'active' as const,
-    contact_email: 'mdrrmo@bayani.gov.ph',
-    incidents_count: 47,
-    users_count: 1240,
-    admins_count: 5,
-    created_at: '2026-05-15',
-  },
-  {
-    id: '2',
-    name: 'Municipality of San Rafael',
-    slug: 'san-rafael',
-    province: 'Bulacan',
-    region: 'Central Luzon',
-    municipality: 'San Rafael',
-    plan: 'enterprise' as const,
-    status: 'active' as const,
-    contact_email: 'rescue@sanrafael.gov.ph',
-    incidents_count: 89,
-    users_count: 3400,
-    admins_count: 12,
-    created_at: '2026-04-20',
-  },
-  {
-    id: '3',
-    name: 'Municipality of Rosario',
-    slug: 'rosario',
-    province: 'Batangas',
-    region: 'CALABARZON',
-    municipality: 'Rosario',
-    plan: 'starter' as const,
-    status: 'trial' as const,
-    contact_email: 'drrm@rosario.gov.ph',
-    incidents_count: 12,
-    users_count: 320,
-    admins_count: 2,
-    created_at: '2026-06-10',
-  },
-  {
-    id: '4',
-    name: 'Municipality of Consolacion',
-    slug: 'consolacion',
-    province: 'Cebu',
-    region: 'Central Visayas',
-    municipality: 'Consolacion',
-    plan: 'professional' as const,
-    status: 'suspended' as const,
-    contact_email: 'mdrrmo@consolacion.gov.ph',
-    incidents_count: 31,
-    users_count: 890,
-    admins_count: 4,
-    created_at: '2026-03-01',
-  },
-]
 
 const statusConfig = {
   trial: { label: 'Trial', color: 'bg-blue-500/10 text-blue-400 border-blue-500/20', icon: Clock },
@@ -110,8 +44,75 @@ const planColors = {
 }
 
 export default function SuperAdminPage() {
+  const router = useRouter()
+  const [loading, setLoading] = useState(true)
+  const [authorized, setAuthorized] = useState(false)
+  const [userName, setUserName] = useState('')
   const [search, setSearch] = useState('')
-  const [tenants] = useState(DEMO_TENANTS)
+  const [tenants, setTenants] = useState<Tenant[]>([])
+
+  useEffect(() => {
+    checkAuth()
+  }, [])
+
+  async function checkAuth() {
+    const supabase = createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (!user) {
+      toast.error('Please sign in first')
+      router.push('/auth/login')
+      return
+    }
+
+    // Check if super_admin
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('platform_role, full_name')
+      .eq('id', user.id)
+      .single() as { data: { platform_role: string; full_name: string } | null }
+
+    if (profile?.platform_role !== 'super_admin') {
+      toast.error('Access denied. Super Admin only.')
+      router.push('/')
+      return
+    }
+
+    setUserName(profile.full_name || user.email || 'Admin')
+    setAuthorized(true)
+
+    // Load tenants
+    const { data: tenantsData } = await supabase
+      .from('tenants')
+      .select('*')
+      .order('created_at', { ascending: false })
+
+    if (tenantsData) {
+      setTenants(tenantsData as Tenant[])
+    }
+
+    setLoading(false)
+  }
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    toast.success('Signed out')
+    router.push('/')
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-center space-y-3">
+          <Loader2 className="w-8 h-8 text-amber-400 animate-spin mx-auto" />
+          <p className="text-slate-400 text-sm">Verifying super admin access...</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!authorized) return null
 
   const filtered = tenants.filter((t) =>
     t.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -124,8 +125,6 @@ export default function SuperAdminPage() {
     active: tenants.filter((t) => t.status === 'active').length,
     trial: tenants.filter((t) => t.status === 'trial').length,
     suspended: tenants.filter((t) => t.status === 'suspended').length,
-    totalUsers: tenants.reduce((s, t) => s + t.users_count, 0),
-    totalIncidents: tenants.reduce((s, t) => s + t.incidents_count, 0),
   }
 
   return (
@@ -139,7 +138,7 @@ export default function SuperAdminPage() {
             </div>
             <div>
               <h1 className="text-lg font-bold text-white">Platform Admin</h1>
-              <p className="text-xs text-slate-500">RescuePortal Super Administrator</p>
+              <p className="text-xs text-slate-500">Welcome, {userName}</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
@@ -149,20 +148,21 @@ export default function SuperAdminPage() {
             <Button className="bg-amber-600 hover:bg-amber-700 text-white">
               <Plus className="w-4 h-4 mr-1" /> Add Tenant
             </Button>
+            <Button variant="ghost" className="text-slate-400 hover:text-white" onClick={handleSignOut}>
+              <LogOut className="w-4 h-4 mr-1" /> Sign Out
+            </Button>
           </div>
         </div>
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-6 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
             { label: 'Total Tenants', value: stats.total, color: 'text-white' },
             { label: 'Active', value: stats.active, color: 'text-green-400' },
             { label: 'On Trial', value: stats.trial, color: 'text-blue-400' },
             { label: 'Suspended', value: stats.suspended, color: 'text-red-400' },
-            { label: 'Total Users', value: stats.totalUsers.toLocaleString(), color: 'text-purple-400' },
-            { label: 'Total Incidents', value: stats.totalIncidents, color: 'text-amber-400' },
           ].map(({ label, value, color }) => (
             <Card key={label} className="bg-slate-900 border-slate-800">
               <CardContent className="p-4 text-center">
@@ -196,9 +196,6 @@ export default function SuperAdminPage() {
                   <th className="px-4 py-3 text-slate-400 font-medium">Province Lock</th>
                   <th className="px-4 py-3 text-slate-400 font-medium">Plan</th>
                   <th className="px-4 py-3 text-slate-400 font-medium">Status</th>
-                  <th className="px-4 py-3 text-slate-400 font-medium text-center">Users</th>
-                  <th className="px-4 py-3 text-slate-400 font-medium text-center">Incidents</th>
-                  <th className="px-4 py-3 text-slate-400 font-medium text-center">Admins</th>
                   <th className="px-4 py-3 text-slate-400 font-medium">Actions</th>
                 </tr>
               </thead>
@@ -239,9 +236,6 @@ export default function SuperAdminPage() {
                           {st.label}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-center text-white font-medium">{tenant.users_count.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-center text-white font-medium">{tenant.incidents_count}</td>
-                      <td className="px-4 py-3 text-center text-white font-medium">{tenant.admins_count}</td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
                           <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white h-8 w-8 p-0" onClick={() => toast.info(`Viewing ${tenant.name}`)}>
@@ -263,7 +257,9 @@ export default function SuperAdminPage() {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={8} className="text-center py-10 text-slate-500">No tenants found</td>
+                    <td colSpan={5} className="text-center py-10 text-slate-500">
+                      {tenants.length === 0 ? 'No tenants yet. Add your first municipality!' : 'No tenants found'}
+                    </td>
                   </tr>
                 )}
               </tbody>
@@ -279,9 +275,8 @@ export default function SuperAdminPage() {
               <p className="text-amber-300 font-semibold text-sm">Province Lock Security</p>
               <p className="text-amber-400/70 text-xs mt-1 leading-relaxed">
                 Province and municipality assignments are protected by a database-level trigger.
-                Only super administrators (you) can modify these fields. Tenant admins cannot change
-                their location lock, even with direct API access. This ensures each municipality
-                stays within its registered coverage area.
+                Only you (super admin) can modify these fields. Tenant admins cannot change
+                their location lock, even with direct API access.
               </p>
             </div>
           </CardContent>
