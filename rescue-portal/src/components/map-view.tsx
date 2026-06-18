@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { SeverityLevel } from '@/lib/types'
 import { getSeverityHexColor } from '@/lib/utils'
 
@@ -24,83 +24,6 @@ interface MapViewProps {
   height?: string
 }
 
-function latLngToCanvas(
-  lat: number,
-  lng: number,
-  centerLat: number,
-  centerLng: number,
-  zoom: number,
-  width: number,
-  height: number
-): { x: number; y: number } {
-  const scale = Math.pow(2, zoom) * 80
-  const x = (lng - centerLng) * scale + width / 2
-  const y = -(lat - centerLat) * scale + height / 2
-  return { x, y }
-}
-
-function drawGrid(
-  ctx: CanvasRenderingContext2D,
-  width: number,
-  height: number,
-  centerLat: number,
-  centerLng: number,
-  zoom: number
-) {
-  ctx.strokeStyle = 'rgba(51, 65, 85, 0.6)'
-  ctx.lineWidth = 0.5
-
-  const step = 0.005
-  const latRange = 0.08
-  const lngRange = 0.12
-
-  for (let lat = centerLat - latRange; lat <= centerLat + latRange; lat += step) {
-    const start = latLngToCanvas(lat, centerLng - lngRange, centerLat, centerLng, zoom, width, height)
-    const end = latLngToCanvas(lat, centerLng + lngRange, centerLat, centerLng, zoom, width, height)
-    ctx.beginPath()
-    ctx.moveTo(start.x, start.y)
-    ctx.lineTo(end.x, end.y)
-    ctx.stroke()
-  }
-  for (let lng = centerLng - lngRange; lng <= centerLng + lngRange; lng += step) {
-    const start = latLngToCanvas(centerLat - latRange, lng, centerLat, centerLng, zoom, width, height)
-    const end = latLngToCanvas(centerLat + latRange, lng, centerLat, centerLng, zoom, width, height)
-    ctx.beginPath()
-    ctx.moveTo(start.x, start.y)
-    ctx.lineTo(end.x, end.y)
-    ctx.stroke()
-  }
-}
-
-function drawRoads(
-  ctx: CanvasRenderingContext2D,
-  centerLat: number,
-  centerLng: number,
-  zoom: number,
-  width: number,
-  height: number
-) {
-  const roads = [
-    [[14.170, 121.236], [14.158, 121.248]],
-    [[14.165, 121.240], [14.160, 121.246]],
-    [[14.163, 121.241], [14.163, 121.249]],
-    [[14.168, 121.238], [14.155, 121.238]],
-  ]
-
-  ctx.strokeStyle = 'rgba(71, 85, 105, 0.8)'
-  ctx.lineWidth = 1.5
-
-  for (const road of roads) {
-    ctx.beginPath()
-    road.forEach(([lat, lng], i) => {
-      const { x, y } = latLngToCanvas(lat, lng, centerLat, centerLng, zoom, width, height)
-      if (i === 0) ctx.moveTo(x, y)
-      else ctx.lineTo(x, y)
-    })
-    ctx.stroke()
-  }
-}
-
 export function MapView({
   center,
   zoom = 13,
@@ -110,156 +33,234 @@ export function MapView({
   className = '',
   height = '400px',
 }: MapViewProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  const animFrameRef = useRef<number>(0)
-  const pulseRef = useRef(0)
+  const mapContainerRef = useRef<HTMLDivElement>(null)
+  const mapRef = useRef<L.Map | null>(null)
+  const markersRef = useRef<L.CircleMarker[]>([])
+  const [leafletLoaded, setLeafletLoaded] = useState(false)
+  const LRef = useRef<typeof import('leaflet') | null>(null)
 
+  // Dynamically import Leaflet (SSR-safe)
   useEffect(() => {
-    const canvas = canvasRef.current
-    if (!canvas) return
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return
-
-    const dpr = window.devicePixelRatio || 1
-    const rect = canvas.getBoundingClientRect()
-    canvas.width = rect.width * dpr
-    canvas.height = rect.height * dpr
-    ctx.scale(dpr, dpr)
-    const W = rect.width
-    const H = rect.height
-
-    function draw(tick: number) {
-      if (!ctx || !canvas) return
-      ctx.clearRect(0, 0, W, H)
-
-      // Background
-      ctx.fillStyle = '#0f172a'
-      ctx.fillRect(0, 0, W, H)
-
-      drawGrid(ctx, W, H, center.lat, center.lng, zoom)
-      drawRoads(ctx, center.lat, center.lng, zoom, W, H)
-
-      // Center cross
-      const c = latLngToCanvas(center.lat, center.lng, center.lat, center.lng, zoom, W, H)
-      ctx.strokeStyle = 'rgba(148,163,184,0.3)'
-      ctx.lineWidth = 1
-      ctx.beginPath()
-      ctx.moveTo(c.x - 8, c.y)
-      ctx.lineTo(c.x + 8, c.y)
-      ctx.moveTo(c.x, c.y - 8)
-      ctx.lineTo(c.x, c.y + 8)
-      ctx.stroke()
-
-      // Markers
-      for (const marker of markers) {
-        const { x, y } = latLngToCanvas(marker.lat, marker.lng, center.lat, center.lng, zoom, W, H)
-        if (x < -20 || x > W + 20 || y < -20 || y > H + 20) continue
-
-        const color = marker.color || (marker.severity ? getSeverityHexColor(marker.severity) : '#3b82f6')
-        const isSelected = marker.id === selectedMarkerId
-
-        // Pulse ring for active/critical
-        if (marker.pulse || isSelected) {
-          const pulse = (Math.sin(tick * 0.04) + 1) / 2
-          const radius = 12 + pulse * 10
-          ctx.beginPath()
-          ctx.arc(x, y, radius, 0, Math.PI * 2)
-          ctx.fillStyle = color + '30'
-          ctx.fill()
-        }
-
-        // Outer ring
-        ctx.beginPath()
-        ctx.arc(x, y, isSelected ? 12 : 10, 0, Math.PI * 2)
-        ctx.fillStyle = color + '40'
-        ctx.fill()
-
-        // Main dot
-        ctx.beginPath()
-        ctx.arc(x, y, isSelected ? 8 : 7, 0, Math.PI * 2)
-        ctx.fillStyle = color
-        ctx.fill()
-
-        // White center
-        ctx.beginPath()
-        ctx.arc(x, y, 3, 0, Math.PI * 2)
-        ctx.fillStyle = 'white'
-        ctx.fill()
-
-        // Label
-        if (marker.label && (isSelected || zoom > 12)) {
-          ctx.font = '10px Inter, sans-serif'
-          ctx.fillStyle = 'white'
-          ctx.textAlign = 'center'
-          const textX = x
-          const textY = y - 14
-          const textWidth = ctx.measureText(marker.label).width
-          ctx.fillStyle = 'rgba(0,0,0,0.7)'
-          ctx.fillRect(textX - textWidth / 2 - 3, textY - 10, textWidth + 6, 14)
-          ctx.fillStyle = 'white'
-          ctx.fillText(marker.label, textX, textY)
-        }
-      }
-
-      pulseRef.current = tick + 1
-      animFrameRef.current = requestAnimationFrame(() => draw(pulseRef.current))
-    }
-
-    draw(0)
-
-    function handleClick(e: MouseEvent) {
-      if (!onMarkerClick || !canvas) return
-      const rect = canvas.getBoundingClientRect()
-      const mx = e.clientX - rect.left
-      const my = e.clientY - rect.top
-      const W2 = rect.width
-      const H2 = rect.height
-
-      for (const marker of markers) {
-        const { x, y } = latLngToCanvas(marker.lat, marker.lng, center.lat, center.lng, zoom, W2, H2)
-        const dist = Math.hypot(mx - x, my - y)
-        if (dist < 14) {
-          onMarkerClick(marker.id)
-          break
-        }
+    let cancelled = false
+    async function loadLeaflet() {
+      const L = await import('leaflet')
+      if (!cancelled) {
+        LRef.current = L
+        setLeafletLoaded(true)
       }
     }
+    loadLeaflet()
+    return () => { cancelled = true }
+  }, [])
 
-    canvas.addEventListener('click', handleClick)
+  // Initialize map
+  useEffect(() => {
+    if (!leafletLoaded || !mapContainerRef.current || mapRef.current) return
+    const L = LRef.current!
+
+    const map = L.map(mapContainerRef.current, {
+      center: [center.lat, center.lng],
+      zoom,
+      zoomControl: true,
+      attributionControl: true,
+    })
+
+    // Dark tile layer
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a> &copy; <a href="https://carto.com/">CARTO</a>',
+      subdomains: 'abcd',
+      maxZoom: 19,
+    }).addTo(map)
+
+    mapRef.current = map
+
+    // Fix Leaflet icon issue in Next.js
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    delete (L.Icon.Default.prototype as any)._getIconUrl
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon-2x.png',
+      iconUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-icon.png',
+      shadowUrl: 'https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/images/marker-shadow.png',
+    })
 
     return () => {
-      cancelAnimationFrame(animFrameRef.current)
-      canvas.removeEventListener('click', handleClick)
+      map.remove()
+      mapRef.current = null
     }
-  }, [center, zoom, markers, selectedMarkerId, onMarkerClick])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leafletLoaded])
+
+  // Update center/zoom
+  useEffect(() => {
+    if (!mapRef.current) return
+    mapRef.current.setView([center.lat, center.lng], zoom, { animate: true })
+  }, [center.lat, center.lng, zoom])
+
+  // Update markers
+  useEffect(() => {
+    if (!mapRef.current || !LRef.current) return
+    const L = LRef.current
+    const map = mapRef.current
+
+    // Clear existing markers
+    markersRef.current.forEach((m) => map.removeLayer(m))
+    markersRef.current = []
+
+    markers.forEach((marker) => {
+      const color = marker.color || (marker.severity ? getSeverityHexColor(marker.severity) : '#3b82f6')
+      const isSelected = marker.id === selectedMarkerId
+      const radius = isSelected ? 12 : 9
+
+      // Pulse ring for selected/critical
+      if (isSelected || marker.severity === 'critical') {
+        const pulseRing = L.circleMarker([marker.lat, marker.lng], {
+          radius: radius + 8,
+          color: color,
+          fillColor: color,
+          fillOpacity: 0.15,
+          weight: 2,
+          opacity: 0.4,
+          className: 'pulse-marker',
+        }).addTo(map)
+        markersRef.current.push(pulseRing)
+      }
+
+      // Main marker
+      const circleMarker = L.circleMarker([marker.lat, marker.lng], {
+        radius,
+        color: isSelected ? '#ffffff' : color,
+        fillColor: color,
+        fillOpacity: 0.9,
+        weight: isSelected ? 3 : 2,
+        opacity: 1,
+      }).addTo(map)
+
+      // Popup
+      if (marker.label) {
+        const severityLabel = marker.severity
+          ? `<span style="color:${color};font-weight:600;text-transform:uppercase;">${marker.severity}</span>`
+          : ''
+        circleMarker.bindPopup(
+          `<div style="font-family:system-ui;min-width:140px;">
+            <div style="font-weight:700;font-size:13px;margin-bottom:4px;">${marker.label}</div>
+            ${severityLabel}
+            <div style="font-size:11px;color:#94a3b8;margin-top:2px;">
+              ${marker.lat.toFixed(4)}, ${marker.lng.toFixed(4)}
+            </div>
+          </div>`,
+          {
+            className: 'dark-popup',
+            closeButton: true,
+          }
+        )
+      }
+
+      // Tooltip (always visible for selected)
+      if (marker.label) {
+        circleMarker.bindTooltip(marker.label, {
+          permanent: isSelected,
+          direction: 'top',
+          offset: [0, -radius - 4],
+          className: 'dark-tooltip',
+        })
+      }
+
+      circleMarker.on('click', () => {
+        onMarkerClick?.(marker.id)
+      })
+
+      markersRef.current.push(circleMarker)
+    })
+  }, [markers, selectedMarkerId, onMarkerClick])
+
+  // Pan to selected marker
+  useEffect(() => {
+    if (!mapRef.current || !selectedMarkerId) return
+    const marker = markers.find((m) => m.id === selectedMarkerId)
+    if (marker) {
+      mapRef.current.panTo([marker.lat, marker.lng], { animate: true })
+    }
+  }, [selectedMarkerId, markers])
 
   return (
-    <div
-      className={`relative rounded-lg overflow-hidden border border-slate-700 ${className}`}
-      style={{ height }}
-    >
-      <canvas
-        ref={canvasRef}
-        className="w-full h-full cursor-crosshair"
-        style={{ display: 'block' }}
+    <div className={`relative rounded-lg overflow-hidden border border-slate-700 ${className}`} style={{ height }}>
+      {/* Leaflet CSS */}
+      <link
+        rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"
+        crossOrigin=""
       />
-      <div className="absolute top-2 right-2 bg-slate-900/80 rounded px-2 py-1 text-xs text-slate-400">
-        Demo Map
-      </div>
-      <div className="absolute bottom-2 left-2 flex flex-col gap-1">
-        {markers.filter((m) => m.label).slice(0, 3).map((m) => (
-          <div
-            key={m.id}
-            className="flex items-center gap-1.5 bg-slate-900/80 rounded px-1.5 py-0.5 cursor-pointer hover:bg-slate-800"
-            onClick={() => onMarkerClick?.(m.id)}
-          >
-            <span
-              className="w-2.5 h-2.5 rounded-full"
-              style={{ background: m.color || '#3b82f6' }}
-            />
-            <span className="text-xs text-slate-300">{m.label}</span>
+      <style>{`
+        .dark-popup .leaflet-popup-content-wrapper {
+          background: #1e293b;
+          color: #e2e8f0;
+          border-radius: 8px;
+          border: 1px solid #334155;
+          box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+        .dark-popup .leaflet-popup-tip {
+          background: #1e293b;
+          border: 1px solid #334155;
+        }
+        .dark-popup .leaflet-popup-close-button {
+          color: #94a3b8 !important;
+        }
+        .dark-tooltip {
+          background: #0f172a !important;
+          color: #e2e8f0 !important;
+          border: 1px solid #334155 !important;
+          border-radius: 4px !important;
+          font-size: 11px !important;
+          font-weight: 600 !important;
+          padding: 2px 6px !important;
+          box-shadow: 0 2px 8px rgba(0,0,0,0.4) !important;
+        }
+        .dark-tooltip::before {
+          border-top-color: #334155 !important;
+        }
+        .pulse-marker {
+          animation: pulse-ring 2s ease-out infinite;
+        }
+        @keyframes pulse-ring {
+          0% { opacity: 0.6; }
+          50% { opacity: 0.2; }
+          100% { opacity: 0.6; }
+        }
+        .leaflet-control-zoom a {
+          background: #1e293b !important;
+          color: #e2e8f0 !important;
+          border-color: #334155 !important;
+        }
+        .leaflet-control-zoom a:hover {
+          background: #334155 !important;
+        }
+        .leaflet-control-attribution {
+          background: rgba(15,23,42,0.8) !important;
+          color: #64748b !important;
+          font-size: 10px !important;
+        }
+        .leaflet-control-attribution a {
+          color: #94a3b8 !important;
+        }
+      `}</style>
+
+      {/* Map container */}
+      <div ref={mapContainerRef} className="w-full h-full" style={{ background: '#0f172a' }} />
+
+      {/* Loading state */}
+      {!leafletLoaded && (
+        <div className="absolute inset-0 flex items-center justify-center bg-slate-900">
+          <div className="flex flex-col items-center gap-2">
+            <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+            <span className="text-xs text-slate-400">Loading map...</span>
           </div>
-        ))}
+        </div>
+      )}
+
+      {/* Live badge */}
+      <div className="absolute top-2 right-2 bg-slate-900/80 backdrop-blur rounded px-2 py-1 text-xs text-green-400 flex items-center gap-1.5 z-[1000]">
+        <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+        LIVE
       </div>
     </div>
   )
