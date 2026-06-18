@@ -30,6 +30,7 @@ export interface TenantGeographyScope {
 }
 
 export const PSGC_VERSION_LABEL = geographyData.versionLabel
+export const COVERAGE_LOCK_STORAGE_KEY = 'rescue-portal.coverage-lock'
 export const PH_REGIONS = geographyData.regions as RegionOption[]
 export const PH_PROVINCES = geographyData.provinces as ProvinceOption[]
 export const PH_LOCALITIES = geographyData.localities as LocalityOption[]

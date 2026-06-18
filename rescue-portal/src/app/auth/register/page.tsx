@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, Check, Shield, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,16 +13,17 @@ import { Progress } from '@/components/ui/progress'
 import { DemoBanner } from '@/components/demo-banner'
 import { DEMO_BARANGAYS } from '@/lib/demo-data'
 import {
+  COVERAGE_LOCK_STORAGE_KEY,
   DEMO_TENANT_GEO_SCOPE,
   getLocalitiesForProvince,
   getLocalitiesForRegionWithoutProvince,
   getLocalityLabel,
-  getProvinceName,
   getRegionName,
   getScopedProvinces,
   getScopedRegions,
   PSGC_VERSION_LABEL,
 } from '@/lib/philippines-geography'
+import type { TenantGeographyScope } from '@/lib/philippines-geography'
 import { generateDemoReferenceNumber } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -69,6 +70,8 @@ export default function RegisterPage() {
   const [step, setStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
   const [refNumber, setRefNumber] = useState('')
+  const [geoScope, setGeoScope] = useState<TenantGeographyScope>(DEMO_TENANT_GEO_SCOPE)
+  const [geoScopePersistence, setGeoScopePersistence] = useState<'checking' | 'supabase' | 'demo'>('checking')
   const [form, setForm] = useState<FormData>({
     full_name: '', phone: '', email: '', date_of_birth: '',
     region: '', regionCode: '', province: '', provinceCode: '',
@@ -78,19 +81,71 @@ export default function RegisterPage() {
     privacy_agree: false, false_alert_agree: false,
   })
 
-  const allowedRegions = getScopedRegions(DEMO_TENANT_GEO_SCOPE)
+  const allowedRegions = getScopedRegions(geoScope)
   const selectedRegionCode = form.regionCode || (allowedRegions.length === 1 ? allowedRegions[0].code : '')
-  const allowedProvinces = getScopedProvinces(DEMO_TENANT_GEO_SCOPE)
+  const allowedProvinces = getScopedProvinces(geoScope)
     .filter((province) => !selectedRegionCode || province.regionCode === selectedRegionCode)
   const provinceLocalities = form.provinceCode
-    ? getLocalitiesForProvince(form.provinceCode, DEMO_TENANT_GEO_SCOPE)
+    ? getLocalitiesForProvince(form.provinceCode, geoScope)
     : []
   const metroLocalities = selectedRegionCode && allowedProvinces.length === 0
-    ? getLocalitiesForRegionWithoutProvince(selectedRegionCode, DEMO_TENANT_GEO_SCOPE)
+    ? getLocalitiesForRegionWithoutProvince(selectedRegionCode, geoScope)
     : []
   const municipalityOptions = provinceLocalities.length > 0 ? provinceLocalities : metroLocalities
   const selectedMunicipality = municipalityOptions.find((item) => item.code === form.municipalityCode)
   const selectedMunicipalityLabel = selectedMunicipality ? getLocalityLabel(selectedMunicipality) : ''
+
+  useEffect(() => {
+    let cancelled = false
+
+    function loadLocalCoverageLock() {
+      try {
+        const stored = window.localStorage.getItem(COVERAGE_LOCK_STORAGE_KEY)
+        return stored ? JSON.parse(stored) as TenantGeographyScope : null
+      } catch {
+        return null
+      }
+    }
+
+    async function loadCoverageLock() {
+      try {
+        const response = await fetch('/api/coverage-lock', { cache: 'no-store' })
+        const payload = await response.json()
+        if (cancelled) return
+
+        const nextScope = response.ok && payload.scope
+          ? payload.scope as TenantGeographyScope
+          : loadLocalCoverageLock()
+
+        if (nextScope) {
+          setGeoScope(nextScope)
+          setForm((prev) => ({
+            ...prev,
+            region: '',
+            regionCode: '',
+            province: '',
+            provinceCode: '',
+            municipality: '',
+            municipalityCode: '',
+            barangay: '',
+          }))
+        }
+        setGeoScopePersistence(response.ok ? 'supabase' : 'demo')
+      } catch {
+        if (!cancelled) {
+          const localScope = loadLocalCoverageLock()
+          if (localScope) setGeoScope(localScope)
+          setGeoScopePersistence('demo')
+        }
+      }
+    }
+
+    loadCoverageLock()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function update(field: keyof FormData, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -216,8 +271,15 @@ export default function RegisterPage() {
                   <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
                     <p className="text-xs font-semibold text-blue-200">Buyer geography lock</p>
                     <p className="mt-1 text-xs text-blue-100/80">
-                      Demo scope is open to all Philippines regions, provinces, and cities/municipalities for testing.
+                      This buyer account is currently scoped to {geoScope.level === 'country' ? 'all Philippines regions, provinces, and cities/municipalities' : 'the saved admin coverage lock'}.
                       Source: {PSGC_VERSION_LABEL}.
+                    </p>
+                    <p className="mt-1 text-xs text-blue-100/60">
+                      Storage: {geoScopePersistence === 'checking'
+                        ? 'Checking...'
+                        : geoScopePersistence === 'supabase'
+                        ? 'Supabase persisted'
+                        : 'Demo fallback'}
                     </p>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

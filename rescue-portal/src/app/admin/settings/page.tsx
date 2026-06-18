@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Save, Plus, Edit2, Eye, EyeOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -13,6 +13,7 @@ import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DEMO_ORGANIZATION, DEMO_EMERGENCY_TYPES, DEMO_BARANGAYS } from '@/lib/demo-data'
 import {
+  COVERAGE_LOCK_STORAGE_KEY,
   DEMO_TENANT_GEO_SCOPE,
   PH_LOCALITIES,
   PH_PROVINCES,
@@ -27,6 +28,7 @@ import {
   PSGC_VERSION_LABEL,
 } from '@/lib/philippines-geography'
 import type { GeoScopeLevel } from '@/lib/philippines-geography'
+import type { TenantGeographyScope } from '@/lib/philippines-geography'
 import { toast } from 'sonner'
 
 const SCOPE_LEVEL_LABELS: Record<GeoScopeLevel, string> = {
@@ -38,6 +40,8 @@ const SCOPE_LEVEL_LABELS: Record<GeoScopeLevel, string> = {
 
 export default function SettingsPage() {
   const [showToken, setShowToken] = useState(false)
+  const [savingCoverage, setSavingCoverage] = useState(false)
+  const [coveragePersistence, setCoveragePersistence] = useState<'checking' | 'supabase' | 'demo'>('checking')
   const [orgName, setOrgName] = useState(DEMO_ORGANIZATION.name)
   const [hotline, setHotline] = useState(DEMO_ORGANIZATION.emergency_hotline)
   const [province, setProvince] = useState(DEMO_ORGANIZATION.province)
@@ -76,9 +80,100 @@ export default function SettingsPage() {
     : selectedScopeLocality
     ? getLocalityLabel(selectedScopeLocality)
     : ''
+  const canSaveCoverage = scopeLevel === 'country'
+    || (scopeLevel === 'region' && Boolean(scopeRegionCode))
+    || (scopeLevel === 'province' && Boolean(scopeProvinceCode))
+    || (scopeLevel === 'municipality' && Boolean(scopeMunicipalityCode))
+
+  function applyCoverageScope(scope: TenantGeographyScope) {
+    setScopeLevel(scope.level)
+    setScopeRegionCode(scope.regionCode ?? '')
+    setScopeProvinceCode(scope.provinceCode ?? '')
+    setScopeMunicipalityCode(scope.municipalityCode ?? '')
+  }
+
+  function loadLocalCoverageLock() {
+    try {
+      const stored = window.localStorage.getItem(COVERAGE_LOCK_STORAGE_KEY)
+      return stored ? JSON.parse(stored) as TenantGeographyScope : null
+    } catch {
+      return null
+    }
+  }
+
+  function saveLocalCoverageLock(scope: TenantGeographyScope) {
+    window.localStorage.setItem(COVERAGE_LOCK_STORAGE_KEY, JSON.stringify(scope))
+  }
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadCoverageLock() {
+      try {
+        const response = await fetch('/api/coverage-lock', { cache: 'no-store' })
+        const payload = await response.json()
+        if (cancelled) return
+
+        if (response.ok && payload.scope) {
+          applyCoverageScope(payload.scope)
+          setCoveragePersistence('supabase')
+          return
+        }
+
+        const localScope = loadLocalCoverageLock()
+        if (localScope) applyCoverageScope(localScope)
+        setCoveragePersistence('demo')
+      } catch {
+        if (!cancelled) {
+          const localScope = loadLocalCoverageLock()
+          if (localScope) applyCoverageScope(localScope)
+          setCoveragePersistence('demo')
+        }
+      }
+    }
+
+    loadCoverageLock()
+
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   function save() {
-    toast.success('Settings saved (demo mode — not persisted)')
+    toast.success('General settings saved (demo mode — not persisted)')
+  }
+
+  async function saveCoverage() {
+    if (!canSaveCoverage) {
+      toast.error('Choose the required location before saving.')
+      return
+    }
+
+    setSavingCoverage(true)
+
+    try {
+      const response = await fetch('/api/coverage-lock', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ scope: currentScope }),
+      })
+      const payload = await response.json()
+
+      if (!response.ok) {
+        throw new Error(payload.message ?? 'Unable to save coverage lock.')
+      }
+
+      applyCoverageScope(payload.scope)
+      setCoveragePersistence('supabase')
+      toast.success('Coverage lock saved to Supabase')
+    } catch (error) {
+      saveLocalCoverageLock(currentScope)
+      setCoveragePersistence('demo')
+      toast.success('Coverage lock saved in this browser for testing')
+      console.warn(error instanceof Error ? error.message : 'Unable to save coverage lock to Supabase.')
+    } finally {
+      setSavingCoverage(false)
+    }
   }
 
   return (
@@ -274,10 +369,17 @@ export default function SettingsPage() {
               <div className="rounded-lg border border-slate-700 bg-slate-950 p-3">
                 <p className="text-xs font-medium text-slate-300">Dataset</p>
                 <p className="mt-1 text-xs text-slate-500">{PSGC_VERSION_LABEL} · 18 regions · 82 provinces · 1,642 cities/municipalities</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  Storage: {coveragePersistence === 'checking'
+                    ? 'Checking...'
+                    : coveragePersistence === 'supabase'
+                    ? 'Supabase persisted'
+                    : 'Demo fallback'}
+                </p>
               </div>
 
-              <Button onClick={save} className="bg-blue-600 hover:bg-blue-700 text-white">
-                <Save className="w-4 h-4 mr-1" /> Save Coverage
+              <Button onClick={saveCoverage} disabled={savingCoverage || !canSaveCoverage} className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Save className="w-4 h-4 mr-1" /> {savingCoverage ? 'Saving...' : 'Save Coverage'}
               </Button>
             </CardContent>
           </Card>

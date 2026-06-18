@@ -27,6 +27,7 @@ export type Database = {
       device_sessions: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown> }
       false_alert_reviews: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown> }
       triage_answers: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown> }
+      organization_geo_scopes: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown> }
     }
     Views: Record<string, never>
     Functions: Record<string, never>
@@ -36,6 +37,7 @@ export type Database = {
       severity_level: 'critical' | 'high' | 'medium' | 'low' | 'info'
       team_status: 'available' | 'assigned' | 'preparing' | 'dispatched' | 'on_scene' | 'returning' | 'off_duty' | 'unavailable'
       registration_status: 'draft' | 'submitted' | 'under_review' | 'more_info_required' | 'approved' | 'rejected' | 'suspended'
+      geography_scope_level: 'country' | 'region' | 'province' | 'municipality'
     }
   }
 }
