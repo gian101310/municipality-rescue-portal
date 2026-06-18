@@ -11,6 +11,39 @@ import {
 } from 'recharts'
 import { DEMO_STATS, DEMO_INCIDENTS } from '@/lib/demo-data'
 import { toast } from 'sonner'
+import { calculateSeverity } from '@/lib/severity-scoring'
+
+function exportCSV() {
+  const headers = ['Reference', 'Type', 'Severity', 'Status', 'Barangay', 'Reporter', 'Phone', 'Created At', 'Severity Score']
+  const rows = DEMO_INCIDENTS.map((inc) => {
+    const sev = calculateSeverity({
+      emergencyType: inc.emergency_type.id,
+      hazards: [],
+      affectedCount: inc.affected_count || 1,
+      description: inc.description,
+    })
+    return [
+      inc.reference_number,
+      inc.emergency_type.name,
+      inc.severity,
+      inc.status,
+      inc.barangay,
+      inc.reporter_name,
+      inc.reporter_phone,
+      inc.created_at,
+      sev.score,
+    ].join(',')
+  })
+  const csv = [headers.join(','), ...rows].join('\n')
+  const blob = new Blob([csv], { type: 'text/csv' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `rescue-portal-incidents-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+  toast.success('CSV exported successfully')
+}
 
 const COLORS = ['#dc2626', '#ea580c', '#0284c7', '#ca8a04', '#7c3aed', '#be123c', '#15803d', '#92400e', '#6b7280']
 
@@ -55,7 +88,7 @@ export default function ReportsPage() {
           <h1 className="text-2xl font-bold text-white">Reports & Analytics</h1>
           <p className="text-slate-400 text-sm">Emergency response performance overview</p>
         </div>
-        <Button variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800" onClick={() => toast.success('Demo: CSV would be downloaded')}>
+        <Button variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800" onClick={exportCSV}>
           <Download className="w-4 h-4 mr-1" /> Export CSV
         </Button>
       </div>

@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, AlertTriangle, Map, Users, UserCheck,
   ShieldCheck, BarChart3, ScrollText, Settings, Activity,
-  Shield, Menu, ChevronLeft, LogOut, User, Clock,
+  Shield, Menu, ChevronLeft, LogOut, User, Clock, QrCode,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -22,6 +22,7 @@ import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Badge } from '@/components/ui/badge'
 import { NotificationCenter } from '@/components/notification-center'
 import { DemoBanner } from '@/components/demo-banner'
+import { PushNotificationToggle } from '@/components/push-notification-toggle'
 import { DEMO_ORGANIZATION, DEMO_RESCUE_UNITS, DEMO_STATS } from '@/lib/demo-data'
 import { cn } from '@/lib/utils'
 import {
@@ -40,6 +41,7 @@ const NAV_ITEMS = [
   { href: '/admin/verification', label: 'Verification', icon: ShieldCheck },
   { href: '/admin/reports', label: 'Reports', icon: BarChart3 },
   { href: '/admin/audit', label: 'Audit Logs', icon: ScrollText },
+  { href: '/admin/qr-posters', label: 'QR Posters', icon: QrCode },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
   { href: '/admin/health', label: 'System Health', icon: Activity },
 ]
@@ -231,6 +233,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <span className="w-2 h-2 rounded-full bg-green-400" />
                 {availableUnits} responder{availableUnits !== 1 ? 's' : ''} available
               </div>
+              <PushNotificationToggle />
               <NotificationCenter />
               <DropdownMenu>
                 <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="rounded-full" />}>

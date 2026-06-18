@@ -20,6 +20,9 @@ import { useSettings } from '@/lib/settings-context'
 import { generateDemoReferenceNumber } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { EmergencyType } from '@/lib/types'
+import { calculateSeverity, getSeverityRingProps } from '@/lib/severity-scoring'
+import { VoiceSOS } from '@/components/voice-sos'
+import { checkRateLimit, recordSubmission } from '@/lib/rate-limiter'
 
 type Step = 'select' | 'details' | 'confirm' | 'submitted'
 
@@ -104,7 +107,15 @@ export default function EmergencyPage() {
     if (!description.trim()) { toast.error('Please describe the emergency'); return }
     if (!locationGranted) { toast.error('Please share your location first'); return }
 
+    // Rate limiting
+    const limit = checkRateLimit()
+    if (!limit.allowed) {
+      toast.error(`Too many submissions. Try again in ${Math.ceil(limit.resetIn / 60)} minutes.`)
+      return
+    }
+
     setSubmitting(true)
+    recordSubmission()
     await new Promise((r) => setTimeout(r, 2000))
     const ref = generateDemoReferenceNumber()
     setRefNumber(ref)
@@ -283,6 +294,12 @@ export default function EmergencyPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 className="min-h-[100px] border-slate-300"
               />
+              <div className="mt-2">
+                <VoiceSOS
+                  onTranscript={(text) => setDescription(text)}
+                  onSOSTrigger={() => toast.warning('SOS keyword detected — submitting soon')}
+                />
+              </div>
             </div>
 
             {/* Affected count */}
@@ -382,6 +399,41 @@ export default function EmergencyPage() {
                     {activeHazards.includes('chemical') && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Hazmat</span>}
                   </div>
                 )}
+
+                {/* Auto Severity Score */}
+                {(() => {
+                  const severity = calculateSeverity({
+                    emergencyType: selectedType.id,
+                    hazards: activeHazards,
+                    affectedCount: parseInt(String(affectedCount)) || 1,
+                    description,
+                  })
+                  const ring = getSeverityRingProps(severity.score)
+                  return (
+                    <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
+                      <svg width="48" height="48" viewBox="0 0 100 100" className="shrink-0">
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="#e2e8f0" strokeWidth="8" />
+                        <circle
+                          cx="50" cy="50" r="40" fill="none"
+                          stroke={severity.color}
+                          strokeWidth="8"
+                          strokeDasharray={ring.circumference}
+                          strokeDashoffset={ring.offset}
+                          strokeLinecap="round"
+                          transform="rotate(-90 50 50)"
+                        />
+                        <text x="50" y="55" textAnchor="middle" fontSize="24" fontWeight="900" fill={severity.color}>
+                          {severity.score}
+                        </text>
+                      </svg>
+                      <div>
+                        <p className="text-xs text-slate-500">Auto Severity Score</p>
+                        <p className="font-bold text-sm" style={{ color: severity.color }}>{severity.label}</p>
+                        <p className="text-xs text-slate-400">Priority triage for dispatchers</p>
+                      </div>
+                    </div>
+                  )
+                })()}
               </CardContent>
             </Card>
 

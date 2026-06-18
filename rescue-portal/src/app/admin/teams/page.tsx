@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Users, Phone, MapPin, Plus, ChevronDown, ChevronUp } from 'lucide-react'
+import { Users, Phone, MapPin, Plus, ChevronDown, ChevronUp, Calendar } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -42,9 +43,14 @@ export default function TeamsPage() {
           <h1 className="text-2xl font-bold text-white">Rescue Teams</h1>
           <p className="text-slate-400 text-sm">{DEMO_RESCUE_UNITS.length} units registered</p>
         </div>
-        <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setAddOpen(true)}>
-          <Plus className="w-4 h-4 mr-1" /> Add Team
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800" render={<Link href="/admin/teams/shifts" />}>
+            <Calendar className="w-4 h-4 mr-1" /> Shift Schedule
+          </Button>
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setAddOpen(true)}>
+            <Plus className="w-4 h-4 mr-1" /> Add Team
+          </Button>
+        </div>
       </div>
 
       {/* Status summary */}

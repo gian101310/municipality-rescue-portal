@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { DemoBanner } from '@/components/demo-banner'
+import { LanguageSwitcher } from '@/components/language-switcher'
 import { DEMO_NOTIFICATIONS } from '@/lib/demo-data'
 import { cn } from '@/lib/utils'
 
@@ -42,7 +43,8 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
             <Shield className="w-6 h-6 text-red-600" />
             <span className="font-bold text-slate-900">RescuePortal</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
+            <LanguageSwitcher variant="compact" />
             <Button variant="ghost" size="icon" className="relative text-slate-600">
               <Bell className="w-5 h-5" />
               {unread > 0 && (

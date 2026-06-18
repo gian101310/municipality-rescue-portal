@@ -5,10 +5,13 @@ import { Shield, Bell, MapPin, Users, Phone, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { DemoBanner } from '@/components/demo-banner'
+import { LanguageSwitcher } from '@/components/language-switcher'
 import { useSettings } from '@/lib/settings-context'
+import { useI18n } from '@/lib/i18n-context'
 
 export default function LandingPage() {
   const { settings } = useSettings()
+  const { t } = useI18n()
   const municipalityName = settings.municipalityName
   const hotline = settings.hotline
 
@@ -28,11 +31,12 @@ export default function LandingPage() {
             <a href="#hotline" className="hover:text-white transition-colors">Emergency</a>
           </nav>
           <div className="flex items-center gap-2">
+            <LanguageSwitcher />
             <Button variant="ghost" size="sm" className="text-slate-300 hover:text-white" render={<Link href="/auth/login" />}>
-              Sign In
+              {t('nav.signIn')}
             </Button>
             <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" render={<Link href="/auth/login?role=resident" />}>
-              Get Help
+              {t('nav.getHelp')}
             </Button>
           </div>
         </div>
@@ -52,35 +56,34 @@ export default function LandingPage() {
 
           <div className="inline-flex items-center gap-2 bg-slate-800/60 rounded-full px-4 py-1.5 text-sm text-slate-300 mb-6 border border-slate-700">
             <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            {municipalityName} — Active Emergency Response
+            {municipalityName} — {t('landing.badge')}
           </div>
 
           <h1 className="text-5xl md:text-6xl lg:text-7xl font-black tracking-tight mb-4">
             Rescue<span className="text-red-500">Portal</span>
           </h1>
           <p className="text-xl md:text-2xl text-slate-300 font-medium mb-3">
-            Municipal Emergency Response System
+            {t('landing.subtitle')}
           </p>
           <p className="text-slate-400 max-w-2xl mx-auto mb-10 leading-relaxed">
-            Report emergencies instantly, track rescue operations in real time, and connect with
-            municipal rescue teams—all from your phone.
+            {t('landing.description')}
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
             <Button size="lg" className="bg-red-600 hover:bg-red-700 text-white h-14 px-8 text-base font-semibold shadow-lg shadow-red-900/40" render={<Link href="/auth/login?role=resident" />}>
               <Shield className="w-5 h-5 mr-2" />
-              Request Rescue
+              {t('landing.requestRescue')}
               <ArrowRight className="w-4 h-4 ml-2" />
             </Button>
             <Button size="lg" variant="outline" className="border-slate-600 text-slate-200 hover:bg-slate-800 h-14 px-8 text-base" render={<Link href="/admin" />}>
-              Admin Dashboard
+              {t('landing.adminDashboard')}
             </Button>
           </div>
 
           <p className="mt-6 text-xs text-slate-500">
-            Registered residents get priority response.{' '}
+            {t('landing.registerPrompt')}{' '}
             <Link href="/auth/register" className="text-blue-400 hover:text-blue-300 underline">
-              Register now
+              {t('landing.registerNow')}
             </Link>
           </p>
         </div>
@@ -90,8 +93,8 @@ export default function LandingPage() {
       <section id="features" className="py-20 bg-slate-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-white mb-3">Built for Emergency Response</h2>
-            <p className="text-slate-400">Everything your municipality needs to respond faster.</p>
+            <h2 className="text-3xl font-bold text-white mb-3">{t('landing.builtFor')}</h2>
+            <p className="text-slate-400">{t('landing.builtForSub')}</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <Card className="bg-slate-800/50 border-slate-700">
@@ -99,10 +102,9 @@ export default function LandingPage() {
                 <div className="w-12 h-12 rounded-xl bg-red-600/20 flex items-center justify-center mb-4">
                   <Bell className="w-6 h-6 text-red-400" />
                 </div>
-                <h3 className="font-semibold text-white mb-2">Real-Time Alerts</h3>
+                <h3 className="font-semibold text-white mb-2">{t('landing.realTimeAlerts')}</h3>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                  Instant notifications to dispatchers and rescue teams the moment an emergency is reported.
-                  Telegram integration keeps teams connected.
+                  {t('landing.realTimeAlertsDesc')}
                 </p>
               </CardContent>
             </Card>
@@ -111,10 +113,9 @@ export default function LandingPage() {
                 <div className="w-12 h-12 rounded-xl bg-blue-600/20 flex items-center justify-center mb-4">
                   <MapPin className="w-6 h-6 text-blue-400" />
                 </div>
-                <h3 className="font-semibold text-white mb-2">GPS Tracking</h3>
+                <h3 className="font-semibold text-white mb-2">{t('landing.gpsTracking')}</h3>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                  Automatic location capture on report submission. Live map view shows all active
-                  incidents and team positions.
+                  {t('landing.gpsTrackingDesc')}
                 </p>
               </CardContent>
             </Card>
@@ -123,10 +124,9 @@ export default function LandingPage() {
                 <div className="w-12 h-12 rounded-xl bg-green-600/20 flex items-center justify-center mb-4">
                   <Users className="w-6 h-6 text-green-400" />
                 </div>
-                <h3 className="font-semibold text-white mb-2">Team Dispatch</h3>
+                <h3 className="font-semibold text-white mb-2">{t('landing.teamDispatch')}</h3>
                 <p className="text-slate-400 text-sm leading-relaxed">
-                  Manage rescue units, assign teams, and track operation status from a single
-                  command center dashboard.
+                  {t('landing.teamDispatchDesc')}
                 </p>
               </CardContent>
             </Card>
@@ -137,7 +137,7 @@ export default function LandingPage() {
       {/* Emergency Hotline Banner */}
       <section id="hotline" className="py-12 bg-red-950/40 border-y border-red-900/40">
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <p className="text-sm text-red-300 font-medium uppercase tracking-widest mb-2">Emergency Hotline</p>
+          <p className="text-sm text-red-300 font-medium uppercase tracking-widest mb-2">{t('landing.hotlineLabel')}</p>
           <a
             href={`tel:${hotline.replace(/[^0-9+]/g, '')}`}
             className="text-4xl md:text-5xl font-black text-white hover:text-red-300 transition-colors flex items-center justify-center gap-3"
@@ -146,15 +146,15 @@ export default function LandingPage() {
             {hotline}
           </a>
           <p className="text-slate-400 mt-4 text-sm">
-            Available 24 hours a day, 7 days a week · {municipalityName}
+            {t('landing.hotlineAvail')} · {municipalityName}
           </p>
           {settings.secondaryHotline && (
             <p className="mt-2 text-sm text-slate-300">
-              Secondary: <a href={`tel:${settings.secondaryHotline.replace(/[^0-9+]/g, '')}`} className="text-red-300 hover:text-white font-semibold">{settings.secondaryHotline}</a>
+              {t('landing.secondary')}: <a href={`tel:${settings.secondaryHotline.replace(/[^0-9+]/g, '')}`} className="text-red-300 hover:text-white font-semibold">{settings.secondaryHotline}</a>
             </p>
           )}
           <p className="mt-3 text-xs text-red-400/70 font-medium">
-            For life-threatening emergencies, also call 911 (National Emergency Hotline)
+            {t('landing.lifeThreaten')}
           </p>
         </div>
       </section>
@@ -163,14 +163,14 @@ export default function LandingPage() {
       <section className="py-20 bg-slate-950">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-white mb-3">How It Works</h2>
+            <h2 className="text-3xl font-bold text-white mb-3">{t('landing.howItWorks')}</h2>
           </div>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 text-center">
             {[
-              { step: '1', title: 'Register', desc: 'Create your resident account with a valid ID', color: 'blue' },
-              { step: '2', title: 'Report', desc: 'Tap SOS and describe your emergency', color: 'red' },
-              { step: '3', title: 'Dispatch', desc: 'Nearest team is assigned and dispatched', color: 'amber' },
-              { step: '4', title: 'Respond', desc: 'Track the team live until they arrive', color: 'green' },
+              { step: '1', title: t('landing.step1'), desc: t('landing.step1Desc'), color: 'blue' },
+              { step: '2', title: t('landing.step2'), desc: t('landing.step2Desc'), color: 'red' },
+              { step: '3', title: t('landing.step3'), desc: t('landing.step3Desc'), color: 'amber' },
+              { step: '4', title: t('landing.step4'), desc: t('landing.step4Desc'), color: 'green' },
             ].map(({ step, title, desc }) => (
               <div key={step} className="flex flex-col items-center">
                 <div className="w-12 h-12 rounded-full bg-slate-800 border border-slate-700 flex items-center justify-center text-slate-300 font-black text-xl mb-3">
