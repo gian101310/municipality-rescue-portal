@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, AlertTriangle, Map, Users, UserCheck,
   ShieldCheck, BarChart3, ScrollText, Settings, Activity,
-  Shield, Menu, X, ChevronLeft, LogOut, User, Clock,
+  Shield, Menu, ChevronLeft, LogOut, User, Clock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -18,12 +18,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet'
+import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Badge } from '@/components/ui/badge'
 import { NotificationCenter } from '@/components/notification-center'
 import { DemoBanner } from '@/components/demo-banner'
 import { DEMO_ORGANIZATION, DEMO_RESCUE_UNITS, DEMO_STATS } from '@/lib/demo-data'
 import { cn } from '@/lib/utils'
+import {
+  COVERAGE_LOCK_CHANGED_EVENT,
+  getBuyerDetails,
+  loadCoverageLock,
+} from '@/lib/coverage-lock-client'
+import type { TenantGeographyScope } from '@/lib/philippines-geography'
 
 const NAV_ITEMS = [
   { href: '/admin', label: 'Command Center', icon: LayoutDashboard, exact: true },
@@ -69,10 +75,12 @@ function NavLink({ item, collapsed, onClick }: {
   )
 }
 
-function Sidebar({ collapsed, setCollapsed, onClick }: {
+function Sidebar({ collapsed, setCollapsed, onClick, organizationName, organizationArea }: {
   collapsed: boolean
   setCollapsed?: (v: boolean) => void
   onClick?: () => void
+  organizationName: string
+  organizationArea: string
 }) {
   return (
     <div className={cn('flex flex-col h-full bg-slate-950 border-r border-slate-800', collapsed ? 'w-16' : 'w-60')}>
@@ -102,8 +110,8 @@ function Sidebar({ collapsed, setCollapsed, onClick }: {
       {/* Footer */}
       {!collapsed && (
         <div className="border-t border-slate-800 px-4 py-3">
-          <p className="text-xs text-slate-600 truncate">{DEMO_ORGANIZATION.name}</p>
-          <p className="text-xs text-slate-600">{DEMO_ORGANIZATION.province}, {DEMO_ORGANIZATION.region}</p>
+          <p className="text-xs text-slate-600 truncate">{organizationName}</p>
+          <p className="text-xs text-slate-600 truncate">{organizationArea}</p>
         </div>
       )}
     </div>
@@ -132,8 +140,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter()
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const [coverageScope, setCoverageScope] = useState<TenantGeographyScope | null>(null)
 
   const availableUnits = DEMO_RESCUE_UNITS.filter((u) => u.status === 'available').length
+  const buyerDetails = getBuyerDetails(coverageScope ?? { level: 'country' })
+  const organizationName = coverageScope ? buyerDetails.organizationName : DEMO_ORGANIZATION.name
+  const organizationArea = coverageScope
+    ? [buyerDetails.provinceName, buyerDetails.regionName].filter(Boolean).join(', ') || buyerDetails.locationName
+    : `${DEMO_ORGANIZATION.province}, ${DEMO_ORGANIZATION.region}`
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function refreshCoverage(scope?: TenantGeographyScope) {
+      const activeScope = scope ?? (await loadCoverageLock()).scope
+      if (!cancelled) setCoverageScope(activeScope)
+    }
+
+    function handleCoverageChange(event: Event) {
+      const customEvent = event as CustomEvent<TenantGeographyScope>
+      if (customEvent.detail) void refreshCoverage(customEvent.detail)
+    }
+
+    void refreshCoverage()
+    window.addEventListener(COVERAGE_LOCK_CHANGED_EVENT, handleCoverageChange)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener(COVERAGE_LOCK_CHANGED_EVENT, handleCoverageChange)
+    }
+  }, [])
 
   function handleLogout() {
     sessionStorage.removeItem('demo_role')
@@ -147,13 +183,23 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       <div className="flex flex-1 overflow-hidden">
         {/* Desktop Sidebar */}
         <div className="hidden md:flex shrink-0">
-          <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
+          <Sidebar
+            collapsed={collapsed}
+            setCollapsed={setCollapsed}
+            organizationName={organizationName}
+            organizationArea={organizationArea}
+          />
         </div>
 
         {/* Mobile Sidebar */}
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetContent side="left" className="p-0 w-64 bg-slate-950 border-slate-800">
-            <Sidebar collapsed={false} onClick={() => setMobileOpen(false)} />
+            <Sidebar
+              collapsed={false}
+              onClick={() => setMobileOpen(false)}
+              organizationName={organizationName}
+              organizationArea={organizationArea}
+            />
           </SheetContent>
         </Sheet>
 
@@ -172,7 +218,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             <div className="flex items-center gap-2 min-w-0">
               <span className="font-semibold text-white text-sm truncate hidden sm:block">
-                {DEMO_ORGANIZATION.name}
+                {organizationName}
               </span>
               <Badge className="hidden sm:flex bg-green-600/20 text-green-400 border border-green-500/30 text-xs">
                 LIVE
