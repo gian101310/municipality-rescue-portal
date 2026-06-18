@@ -1,13 +1,17 @@
+'use client'
+
 import Link from 'next/link'
 import { Shield, Bell, MapPin, Users, Phone, ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { DemoBanner } from '@/components/demo-banner'
-
-const MUNICIPALITY_NAME = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_MUNICIPALITY_NAME) || 'Municipality of Bayani'
-const HOTLINE = (typeof process !== 'undefined' && process.env.NEXT_PUBLIC_HOTLINE) || '049-555-1234'
+import { useSettings } from '@/lib/settings-context'
 
 export default function LandingPage() {
+  const { settings } = useSettings()
+  const municipalityName = settings.municipalityName
+  const hotline = settings.hotline
+
   return (
     <div className="flex flex-col min-h-screen bg-slate-950 text-white">
       <DemoBanner />
@@ -48,7 +52,7 @@ export default function LandingPage() {
 
           <div className="inline-flex items-center gap-2 bg-slate-800/60 rounded-full px-4 py-1.5 text-sm text-slate-300 mb-6 border border-slate-700">
             <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" />
-            {MUNICIPALITY_NAME} — Active Emergency Response
+            {municipalityName} — Active Emergency Response
           </div>
 
           <h1 className="text-5xl md:text-6xl lg:text-7xl font-black tracking-tight mb-4">
@@ -135,15 +139,20 @@ export default function LandingPage() {
         <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
           <p className="text-sm text-red-300 font-medium uppercase tracking-widest mb-2">Emergency Hotline</p>
           <a
-            href={`tel:${HOTLINE.replace(/[^0-9+]/g, '')}`}
+            href={`tel:${hotline.replace(/[^0-9+]/g, '')}`}
             className="text-4xl md:text-5xl font-black text-white hover:text-red-300 transition-colors flex items-center justify-center gap-3"
           >
             <Phone className="w-8 h-8 md:w-10 md:h-10 text-red-400" />
-            {HOTLINE}
+            {hotline}
           </a>
           <p className="text-slate-400 mt-4 text-sm">
-            Available 24 hours a day, 7 days a week · {MUNICIPALITY_NAME}
+            Available 24 hours a day, 7 days a week · {municipalityName}
           </p>
+          {settings.secondaryHotline && (
+            <p className="mt-2 text-sm text-slate-300">
+              Secondary: <a href={`tel:${settings.secondaryHotline.replace(/[^0-9+]/g, '')}`} className="text-red-300 hover:text-white font-semibold">{settings.secondaryHotline}</a>
+            </p>
+          )}
           <p className="mt-3 text-xs text-red-400/70 font-medium">
             For life-threatening emergencies, also call 911 (National Emergency Hotline)
           </p>
@@ -180,7 +189,7 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-slate-500">
           <div className="flex items-center gap-2">
             <Shield className="w-4 h-4 text-red-500" />
-            <span>© {new Date().getFullYear()} RescuePortal — {MUNICIPALITY_NAME}</span>
+            <span>© {new Date().getFullYear()} RescuePortal — {municipalityName}</span>
           </div>
           <div className="flex items-center gap-4">
             <Link href="/privacy" className="hover:text-slate-300 transition-colors">Privacy Policy</Link>

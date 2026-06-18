@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, MapPin, Camera, ChevronRight, CheckCircle2,
-  AlertTriangle, Users, Shield
+  AlertTriangle, Users, Shield, Phone
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -16,22 +16,58 @@ import { Card, CardContent } from '@/components/ui/card'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
 import { DEMO_EMERGENCY_TYPES } from '@/lib/demo-data'
+import { useSettings } from '@/lib/settings-context'
 import { generateDemoReferenceNumber } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { EmergencyType } from '@/lib/types'
 
 type Step = 'select' | 'details' | 'confirm' | 'submitted'
 
+// Define which hazard toggles are relevant per emergency type category
+function getRelevantHazards(typeId: string) {
+  const hazards: { key: string; label: string; urgent: boolean }[] = []
+
+  // Unconscious/unresponsive — always relevant for medical, rescue, fire, collapse, vehicular
+  if (['et-medical', 'et-rescue', 'et-fire', 'et-collapse', 'et-vehicular'].includes(typeId)) {
+    hazards.push({ key: 'unconscious', label: 'Someone is unconscious or unresponsive', urgent: true })
+  }
+
+  // Fire — relevant for fire, collapse, hazmat, explosion types
+  if (['et-fire', 'et-collapse', 'et-hazmat', 'et-explosion', 'et-other'].includes(typeId)) {
+    hazards.push({ key: 'fire', label: 'There is fire present', urgent: true })
+  }
+
+  // Flooding — relevant for flood, rescue, typhoon, landslide
+  if (['et-flood', 'et-rescue', 'et-typhoon', 'et-landslide', 'et-other'].includes(typeId)) {
+    hazards.push({ key: 'flooding', label: 'There is flooding or water hazard', urgent: false })
+  }
+
+  // Violence — relevant for crime, civil unrest
+  if (['et-crime', 'et-civil_unrest', 'et-other'].includes(typeId)) {
+    hazards.push({ key: 'violence', label: 'There is violence or threat of violence', urgent: true })
+  }
+
+  // Trapped persons — relevant for collapse, earthquake, landslide, vehicular
+  if (['et-collapse', 'et-earthquake', 'et-landslide', 'et-vehicular'].includes(typeId)) {
+    hazards.push({ key: 'trapped', label: 'People are trapped or pinned', urgent: true })
+  }
+
+  // Chemical/hazmat — relevant for hazmat, explosion, fire
+  if (['et-hazmat', 'et-explosion', 'et-fire'].includes(typeId)) {
+    hazards.push({ key: 'chemical', label: 'Hazardous materials or chemical exposure', urgent: true })
+  }
+
+  return hazards
+}
+
 export default function EmergencyPage() {
   const router = useRouter()
+  const { settings } = useSettings()
   const [step, setStep] = useState<Step>('select')
   const [selectedType, setSelectedType] = useState<EmergencyType | null>(null)
   const [description, setDescription] = useState('')
   const [affectedCount, setAffectedCount] = useState(1)
-  const [hasUnconscious, setHasUnconscious] = useState(false)
-  const [hasFire, setHasFire] = useState(false)
-  const [hasFlooding, setHasFlooding] = useState(false)
-  const [hasViolence, setHasViolence] = useState(false)
+  const [hazardStates, setHazardStates] = useState<Record<string, boolean>>({})
   const [locationGranted, setLocationGranted] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [refNumber, setRefNumber] = useState('')
@@ -39,10 +75,17 @@ export default function EmergencyPage() {
   function selectType(type: EmergencyType) {
     setSelectedType(type)
     setStep('details')
-    // Auto-set toggles based on type
-    setHasFire(type.id === 'et-fire')
-    setHasFlooding(type.id === 'et-flood')
-    setHasViolence(type.id === 'et-crime')
+    // Pre-set hazards based on type
+    const presets: Record<string, boolean> = {}
+    if (type.id === 'et-fire') presets.fire = true
+    if (type.id === 'et-flood') presets.flooding = true
+    if (type.id === 'et-crime') presets.violence = true
+    if (type.id === 'et-collapse' || type.id === 'et-earthquake') presets.trapped = true
+    setHazardStates(presets)
+  }
+
+  function toggleHazard(key: string, value: boolean) {
+    setHazardStates((prev) => ({ ...prev, [key]: value }))
   }
 
   function requestLocation() {
@@ -68,6 +111,9 @@ export default function EmergencyPage() {
     setStep('submitted')
     setSubmitting(false)
   }
+
+  const activeHazards = Object.entries(hazardStates).filter(([, v]) => v).map(([k]) => k)
+  const relevantHazards = selectedType ? getRelevantHazards(selectedType.id) : []
 
   // Submitted / Success screen
   if (step === 'submitted') {
@@ -95,6 +141,35 @@ export default function EmergencyPage() {
             <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
             <span className="text-sm text-blue-700 font-medium">Dispatcher reviewing your report...</span>
           </div>
+        </div>
+
+        {/* Escalation Call Button */}
+        <div className="w-full bg-red-50 border border-red-200 rounded-xl p-4 space-y-3">
+          <p className="text-sm font-semibold text-red-700">Need immediate help?</p>
+          <p className="text-xs text-red-600">If the situation is life-threatening, call our emergency hotline directly.</p>
+          <a
+            href={`tel:${settings.hotline.replace(/[^0-9+]/g, '')}`}
+            className="flex items-center justify-center gap-2 w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-lg transition-colors"
+          >
+            <Phone className="w-5 h-5" />
+            Call {settings.hotline}
+          </a>
+          {settings.secondaryHotline && (
+            <a
+              href={`tel:${settings.secondaryHotline.replace(/[^0-9+]/g, '')}`}
+              className="flex items-center justify-center gap-2 w-full border border-red-300 text-red-700 font-semibold py-2.5 rounded-lg hover:bg-red-100 transition-colors text-sm"
+            >
+              <Phone className="w-4 h-4" />
+              Secondary: {settings.secondaryHotline}
+            </a>
+          )}
+          <a
+            href="tel:911"
+            className="flex items-center justify-center gap-2 w-full border border-slate-300 text-slate-700 font-semibold py-2.5 rounded-lg hover:bg-slate-100 transition-colors text-sm"
+          >
+            <Phone className="w-4 h-4" />
+            911 — National Emergency
+          </a>
         </div>
 
         <p className="text-xs text-slate-400 max-w-xs">
@@ -222,21 +297,18 @@ export default function EmergencyPage() {
               />
             </div>
 
-            {/* Danger toggles */}
-            <div className="space-y-3">
-              <p className="text-slate-700 font-semibold text-sm">Additional Hazards</p>
-              {[
-                { label: 'Someone is unconscious or unresponsive', state: hasUnconscious, set: setHasUnconscious, urgent: true },
-                { label: 'There is fire present', state: hasFire, set: setHasFire, urgent: true },
-                { label: 'There is flooding or water hazard', state: hasFlooding, set: setHasFlooding },
-                { label: 'There is violence or threat of violence', state: hasViolence, set: setHasViolence, urgent: true },
-              ].map(({ label, state, set, urgent }) => (
-                <div key={label} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg">
-                  <span className={`text-sm ${urgent && state ? 'text-red-700 font-medium' : 'text-slate-700'}`}>{label}</span>
-                  <Switch checked={state} onCheckedChange={set} />
-                </div>
-              ))}
-            </div>
+            {/* Context-specific hazard toggles */}
+            {relevantHazards.length > 0 && (
+              <div className="space-y-3">
+                <p className="text-slate-700 font-semibold text-sm">Additional Hazards</p>
+                {relevantHazards.map(({ key, label, urgent }) => (
+                  <div key={key} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg">
+                    <span className={`text-sm ${urgent && hazardStates[key] ? 'text-red-700 font-medium' : 'text-slate-700'}`}>{label}</span>
+                    <Switch checked={!!hazardStates[key]} onCheckedChange={(v) => toggleHazard(key, v)} />
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Photo */}
             <div>
@@ -300,12 +372,14 @@ export default function EmergencyPage() {
                     </div>
                   </div>
                 </div>
-                {(hasUnconscious || hasFire || hasFlooding || hasViolence) && (
+                {activeHazards.length > 0 && (
                   <div className="flex flex-wrap gap-1">
-                    {hasUnconscious && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Unconscious</span>}
-                    {hasFire && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Fire</span>}
-                    {hasFlooding && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Flooding</span>}
-                    {hasViolence && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Violence</span>}
+                    {activeHazards.includes('unconscious') && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Unconscious</span>}
+                    {activeHazards.includes('fire') && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Fire</span>}
+                    {activeHazards.includes('flooding') && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Flooding</span>}
+                    {activeHazards.includes('violence') && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Violence</span>}
+                    {activeHazards.includes('trapped') && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Trapped</span>}
+                    {activeHazards.includes('chemical') && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Hazmat</span>}
                   </div>
                 )}
               </CardContent>

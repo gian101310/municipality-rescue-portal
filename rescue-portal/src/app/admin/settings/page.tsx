@@ -33,6 +33,7 @@ import {
   loadCoverageLock,
   saveCoverageLock,
 } from '@/lib/coverage-lock-client'
+import { useSettings } from '@/lib/settings-context'
 import { toast } from 'sonner'
 
 const SCOPE_LEVEL_LABELS: Record<GeoScopeLevel, string> = {
@@ -43,16 +44,19 @@ const SCOPE_LEVEL_LABELS: Record<GeoScopeLevel, string> = {
 }
 
 export default function SettingsPage() {
+  const { settings, updateSettings } = useSettings()
   const [showToken, setShowToken] = useState(false)
   const [savingCoverage, setSavingCoverage] = useState(false)
   const [coveragePersistence, setCoveragePersistence] = useState<'checking' | 'supabase' | 'demo'>('checking')
-  const [orgName, setOrgName] = useState(DEMO_ORGANIZATION.name)
-  const [hotline, setHotline] = useState(DEMO_ORGANIZATION.emergency_hotline)
+  const [orgName, setOrgName] = useState(settings.municipalityName || DEMO_ORGANIZATION.name)
+  const [hotline, setHotline] = useState(settings.hotline || DEMO_ORGANIZATION.emergency_hotline)
+  const [secondaryHotline, setSecondaryHotline] = useState(settings.secondaryHotline || DEMO_ORGANIZATION.secondary_hotline || '')
+  const [email, setEmail] = useState(settings.email || DEMO_ORGANIZATION.email || '')
   const [province, setProvince] = useState(DEMO_ORGANIZATION.province)
   const [region, setRegion] = useState(DEMO_ORGANIZATION.region)
   const [municipality, setMunicipality] = useState('Bayani')
-  const [mapLat, setMapLat] = useState(String(DEMO_ORGANIZATION.map_center.lat))
-  const [mapLng, setMapLng] = useState(String(DEMO_ORGANIZATION.map_center.lng))
+  const [mapLat, setMapLat] = useState(String(settings.mapCenterLat || DEMO_ORGANIZATION.map_center.lat))
+  const [mapLng, setMapLng] = useState(String(settings.mapCenterLng || DEMO_ORGANIZATION.map_center.lng))
   const [scopeLevel, setScopeLevel] = useState<GeoScopeLevel>(DEMO_TENANT_GEO_SCOPE.level)
   const [scopeRegionCode, setScopeRegionCode] = useState(DEMO_TENANT_GEO_SCOPE.regionCode ?? '')
   const [scopeProvinceCode, setScopeProvinceCode] = useState(DEMO_TENANT_GEO_SCOPE.provinceCode ?? '')
@@ -127,7 +131,15 @@ export default function SettingsPage() {
   }, [])
 
   function save() {
-    toast.success('General settings saved (demo mode — not persisted)')
+    updateSettings({
+      municipalityName: orgName,
+      hotline,
+      secondaryHotline,
+      email,
+      mapCenterLat: parseFloat(mapLat) || 0,
+      mapCenterLng: parseFloat(mapLng) || 0,
+    })
+    toast.success('Settings saved — changes reflected across the portal')
   }
 
   async function saveCoverage() {
@@ -199,11 +211,11 @@ export default function SettingsPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-slate-300">Secondary Hotline</Label>
-                  <Input defaultValue={DEMO_ORGANIZATION.secondary_hotline || ''} className="bg-slate-800 border-slate-600 text-white" />
+                  <Input value={secondaryHotline} onChange={(e) => setSecondaryHotline(e.target.value)} className="bg-slate-800 border-slate-600 text-white" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-slate-300">Email</Label>
-                  <Input defaultValue={DEMO_ORGANIZATION.email || ''} type="email" className="bg-slate-800 border-slate-600 text-white" />
+                  <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" className="bg-slate-800 border-slate-600 text-white" />
                 </div>
               </div>
               <Separator className="bg-slate-800" />

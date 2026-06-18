@@ -1,10 +1,12 @@
 'use client'
 
 import { useState } from 'react'
-import { User, Phone, MapPin, Shield, Edit2, CheckCircle2, Clock, AlertCircle, LogOut } from 'lucide-react'
+import { User, Phone, MapPin, Shield, Edit2, CheckCircle2, Clock, AlertCircle, LogOut, UserPlus, Trash2, Users } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { DEMO_RESIDENTS } from '@/lib/demo-data'
@@ -40,15 +42,55 @@ const ID_TYPE_LABELS: Record<string, string> = {
   other: 'Other Government ID',
 }
 
+interface DependentContact {
+  id: string
+  name: string
+  phone: string
+  relationship: string
+}
+
+const INITIAL_DEPENDENTS: DependentContact[] = [
+  { id: 'dep-1', name: 'Maria dela Cruz', phone: '09175551234', relationship: 'Mother' },
+  { id: 'dep-2', name: 'Pedro dela Cruz Jr.', phone: '09185559876', relationship: 'Son (Minor)' },
+]
+
 export default function ProfilePage() {
   const router = useRouter()
   const resident = currentResident
   const statusInfo = STATUS_INFO[resident.registration_status]
+  const [dependents, setDependents] = useState<DependentContact[]>(INITIAL_DEPENDENTS)
+  const [showAddDependent, setShowAddDependent] = useState(false)
+  const [newDepName, setNewDepName] = useState('')
+  const [newDepPhone, setNewDepPhone] = useState('')
+  const [newDepRelationship, setNewDepRelationship] = useState('')
 
   function handleLogout() {
     sessionStorage.removeItem('demo_role')
     sessionStorage.removeItem('demo_email')
     router.push('/auth/login')
+  }
+
+  function addDependent() {
+    if (!newDepName.trim() || !newDepPhone.trim()) {
+      toast.info('Please fill in name and phone number')
+      return
+    }
+    setDependents((prev) => [...prev, {
+      id: `dep-${Date.now()}`,
+      name: newDepName.trim(),
+      phone: newDepPhone.trim(),
+      relationship: newDepRelationship.trim() || 'Family',
+    }])
+    setNewDepName('')
+    setNewDepPhone('')
+    setNewDepRelationship('')
+    setShowAddDependent(false)
+    toast.success('Dependent contact added')
+  }
+
+  function removeDependent(id: string) {
+    setDependents((prev) => prev.filter((d) => d.id !== id))
+    toast.success('Contact removed')
   }
 
   return (
@@ -181,6 +223,62 @@ export default function ProfilePage() {
           <a href={`tel:${resident.emergency_contact_phone}`} className="text-blue-600 font-medium">
             {resident.emergency_contact_phone || '—'}
           </a>
+        </CardContent>
+      </Card>
+
+      {/* Dependent / Household Contacts */}
+      <Card className="border-slate-200">
+        <CardHeader className="pb-2 pt-4 px-4">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm font-semibold text-slate-700 flex items-center gap-2">
+              <Users className="w-4 h-4" /> Dependent & Household Contacts
+            </CardTitle>
+            <Button size="sm" variant="outline" className="h-7 text-xs border-slate-300" onClick={() => setShowAddDependent(true)}>
+              <UserPlus className="w-3.5 h-3.5 mr-1" /> Add
+            </Button>
+          </div>
+          <p className="text-xs text-slate-400 mt-1">People in your household who may need rescue assistance. Their info is shared with responders during emergencies.</p>
+        </CardHeader>
+        <CardContent className="px-4 pb-4 space-y-3">
+          {dependents.length === 0 && !showAddDependent && (
+            <p className="text-sm text-slate-400 text-center py-3">No dependent contacts added yet.</p>
+          )}
+          {dependents.map((dep) => (
+            <div key={dep.id} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg border border-slate-100">
+              <div>
+                <p className="font-medium text-slate-900 text-sm">{dep.name}</p>
+                <p className="text-xs text-slate-500">{dep.relationship}</p>
+                <a href={`tel:${dep.phone}`} className="text-xs text-blue-600 font-medium">{dep.phone}</a>
+              </div>
+              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-slate-400 hover:text-red-500" onClick={() => removeDependent(dep.id)}>
+                <Trash2 className="w-3.5 h-3.5" />
+              </Button>
+            </div>
+          ))}
+          {showAddDependent && (
+            <div className="p-3 bg-blue-50 rounded-lg border border-blue-200 space-y-3">
+              <div className="space-y-1.5">
+                <Label className="text-slate-700 text-xs">Full Name *</Label>
+                <Input value={newDepName} onChange={(e) => setNewDepName(e.target.value)} placeholder="Dependent's full name" className="h-9 text-sm" />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1.5">
+                  <Label className="text-slate-700 text-xs">Phone *</Label>
+                  <Input value={newDepPhone} onChange={(e) => setNewDepPhone(e.target.value)} placeholder="09171234567" className="h-9 text-sm" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-slate-700 text-xs">Relationship</Label>
+                  <Input value={newDepRelationship} onChange={(e) => setNewDepRelationship(e.target.value)} placeholder="e.g. Child, Parent" className="h-9 text-sm" />
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white h-8 text-xs" onClick={addDependent}>
+                  <UserPlus className="w-3.5 h-3.5 mr-1" /> Add Contact
+                </Button>
+                <Button size="sm" variant="ghost" className="h-8 text-xs text-slate-500" onClick={() => setShowAddDependent(false)}>Cancel</Button>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 
