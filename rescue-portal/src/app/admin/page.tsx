@@ -145,7 +145,7 @@ export default function CommandCenterPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-slate-300">Emergency Type *</Label>
-                <Select value={alertType} onValueChange={setAlertType}>
+                <Select value={alertType} onValueChange={(v) => setAlertType(v ?? '')}>
                   <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
@@ -158,7 +158,7 @@ export default function CommandCenterPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-slate-300">Severity</Label>
-                <Select value={alertSeverity} onValueChange={setAlertSeverity}>
+                <Select value={alertSeverity} onValueChange={(v) => setAlertSeverity(v ?? 'moderate')}>
                   <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
                     <SelectValue />
                   </SelectTrigger>
@@ -243,7 +243,7 @@ export default function CommandCenterPage() {
                     className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 pl-9 h-9 text-sm"
                   />
                 </div>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
                   <SelectTrigger className="bg-slate-800 border-slate-600 text-white w-[140px] h-9 text-sm">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
@@ -254,7 +254,7 @@ export default function CommandCenterPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v ?? 'all')}>
                   <SelectTrigger className="bg-slate-800 border-slate-600 text-white w-[140px] h-9 text-sm">
                     <SelectValue placeholder="Type" />
                   </SelectTrigger>
