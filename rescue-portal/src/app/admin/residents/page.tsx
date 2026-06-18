@@ -1,23 +1,41 @@
 'use client'
 
-import { useState } from 'react'
-import { Search, Eye, CheckCircle2, XCircle, MessageSquare, ChevronLeft, ChevronRight } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Search, Eye, CheckCircle2, XCircle, MessageSquare, ChevronLeft, ChevronRight, Upload, UserPlus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { Card, CardContent } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
-import { DEMO_RESIDENTS } from '@/lib/demo-data'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { formatDate, formatRelativeTime } from '@/lib/utils'
 import type { ResidentProfile, RegistrationStatus } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import {
+  COVERAGE_LOCK_CHANGED_EVENT,
+  getBuyerDetails,
+  loadCoverageLock,
+} from '@/lib/coverage-lock-client'
+import type { TenantGeographyScope } from '@/lib/philippines-geography'
 import { toast } from 'sonner'
 
 const PAGE_SIZE = 8
+const RESIDENTS_STORAGE_KEY = 'rescue-portal.demo-residents'
+
+type ResidentFormState = {
+  full_name: string
+  phone: string
+  email: string
+  barangay: string
+  address: string
+  registration_status: RegistrationStatus
+}
 
 const STATUS_CONFIG: Record<RegistrationStatus, { label: string; color: string }> = {
   draft: { label: 'Draft', color: 'bg-slate-800 text-slate-400' },
@@ -29,13 +47,167 @@ const STATUS_CONFIG: Record<RegistrationStatus, { label: string; color: string }
   suspended: { label: 'Suspended', color: 'bg-slate-800 text-slate-500' },
 }
 
+const LOCAL_BARANGAYS = [
+  'Poblacion',
+  'San Isidro',
+  'Santo Nino',
+  'San Jose',
+  'Bagong Pag-asa',
+  'Mabuhay',
+  'Pag-asa',
+  'Maligaya',
+  'Bagong Silang',
+  'Lumang Bayan',
+]
+
+const SAMPLE_NAMES = [
+  'Maria Clara Santos',
+  'Jose Rizal Mendoza',
+  'Nena Dela Rosa',
+  'Ramon Ilustrado Villanueva',
+  'Cynthia Aquino Reyes',
+  'Florencio Macaraeg Bautista',
+  'Ligaya Navarro Cruz',
+  'Benedicto Ramos Fernandez',
+  'Amelia Soriano Garcia',
+  'Danilo Reyes Corpuz',
+]
+
+const emptyResidentForm: ResidentFormState = {
+  full_name: '',
+  phone: '',
+  email: '',
+  barangay: 'Poblacion',
+  address: '',
+  registration_status: 'submitted',
+}
+
+function makeResident(
+  fields: ResidentFormState,
+  area: ReturnType<typeof getBuyerDetails>,
+  index: number,
+  idPrefix = 'local'
+): ResidentProfile {
+  const createdAt = new Date(Date.now() - index * 36 * 60 * 60 * 1000).toISOString()
+  const municipality = area.municipalityName || area.locationName
+  const province = area.provinceName || 'Philippines'
+  const recordKey = idPrefix === 'sample' ? `sample-${index}` : `${idPrefix}-${Date.now()}-${index}`
+
+  return {
+    id: recordKey,
+    user_id: `uid-${recordKey}`,
+    role: 'resident',
+    full_name: fields.full_name,
+    email: fields.email,
+    phone: fields.phone || null,
+    avatar_url: null,
+    organization_id: 'org-bayani-001',
+    municipality_id: null,
+    is_active: fields.registration_status !== 'rejected',
+    last_login_at: null,
+    created_at: createdAt,
+    updated_at: createdAt,
+    date_of_birth: null,
+    address: fields.address || `Purok ${(index % 6) + 1}, ${fields.barangay}`,
+    barangay: fields.barangay,
+    municipality,
+    province,
+    id_type: null,
+    id_number: null,
+    id_front_url: null,
+    id_back_url: null,
+    emergency_contact_name: null,
+    emergency_contact_phone: null,
+    emergency_contact_relationship: null,
+    registration_status: fields.registration_status,
+    verified_at: fields.registration_status === 'approved' ? createdAt : null,
+    verified_by: fields.registration_status === 'approved' ? 'uid-admin' : null,
+    rejection_reason: fields.registration_status === 'rejected' ? 'Demo rejected record.' : null,
+    more_info_request: fields.registration_status === 'more_info_required' ? 'Please submit a clearer ID photo.' : null,
+  }
+}
+
+function generateSampleResidents(scope: TenantGeographyScope) {
+  const area = getBuyerDetails(scope)
+
+  return SAMPLE_NAMES.map((name, index) => {
+    const firstName = name.split(' ')[0].toLowerCase()
+    const lastName = name.split(' ').at(-1)?.toLowerCase() ?? 'resident'
+    const status: RegistrationStatus = index < 6
+      ? 'approved'
+      : index < 8
+      ? 'submitted'
+      : index === 8
+      ? 'under_review'
+      : 'more_info_required'
+
+    return makeResident({
+      full_name: name,
+      phone: `09${17 + index}-${String(210 + index).padStart(3, '0')}-${String(index + 1).padStart(4, '0')}`,
+      email: `${firstName}.${lastName}@email.com`,
+      barangay: LOCAL_BARANGAYS[index % LOCAL_BARANGAYS.length],
+      address: `${12 + index * 7} ${['Rizal', 'Mabini', 'Bonifacio', 'Aguinaldo', 'Luna'][index % 5]} St.`,
+      registration_status: status,
+    }, area, index, 'sample')
+  })
+}
+
+function readStoredResidents() {
+  try {
+    const stored = window.localStorage.getItem(RESIDENTS_STORAGE_KEY)
+    return stored ? JSON.parse(stored) as ResidentProfile[] : []
+  } catch {
+    return []
+  }
+}
+
+function writeStoredResidents(residents: ResidentProfile[]) {
+  window.localStorage.setItem(RESIDENTS_STORAGE_KEY, JSON.stringify(residents))
+}
+
 export default function ResidentsPage() {
   const [tab, setTab] = useState('all')
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
   const [viewResident, setViewResident] = useState<ResidentProfile | null>(null)
+  const [residentRows, setResidentRows] = useState<ResidentProfile[]>([])
+  const [coverageScope, setCoverageScope] = useState<TenantGeographyScope>({ level: 'country' })
+  const [manualForm, setManualForm] = useState<ResidentFormState>(emptyResidentForm)
+  const [bulkText, setBulkText] = useState('Full Name, Phone, Email, Barangay, Address\nAna Lopez Cruz, 0917-555-0001, ana.cruz@email.com, Poblacion, 22 Rizal St.')
 
-  const filtered = DEMO_RESIDENTS.filter((r) => {
+  const buyerDetails = useMemo(() => getBuyerDetails(coverageScope), [coverageScope])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function refreshResidents(scope?: TenantGeographyScope) {
+      const activeScope = scope ?? (await loadCoverageLock()).scope
+      if (cancelled) return
+
+      setCoverageScope(activeScope)
+      setResidentRows([...generateSampleResidents(activeScope), ...readStoredResidents()])
+    }
+
+    function handleCoverageChange(event: Event) {
+      const customEvent = event as CustomEvent<TenantGeographyScope>
+      if (customEvent.detail) void refreshResidents(customEvent.detail)
+    }
+
+    void refreshResidents()
+    window.addEventListener(COVERAGE_LOCK_CHANGED_EVENT, handleCoverageChange)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener(COVERAGE_LOCK_CHANGED_EVENT, handleCoverageChange)
+    }
+  }, [])
+
+  function persistAddedResidents(nextAddedResidents: ResidentProfile[]) {
+    writeStoredResidents(nextAddedResidents)
+    setResidentRows([...generateSampleResidents(coverageScope), ...nextAddedResidents])
+  }
+
+  const filtered = residentRows.filter((r) => {
     if (tab === 'pending' && !['submitted', 'under_review', 'more_info_required'].includes(r.registration_status)) return false
     if (tab === 'approved' && r.registration_status !== 'approved') return false
     if (tab === 'rejected' && r.registration_status !== 'rejected') return false
@@ -52,14 +224,106 @@ export default function ResidentsPage() {
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
-  const pendingCount = DEMO_RESIDENTS.filter((r) => ['submitted', 'under_review', 'more_info_required'].includes(r.registration_status)).length
+  const pendingCount = residentRows.filter((r) => ['submitted', 'under_review', 'more_info_required'].includes(r.registration_status)).length
+
+  function createManualResident() {
+    if (!manualForm.full_name.trim() || !manualForm.phone.trim()) {
+      toast.error('Name and phone are required.')
+      return
+    }
+
+    const added = readStoredResidents()
+    const email = manualForm.email.trim() || `${manualForm.full_name.toLowerCase().replace(/\s+/g, '.')}@pending.local`
+    const resident = makeResident({ ...manualForm, email }, buyerDetails, added.length + 1, 'manual')
+
+    persistAddedResidents([resident, ...added])
+    setManualForm(emptyResidentForm)
+    setPage(1)
+    toast.success('Resident created for fast registration')
+  }
+
+  function importBulkResidents() {
+    const rows = bulkText
+      .split(/\r?\n/)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .filter((line, index) => !(index === 0 && line.toLowerCase().startsWith('full name')))
+
+    const added = readStoredResidents()
+    const residents = rows.map((row, index) => {
+      const [fullName, phone, email, barangay, address] = row.split(',').map((item) => item?.trim() ?? '')
+
+      return makeResident({
+        full_name: fullName || `Interested Resident ${index + 1}`,
+        phone: phone || `0900-000-${String(index + 1).padStart(4, '0')}`,
+        email: email || `interested.${Date.now()}.${index}@pending.local`,
+        barangay: barangay || LOCAL_BARANGAYS[index % LOCAL_BARANGAYS.length],
+        address,
+        registration_status: 'submitted',
+      }, buyerDetails, added.length + index + 1, 'bulk')
+    })
+
+    if (residents.length === 0) {
+      toast.error('Paste at least one resident row.')
+      return
+    }
+
+    persistAddedResidents([...residents, ...added])
+    setPage(1)
+    toast.success(`${residents.length} interested resident${residents.length === 1 ? '' : 's'} uploaded`)
+  }
+
+  function updateResidentStatus(residentId: string, status: RegistrationStatus) {
+    const added = readStoredResidents()
+    const existing = added.find((resident) => resident.id === residentId)
+
+    if (existing) {
+      persistAddedResidents(added.map((resident) => resident.id === residentId
+        ? {
+          ...resident,
+          registration_status: status,
+          verified_at: status === 'approved' ? new Date().toISOString() : resident.verified_at,
+          rejection_reason: status === 'rejected' ? 'Rejected during admin review.' : null,
+          more_info_request: status === 'more_info_required' ? 'Please submit additional documents.' : null,
+        }
+        : resident
+      ))
+    } else {
+      setResidentRows((rows) => rows.map((resident) => resident.id === residentId
+        ? {
+          ...resident,
+          registration_status: status,
+          verified_at: status === 'approved' ? new Date().toISOString() : resident.verified_at,
+          rejection_reason: status === 'rejected' ? 'Rejected during admin review.' : null,
+          more_info_request: status === 'more_info_required' ? 'Please submit additional documents.' : null,
+        }
+        : resident
+      ))
+    }
+
+    toast.success(status === 'approved' ? 'Resident approved' : status === 'rejected' ? 'Resident rejected' : 'More info requested')
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-screen-xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Residents</h1>
-          <p className="text-slate-400 text-sm">{DEMO_RESIDENTS.length} registered residents</p>
+          <p className="text-slate-400 text-sm">{residentRows.length} residents around {buyerDetails.locationName}</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <a
+            href="#bulk-upload-panel"
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg border border-slate-600 px-2.5 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-800 hover:text-white"
+          >
+            <Upload className="w-4 h-4 mr-1.5" /> Bulk Upload
+          </a>
+          <a
+            href="#manual-resident-panel"
+            className="inline-flex h-8 items-center justify-center gap-1.5 rounded-lg bg-blue-600 px-2.5 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+          >
+            <UserPlus className="w-4 h-4 mr-1.5" /> New Resident
+          </a>
         </div>
       </div>
 
@@ -86,6 +350,93 @@ export default function ResidentsPage() {
           </div>
         </CardContent>
       </Card>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
+        <Card id="manual-resident-panel" className="bg-slate-900 border-slate-700 scroll-mt-4">
+          <CardContent className="p-4 space-y-4">
+            <div>
+              <h2 className="text-base font-semibold text-white">Manual Resident Creation</h2>
+              <p className="text-xs text-slate-400">Fast register a resident under {buyerDetails.locationName}.</p>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-slate-300">Full Name *</Label>
+                <Input value={manualForm.full_name} onChange={(e) => setManualForm((prev) => ({ ...prev, full_name: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-slate-300">Phone *</Label>
+                <Input value={manualForm.phone} onChange={(e) => setManualForm((prev) => ({ ...prev, phone: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-slate-300">Email</Label>
+                <Input value={manualForm.email} onChange={(e) => setManualForm((prev) => ({ ...prev, email: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-slate-300">Barangay</Label>
+                <Select value={manualForm.barangay} onValueChange={(value) => value && setManualForm((prev) => ({ ...prev, barangay: value }))}>
+                  <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-600">
+                    {LOCAL_BARANGAYS.map((barangay) => (
+                      <SelectItem key={barangay} value={barangay} className="text-white hover:bg-slate-700">{barangay}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-slate-300">Status</Label>
+                <Select value={manualForm.registration_status} onValueChange={(value) => value && setManualForm((prev) => ({ ...prev, registration_status: value as RegistrationStatus }))}>
+                  <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-600">
+                    {(['submitted', 'under_review', 'approved'] as RegistrationStatus[]).map((status) => (
+                      <SelectItem key={status} value={status} className="text-white hover:bg-slate-700">{STATUS_CONFIG[status].label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-slate-300">Address</Label>
+                <Input value={manualForm.address} onChange={(e) => setManualForm((prev) => ({ ...prev, address: e.target.value }))} placeholder={`Street or purok in ${buyerDetails.locationName}`} className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" />
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={createManualResident}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-blue-600 px-3 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            >
+              <UserPlus className="w-4 h-4 mr-1.5" /> Create Resident
+            </button>
+          </CardContent>
+        </Card>
+
+        <Card id="bulk-upload-panel" className="bg-slate-900 border-slate-700 scroll-mt-4">
+          <CardContent className="p-4 space-y-4">
+            <div>
+              <h2 className="text-base font-semibold text-white">Bulk Upload Interested Residents</h2>
+              <p className="text-xs text-slate-400">Paste CSV rows. Imported residents are marked Submitted under {buyerDetails.locationName}.</p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-slate-300">CSV Rows</Label>
+              <Textarea
+                value={bulkText}
+                onChange={(event) => setBulkText(event.target.value)}
+                className="min-h-40 bg-slate-800 border-slate-600 text-white font-mono text-xs"
+              />
+              <p className="text-xs text-slate-500">Format: Full Name, Phone, Email, Barangay, Address</p>
+            </div>
+            <button
+              type="button"
+              onClick={importBulkResidents}
+              className="inline-flex h-9 items-center justify-center rounded-lg bg-blue-600 px-3 text-sm font-medium text-white transition-colors hover:bg-blue-700"
+            >
+              <Upload className="w-4 h-4 mr-1.5" /> Import Residents
+            </button>
+          </CardContent>
+        </Card>
+      </div>
 
       <Card className="bg-slate-900 border-slate-700">
         <CardContent className="p-0">
@@ -132,13 +483,13 @@ export default function ResidentsPage() {
                           </Button>
                           {['submitted', 'under_review', 'more_info_required'].includes(resident.registration_status) && (
                             <>
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-400 hover:text-green-300" onClick={() => toast.success('Demo: Resident approved')}>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-green-400 hover:text-green-300" onClick={() => updateResidentStatus(resident.id, 'approved')}>
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                               </Button>
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:text-red-300" onClick={() => toast.error('Demo: Resident rejected')}>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-red-400 hover:text-red-300" onClick={() => updateResidentStatus(resident.id, 'rejected')}>
                                 <XCircle className="w-3.5 h-3.5" />
                               </Button>
-                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-amber-400 hover:text-amber-300" onClick={() => toast.info('Demo: More info requested')}>
+                              <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-amber-400 hover:text-amber-300" onClick={() => updateResidentStatus(resident.id, 'more_info_required')}>
                                 <MessageSquare className="w-3.5 h-3.5" />
                               </Button>
                             </>
@@ -212,10 +563,10 @@ export default function ResidentsPage() {
               </div>
               {['submitted', 'under_review', 'more_info_required'].includes(viewResident.registration_status) && (
                 <div className="flex gap-2">
-                  <Button className="flex-1 bg-green-700 hover:bg-green-600 text-white" size="sm" onClick={() => { toast.success('Demo: Approved'); setViewResident(null) }}>
+                  <Button className="flex-1 bg-green-700 hover:bg-green-600 text-white" size="sm" onClick={() => { updateResidentStatus(viewResident.id, 'approved'); setViewResident(null) }}>
                     <CheckCircle2 className="w-4 h-4 mr-1" /> Approve
                   </Button>
-                  <Button className="flex-1 bg-red-700 hover:bg-red-600 text-white" size="sm" onClick={() => { toast.error('Demo: Rejected'); setViewResident(null) }}>
+                  <Button className="flex-1 bg-red-700 hover:bg-red-600 text-white" size="sm" onClick={() => { updateResidentStatus(viewResident.id, 'rejected'); setViewResident(null) }}>
                     <XCircle className="w-4 h-4 mr-1" /> Reject
                   </Button>
                 </div>
