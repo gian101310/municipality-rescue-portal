@@ -1,0 +1,1248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Municipality Rescue Portal</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+<style>
+:root {
+  --primary: #1e40af;
+  --primary-light: #3b82f6;
+  --primary-dark: #1e3a8a;
+  --danger: #dc2626;
+  --danger-light: #ef4444;
+  --warning: #f59e0b;
+  --success: #16a34a;
+  --bg: #f0f4f8;
+  --card: #ffffff;
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --shadow: 0 4px 24px rgba(0,0,0,0.08);
+  --shadow-lg: 0 12px 40px rgba(0,0,0,0.12);
+  --radius: 16px;
+  --radius-sm: 10px;
+}
+
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+
+/* ==================== LANDING PAGE ==================== */
+.landing-page {
+  min-height:100vh;
+  background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #1e40af 100%);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  position:relative; overflow:hidden;
+}
+.landing-page::before {
+  content:''; position:absolute; top:-50%; left:-50%; width:200%; height:200%;
+  background: radial-gradient(circle at 30% 50%, rgba(59,130,246,0.15) 0%, transparent 50%),
+              radial-gradient(circle at 70% 80%, rgba(239,68,68,0.1) 0%, transparent 50%);
+  animation: pulse-bg 8s ease-in-out infinite;
+}
+@keyframes pulse-bg { 0%,100%{opacity:0.8} 50%{opacity:1} }
+
+.landing-content {
+  position:relative; z-index:1; text-align:center; padding:2rem;
+}
+.landing-logo {
+  width:100px; height:100px; background:rgba(255,255,255,0.1); backdrop-filter:blur(10px);
+  border-radius:28px; display:flex; align-items:center; justify-content:center;
+  margin:0 auto 2rem; border:2px solid rgba(255,255,255,0.2);
+  box-shadow: 0 0 60px rgba(59,130,246,0.3);
+}
+.landing-logo i { font-size:48px; color:#fff; }
+.landing-content h1 {
+  font-size:3.5rem; font-weight:900; color:#fff; margin-bottom:0.5rem;
+  letter-spacing:-1px; text-shadow: 0 2px 20px rgba(0,0,0,0.3);
+}
+.landing-content h1 span { color:#60a5fa; }
+.landing-subtitle {
+  font-size:1.2rem; color:rgba(255,255,255,0.7); margin-bottom:3rem; font-weight:300;
+}
+.landing-buttons { display:flex; gap:1.5rem; justify-content:center; flex-wrap:wrap; }
+.landing-btn {
+  padding:18px 48px; border-radius:14px; font-size:1.1rem; font-weight:700;
+  cursor:pointer; border:none; transition:all 0.3s; display:flex; align-items:center; gap:12px;
+  text-transform:uppercase; letter-spacing:1px;
+}
+.btn-user {
+  background:linear-gradient(135deg, #dc2626, #ef4444); color:#fff;
+  box-shadow: 0 8px 32px rgba(220,38,38,0.4);
+}
+.btn-user:hover { transform:translateY(-3px); box-shadow: 0 12px 40px rgba(220,38,38,0.5); }
+.btn-admin {
+  background:rgba(255,255,255,0.1); color:#fff; backdrop-filter:blur(10px);
+  border:2px solid rgba(255,255,255,0.3);
+}
+.btn-admin:hover { background:rgba(255,255,255,0.2); transform:translateY(-3px); }
+
+/* ==================== USER SIDE ==================== */
+.user-app { display:none; min-height:100vh; background:var(--bg); }
+.user-header {
+  background:linear-gradient(135deg, var(--danger), #b91c1c);
+  padding:1.5rem 2rem; color:#fff; display:flex; align-items:center; justify-content:space-between;
+  box-shadow: 0 4px 20px rgba(220,38,38,0.3);
+}
+.user-header h2 { font-size:1.3rem; font-weight:700; display:flex; align-items:center; gap:10px; }
+.back-btn {
+  background:rgba(255,255,255,0.2); border:none; color:#fff; width:40px; height:40px;
+  border-radius:12px; cursor:pointer; font-size:1.1rem; transition:all 0.2s;
+}
+.back-btn:hover { background:rgba(255,255,255,0.3); }
+
+.user-body { max-width:520px; margin:0 auto; padding:1.5rem; }
+
+/* Steps indicator */
+.steps-bar {
+  display:flex; align-items:center; justify-content:center; gap:0; margin-bottom:2rem;
+}
+.step-item {
+  display:flex; align-items:center; gap:0;
+}
+.step-circle {
+  width:44px; height:44px; border-radius:50%; display:flex; align-items:center; justify-content:center;
+  font-weight:700; font-size:0.95rem; transition:all 0.4s;
+  background:#e2e8f0; color:var(--text-muted);
+}
+.step-circle.active { background:var(--danger); color:#fff; box-shadow:0 4px 16px rgba(220,38,38,0.4); }
+.step-circle.done { background:var(--success); color:#fff; }
+.step-line { width:60px; height:3px; background:#e2e8f0; transition:all 0.4s; }
+.step-line.active { background:var(--danger); }
+.step-line.done { background:var(--success); }
+
+/* Cards */
+.form-card {
+  background:var(--card); border-radius:var(--radius); padding:2rem; box-shadow:var(--shadow);
+  margin-bottom:1.5rem;
+}
+.form-card h3 {
+  font-size:1.25rem; font-weight:700; margin-bottom:0.3rem; display:flex; align-items:center; gap:10px;
+}
+.form-card h3 i { color:var(--danger); }
+.form-card p.subtitle { color:var(--text-muted); font-size:0.88rem; margin-bottom:1.5rem; }
+
+.form-group { margin-bottom:1.2rem; }
+.form-group label {
+  display:block; font-weight:600; font-size:0.85rem; margin-bottom:6px;
+  color:var(--text); text-transform:uppercase; letter-spacing:0.5px;
+}
+.form-group label .required { color:var(--danger); }
+.form-input {
+  width:100%; padding:14px 16px; border:2px solid var(--border); border-radius:var(--radius-sm);
+  font-size:1rem; font-family:inherit; transition:all 0.2s; background:#f8fafc;
+}
+.form-input:focus { outline:none; border-color:var(--primary-light); background:#fff; box-shadow:0 0 0 4px rgba(59,130,246,0.1); }
+.form-input.error { border-color:var(--danger); background:#fef2f2; }
+.error-text { color:var(--danger); font-size:0.78rem; margin-top:4px; display:none; }
+.error-text.show { display:block; }
+
+/* Emergency type grid */
+.emergency-grid {
+  display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:1.5rem;
+}
+.emergency-option {
+  padding:1.2rem; border:2px solid var(--border); border-radius:var(--radius-sm);
+  text-align:center; cursor:pointer; transition:all 0.3s; background:#f8fafc;
+}
+.emergency-option:hover { border-color:var(--primary-light); background:#eff6ff; }
+.emergency-option.selected { border-color:var(--danger); background:#fef2f2; box-shadow:0 0 0 4px rgba(220,38,38,0.1); }
+.emergency-option i { font-size:2rem; margin-bottom:8px; display:block; }
+.emergency-option span { font-weight:600; font-size:0.85rem; }
+.eo-fire i { color:#ef4444; }
+.eo-flood i { color:#3b82f6; }
+.eo-medical i { color:#10b981; }
+.eo-earthquake i { color:#f59e0b; }
+.eo-accident i { color:#8b5cf6; }
+.eo-other i { color:#64748b; }
+
+/* GPS */
+.gps-box {
+  background:#f0fdf4; border:2px dashed #86efac; border-radius:var(--radius-sm);
+  padding:1.5rem; text-align:center; margin-bottom:1.5rem; transition:all 0.3s;
+}
+.gps-box.located { border-style:solid; border-color:var(--success); background:#dcfce7; }
+.gps-box i { font-size:2rem; color:var(--success); margin-bottom:8px; }
+.gps-box .gps-label { font-weight:600; color:var(--text); }
+.gps-box .gps-coords { font-size:0.82rem; color:var(--text-muted); margin-top:4px; font-family:monospace; }
+.gps-btn {
+  margin-top:12px; padding:10px 24px; background:var(--success); color:#fff; border:none;
+  border-radius:8px; font-weight:600; cursor:pointer; font-size:0.9rem; transition:all 0.2s;
+}
+.gps-btn:hover { background:#15803d; }
+
+/* Message */
+.message-area {
+  width:100%; padding:14px 16px; border:2px solid var(--border); border-radius:var(--radius-sm);
+  font-size:0.95rem; font-family:inherit; resize:vertical; min-height:80px; background:#f8fafc;
+  transition:all 0.2s;
+}
+.message-area:focus { outline:none; border-color:var(--primary-light); background:#fff; }
+
+/* Buttons */
+.btn-primary {
+  width:100%; padding:16px; background:linear-gradient(135deg, var(--danger), #b91c1c);
+  color:#fff; border:none; border-radius:var(--radius-sm); font-size:1.1rem; font-weight:700;
+  cursor:pointer; transition:all 0.3s; text-transform:uppercase; letter-spacing:1px;
+}
+.btn-primary:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(220,38,38,0.4); }
+.btn-primary:disabled { opacity:0.5; cursor:not-allowed; transform:none; box-shadow:none; }
+.btn-secondary {
+  width:100%; padding:14px; background:var(--primary); color:#fff; border:none;
+  border-radius:var(--radius-sm); font-size:1rem; font-weight:600; cursor:pointer; transition:all 0.2s;
+}
+.btn-secondary:hover { background:var(--primary-dark); }
+
+/* Success screen */
+.success-screen {
+  display:none; text-align:center; padding:3rem 1.5rem;
+}
+.success-screen .check-circle {
+  width:100px; height:100px; background:#dcfce7; border-radius:50%; display:flex;
+  align-items:center; justify-content:center; margin:0 auto 1.5rem;
+  animation: pop-in 0.5s cubic-bezier(0.68,-0.55,0.27,1.55);
+}
+.success-screen .check-circle i { font-size:48px; color:var(--success); }
+@keyframes pop-in { 0%{transform:scale(0)} 100%{transform:scale(1)} }
+.success-screen h3 { font-size:1.5rem; font-weight:800; color:var(--success); margin-bottom:0.5rem; }
+.success-screen p { color:var(--text-muted); margin-bottom:2rem; }
+
+/* ==================== ADMIN SIDE ==================== */
+.admin-app { display:none; min-height:100vh; background:#0f172a; color:#e2e8f0; }
+.admin-header {
+  background:#1e293b; padding:1rem 2rem; display:flex; align-items:center; justify-content:space-between;
+  border-bottom:1px solid #334155; position:sticky; top:0; z-index:100;
+}
+.admin-header h2 { font-size:1.2rem; font-weight:700; display:flex; align-items:center; gap:10px; color:#f1f5f9; }
+.admin-header h2 i { color:#60a5fa; }
+.admin-back-btn {
+  background:#334155; border:none; color:#94a3b8; width:40px; height:40px;
+  border-radius:10px; cursor:pointer; font-size:1rem; transition:all 0.2s;
+}
+.admin-back-btn:hover { background:#475569; color:#fff; }
+
+/* Admin stats bar */
+.stats-bar {
+  display:flex; gap:1rem; padding:1rem 2rem; background:#1e293b; border-bottom:1px solid #334155;
+  overflow-x:auto;
+}
+.stat-card {
+  flex:1; min-width:160px; background:#0f172a; border:1px solid #334155; border-radius:12px;
+  padding:1rem 1.2rem; display:flex; align-items:center; gap:12px;
+}
+.stat-icon {
+  width:44px; height:44px; border-radius:12px; display:flex; align-items:center; justify-content:center;
+  font-size:1.2rem;
+}
+.stat-icon.red { background:rgba(239,68,68,0.15); color:#ef4444; }
+.stat-icon.yellow { background:rgba(245,158,11,0.15); color:#f59e0b; }
+.stat-icon.blue { background:rgba(59,130,246,0.15); color:#60a5fa; }
+.stat-icon.green { background:rgba(34,197,94,0.15); color:#22c55e; }
+.stat-info .stat-num { font-size:1.5rem; font-weight:800; color:#f1f5f9; }
+.stat-info .stat-label { font-size:0.75rem; color:#64748b; text-transform:uppercase; letter-spacing:0.5px; }
+
+/* Admin layout */
+.admin-body { display:flex; height:calc(100vh - 130px); }
+.map-panel { flex:1; position:relative; }
+.sidebar-panel {
+  width:420px; background:#1e293b; border-left:1px solid #334155;
+  display:flex; flex-direction:column; overflow:hidden;
+}
+
+/* Map */
+#admin-map { width:100%; height:100%; background:#0c1426; }
+
+/* Sidebar tabs */
+.sidebar-tabs {
+  display:flex; border-bottom:1px solid #334155; background:#1e293b;
+}
+.sidebar-tab {
+  flex:1; padding:14px; text-align:center; font-weight:600; font-size:0.85rem;
+  cursor:pointer; border-bottom:3px solid transparent; color:#64748b;
+  transition:all 0.2s; text-transform:uppercase; letter-spacing:0.5px;
+}
+.sidebar-tab.active { color:#60a5fa; border-bottom-color:#3b82f6; background:#0f172a; }
+.sidebar-tab:hover { color:#94a3b8; }
+.sidebar-tab .badge {
+  display:inline-flex; align-items:center; justify-content:center;
+  min-width:20px; height:20px; background:#ef4444; color:#fff; border-radius:10px;
+  font-size:0.7rem; font-weight:700; margin-left:6px; padding:0 6px;
+}
+
+/* Alert list */
+.sidebar-content { flex:1; overflow-y:auto; padding:1rem; }
+.alert-card {
+  background:#0f172a; border:1px solid #334155; border-radius:12px; padding:1rem;
+  margin-bottom:0.8rem; cursor:pointer; transition:all 0.2s;
+}
+.alert-card:hover { border-color:#475569; background:#162033; }
+.alert-card.selected { border-color:#3b82f6; background:#162033; box-shadow:0 0 0 3px rgba(59,130,246,0.2); }
+.alert-card.priority-critical { border-left:4px solid #ef4444; }
+.alert-card.priority-high { border-left:4px solid #f59e0b; }
+.alert-card.priority-medium { border-left:4px solid #3b82f6; }
+
+.alert-top { display:flex; justify-content:space-between; align-items:start; margin-bottom:8px; }
+.alert-type-badge {
+  display:inline-flex; align-items:center; gap:5px; padding:4px 10px;
+  border-radius:6px; font-size:0.75rem; font-weight:700; text-transform:uppercase;
+}
+.badge-fire { background:rgba(239,68,68,0.15); color:#ef4444; }
+.badge-flood { background:rgba(59,130,246,0.15); color:#60a5fa; }
+.badge-medical { background:rgba(16,185,129,0.15); color:#10b981; }
+.badge-earthquake { background:rgba(245,158,11,0.15); color:#f59e0b; }
+.badge-accident { background:rgba(139,92,246,0.15); color:#a78bfa; }
+.badge-other { background:rgba(100,116,139,0.15); color:#94a3b8; }
+
+.alert-time { font-size:0.72rem; color:#64748b; }
+.alert-user { font-weight:600; font-size:0.95rem; color:#e2e8f0; margin-bottom:4px; }
+.alert-location { font-size:0.8rem; color:#64748b; display:flex; align-items:center; gap:4px; }
+
+.alert-status {
+  display:inline-flex; align-items:center; gap:5px; padding:3px 10px;
+  border-radius:6px; font-size:0.72rem; font-weight:600; text-transform:uppercase; margin-top:8px;
+}
+.status-pending { background:rgba(239,68,68,0.15); color:#ef4444; }
+.status-responding { background:rgba(245,158,11,0.15); color:#f59e0b; }
+.status-resolved { background:rgba(34,197,94,0.15); color:#22c55e; }
+
+/* Detail panel */
+.detail-panel {
+  display:none; position:absolute; right:420px; top:0; width:380px; height:100%;
+  background:#1e293b; border-left:1px solid #334155; z-index:50;
+  box-shadow:-8px 0 24px rgba(0,0,0,0.3); overflow-y:auto;
+}
+.detail-header {
+  padding:1.5rem; border-bottom:1px solid #334155;
+  display:flex; justify-content:space-between; align-items:center;
+}
+.detail-header h3 { font-size:1.1rem; font-weight:700; color:#f1f5f9; }
+.detail-close {
+  background:#334155; border:none; color:#94a3b8; width:32px; height:32px;
+  border-radius:8px; cursor:pointer; transition:all 0.2s;
+}
+.detail-close:hover { background:#475569; color:#fff; }
+.detail-body { padding:1.5rem; }
+.detail-section { margin-bottom:1.5rem; }
+.detail-section h4 {
+  font-size:0.78rem; font-weight:700; color:#64748b; text-transform:uppercase;
+  letter-spacing:0.5px; margin-bottom:10px;
+}
+.detail-row {
+  display:flex; justify-content:space-between; padding:8px 0;
+  border-bottom:1px solid #2d3a4d;
+}
+.detail-row .label { color:#94a3b8; font-size:0.88rem; }
+.detail-row .value { color:#e2e8f0; font-weight:600; font-size:0.88rem; }
+
+.action-buttons { display:flex; flex-direction:column; gap:10px; margin-top:1rem; }
+.action-btn {
+  padding:12px 20px; border:none; border-radius:10px; font-weight:600; font-size:0.9rem;
+  cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;
+  transition:all 0.2s;
+}
+.btn-respond { background:#f59e0b; color:#000; }
+.btn-respond:hover { background:#d97706; }
+.btn-call { background:#22c55e; color:#fff; }
+.btn-call:hover { background:#16a34a; }
+.btn-resolve { background:#3b82f6; color:#fff; }
+.btn-resolve:hover { background:#2563eb; }
+
+/* Status dropdown */
+.status-select {
+  width:100%; padding:12px; background:#0f172a; border:1px solid #334155; border-radius:10px;
+  color:#e2e8f0; font-size:0.9rem; font-family:inherit; font-weight:600; cursor:pointer;
+}
+.status-select option { background:#0f172a; }
+
+/* Log table */
+.log-table { width:100%; border-collapse:collapse; font-size:0.82rem; }
+.log-table th {
+  text-align:left; padding:10px 12px; background:#0f172a; color:#64748b;
+  text-transform:uppercase; font-size:0.72rem; letter-spacing:0.5px; font-weight:700;
+  border-bottom:1px solid #334155; position:sticky; top:0;
+}
+.log-table td {
+  padding:10px 12px; border-bottom:1px solid #1e293b; color:#cbd5e1;
+}
+.log-table tr:hover td { background:#162033; }
+
+/* Animations */
+.fade-in { animation:fadeIn 0.3s ease; }
+@keyframes fadeIn { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+.slide-in { animation:slideIn 0.3s ease; }
+@keyframes slideIn { from{opacity:0;transform:translateX(20px)} to{opacity:1;transform:translateX(0)} }
+
+/* Pulse for new alerts */
+@keyframes alert-pulse {
+  0% { box-shadow:0 0 0 0 rgba(239,68,68,0.4); }
+  70% { box-shadow:0 0 0 10px rgba(239,68,68,0); }
+  100% { box-shadow:0 0 0 0 rgba(239,68,68,0); }
+}
+.alert-card.new { animation: alert-pulse 2s ease-in-out 3; }
+
+/* Live indicator */
+.live-dot {
+  width:8px; height:8px; background:#22c55e; border-radius:50%;
+  display:inline-block; margin-right:6px; animation: blink 1.5s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* Scrollbar */
+.sidebar-content::-webkit-scrollbar { width:6px; }
+.sidebar-content::-webkit-scrollbar-track { background:#1e293b; }
+.sidebar-content::-webkit-scrollbar-thumb { background:#475569; border-radius:3px; }
+
+/* Responsive */
+@media (max-width:900px) {
+  .admin-body { flex-direction:column; }
+  .map-panel { height:40vh; }
+  .sidebar-panel { width:100%; height:60vh; }
+  .detail-panel { right:0; width:100%; }
+  .landing-content h1 { font-size:2.2rem; }
+}
+
+/* Toast */
+.toast {
+  position:fixed; bottom:2rem; right:2rem; background:#1e293b; color:#fff;
+  padding:1rem 1.5rem; border-radius:12px; box-shadow:0 8px 32px rgba(0,0,0,0.3);
+  display:flex; align-items:center; gap:10px; z-index:999; transform:translateY(100px);
+  opacity:0; transition:all 0.4s cubic-bezier(0.68,-0.55,0.27,1.55);
+  border-left:4px solid #22c55e;
+}
+.toast.show { transform:translateY(0); opacity:1; }
+.toast i { font-size:1.2rem; color:#22c55e; }
+
+/* Map marker pulse */
+.map-marker {
+  position:absolute; cursor:pointer; transform:translate(-50%,-50%);
+}
+.map-marker .pin {
+  width:20px; height:20px; border-radius:50%; position:relative;
+  display:flex; align-items:center; justify-content:center;
+}
+.map-marker .pin::after {
+  content:''; position:absolute; width:100%; height:100%; border-radius:50%;
+  animation: marker-pulse 2s ease-out infinite; border:2px solid;
+}
+.pin-fire { background:#ef4444; } .pin-fire::after { border-color:#ef4444; }
+.pin-flood { background:#3b82f6; } .pin-flood::after { border-color:#3b82f6; }
+.pin-medical { background:#10b981; } .pin-medical::after { border-color:#10b981; }
+.pin-earthquake { background:#f59e0b; } .pin-earthquake::after { border-color:#f59e0b; }
+.pin-accident { background:#8b5cf6; } .pin-accident::after { border-color:#8b5cf6; }
+.pin-other { background:#94a3b8; } .pin-other::after { border-color:#94a3b8; }
+@keyframes marker-pulse { 0%{transform:scale(1);opacity:1} 100%{transform:scale(3);opacity:0} }
+
+/* Filter bar */
+.filter-bar {
+  display:flex; gap:8px; padding:0.8rem 1rem; border-bottom:1px solid #334155; flex-wrap:wrap;
+}
+.filter-chip {
+  padding:6px 14px; border-radius:20px; font-size:0.75rem; font-weight:600;
+  cursor:pointer; border:1px solid #334155; background:transparent; color:#94a3b8;
+  transition:all 0.2s; text-transform:uppercase;
+}
+.filter-chip.active { background:#3b82f6; color:#fff; border-color:#3b82f6; }
+.filter-chip:hover { border-color:#64748b; }
+</style>
+</head>
+<body>
+
+<!-- ==================== LANDING PAGE ==================== -->
+<div class="landing-page" id="landingPage">
+  <div class="landing-content">
+    <div class="landing-logo">
+      <i class="fas fa-shield-halved"></i>
+    </div>
+    <h1>Rescue<span>Portal</span></h1>
+    <p class="landing-subtitle">Municipal Emergency Response System &mdash; Fast. Reliable. Life-saving.</p>
+    <div class="landing-buttons">
+      <button class="landing-btn btn-user" onclick="showApp('user')">
+        <i class="fas fa-hand-holding-heart"></i> Request Rescue
+      </button>
+      <button class="landing-btn btn-admin" onclick="showApp('admin')">
+        <i class="fas fa-tv"></i> Admin Dashboard
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== USER APP ==================== -->
+<div class="user-app" id="userApp">
+  <div class="user-header">
+    <button class="back-btn" onclick="showApp('landing')"><i class="fas fa-arrow-left"></i></button>
+    <h2><i class="fas fa-hand-holding-heart"></i> Request Rescue</h2>
+    <div style="width:40px"></div>
+  </div>
+
+  <div class="user-body">
+    <!-- Steps bar -->
+    <div class="steps-bar">
+      <div class="step-item">
+        <div class="step-circle active" id="stepCircle1">1</div>
+      </div>
+      <div class="step-line" id="stepLine1"></div>
+      <div class="step-item">
+        <div class="step-circle" id="stepCircle2">2</div>
+      </div>
+      <div class="step-line" id="stepLine2"></div>
+      <div class="step-item">
+        <div class="step-circle" id="stepCircle3">3</div>
+      </div>
+    </div>
+
+    <!-- STEP 1: Contact Information -->
+    <div id="step1" class="fade-in">
+      <div class="form-card">
+        <h3><i class="fas fa-user-circle"></i> Contact Information</h3>
+        <p class="subtitle">Please provide your details before requesting rescue. All fields are required.</p>
+
+        <div class="form-group">
+          <label>Full Name <span class="required">*</span></label>
+          <input type="text" class="form-input" id="userName" placeholder="e.g. Juan Dela Cruz">
+          <div class="error-text" id="nameError">Please enter your full name</div>
+        </div>
+
+        <div class="form-group">
+          <label>Government ID Number <span class="required">*</span></label>
+          <input type="text" class="form-input" id="userId" placeholder="e.g. 1234-5678-9012">
+          <div class="error-text" id="idError">Please enter a valid ID number</div>
+        </div>
+
+        <div class="form-group">
+          <label>Phone Number <span class="required">*</span></label>
+          <input type="tel" class="form-input" id="userPhone" placeholder="e.g. 09171234567">
+          <div class="error-text" id="phoneError">Please enter a valid phone number</div>
+        </div>
+
+        <button class="btn-primary" onclick="goToStep(2)">
+          <i class="fas fa-arrow-right"></i> Continue to Emergency Details
+        </button>
+      </div>
+    </div>
+
+    <!-- STEP 2: Emergency Details -->
+    <div id="step2" style="display:none">
+      <div class="form-card fade-in">
+        <h3><i class="fas fa-exclamation-triangle"></i> Emergency Type</h3>
+        <p class="subtitle">Select the type of emergency you're experiencing.</p>
+
+        <div class="emergency-grid">
+          <div class="emergency-option eo-fire" onclick="selectEmergency(this,'Fire')" data-type="fire">
+            <i class="fas fa-fire"></i>
+            <span>Fire</span>
+          </div>
+          <div class="emergency-option eo-flood" onclick="selectEmergency(this,'Flood')" data-type="flood">
+            <i class="fas fa-water"></i>
+            <span>Flood</span>
+          </div>
+          <div class="emergency-option eo-medical" onclick="selectEmergency(this,'Medical')" data-type="medical">
+            <i class="fas fa-heartbeat"></i>
+            <span>Medical</span>
+          </div>
+          <div class="emergency-option eo-earthquake" onclick="selectEmergency(this,'Earthquake')" data-type="earthquake">
+            <i class="fas fa-house-crack"></i>
+            <span>Earthquake</span>
+          </div>
+          <div class="emergency-option eo-accident" onclick="selectEmergency(this,'Accident')" data-type="accident">
+            <i class="fas fa-car-burst"></i>
+            <span>Accident</span>
+          </div>
+          <div class="emergency-option eo-other" onclick="selectEmergency(this,'Other')" data-type="other">
+            <i class="fas fa-circle-exclamation"></i>
+            <span>Other</span>
+          </div>
+        </div>
+        <div class="error-text" id="emergencyError" style="margin-bottom:12px">Please select an emergency type</div>
+      </div>
+
+      <div class="form-card fade-in">
+        <h3><i class="fas fa-location-dot"></i> Your Location</h3>
+        <p class="subtitle">Share your GPS location so rescuers can find you.</p>
+
+        <div class="gps-box" id="gpsBox">
+          <i class="fas fa-satellite-dish"></i>
+          <div class="gps-label">GPS Location Required</div>
+          <div class="gps-coords" id="gpsCoords">Tap below to share your location</div>
+          <button class="gps-btn" onclick="getLocation()"><i class="fas fa-crosshairs"></i> Share My Location</button>
+        </div>
+        <div class="error-text" id="gpsError">Please share your GPS location</div>
+      </div>
+
+      <div class="form-card fade-in">
+        <h3><i class="fas fa-comment-dots"></i> Additional Details</h3>
+        <p class="subtitle">Any additional information that can help rescuers (optional).</p>
+        <textarea class="message-area" id="userMessage" placeholder="Describe your situation, number of people, injuries, etc."></textarea>
+      </div>
+
+      <button class="btn-primary" onclick="goToStep(3)" style="margin-bottom:2rem">
+        <i class="fas fa-paper-plane"></i> Send Rescue Request
+      </button>
+    </div>
+
+    <!-- STEP 3: Success -->
+    <div id="step3" style="display:none">
+      <div class="success-screen" style="display:block">
+        <div class="check-circle">
+          <i class="fas fa-check"></i>
+        </div>
+        <h3>Request Sent!</h3>
+        <p>Your rescue request has been received. Help is being dispatched to your location. Stay calm and stay safe.</p>
+        <div class="form-card" style="text-align:left; margin-top:1rem">
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+            <span style="color:var(--text-muted);font-size:0.88rem">Reference #</span>
+            <span style="font-weight:700;font-size:0.88rem" id="refNum"></span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">
+            <span style="color:var(--text-muted);font-size:0.88rem">Status</span>
+            <span style="font-weight:700;font-size:0.88rem;color:var(--warning)"><i class="fas fa-clock"></i> Pending</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;padding:8px 0">
+            <span style="color:var(--text-muted);font-size:0.88rem">Estimated Response</span>
+            <span style="font-weight:700;font-size:0.88rem">5-10 minutes</span>
+          </div>
+        </div>
+        <button class="btn-secondary" onclick="resetUser()" style="margin-top:1.5rem">
+          <i class="fas fa-home"></i> Back to Home
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== ADMIN APP ==================== -->
+<div class="admin-app" id="adminApp">
+  <div class="admin-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="admin-back-btn" onclick="showApp('landing')"><i class="fas fa-arrow-left"></i></button>
+      <h2><i class="fas fa-shield-halved"></i> RescuePortal &mdash; Command Center</h2>
+    </div>
+    <div style="display:flex;align-items:center;gap:16px">
+      <span style="font-size:0.82rem;color:#64748b"><span class="live-dot"></span>LIVE</span>
+      <span style="font-size:0.82rem;color:#64748b" id="adminClock"></span>
+    </div>
+  </div>
+
+  <!-- Stats bar -->
+  <div class="stats-bar">
+    <div class="stat-card">
+      <div class="stat-icon red"><i class="fas fa-bell"></i></div>
+      <div class="stat-info">
+        <div class="stat-num" id="statPending">0</div>
+        <div class="stat-label">Pending</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon yellow"><i class="fas fa-truck-fast"></i></div>
+      <div class="stat-info">
+        <div class="stat-num" id="statResponding">0</div>
+        <div class="stat-label">Responding</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon green"><i class="fas fa-circle-check"></i></div>
+      <div class="stat-info">
+        <div class="stat-num" id="statResolved">0</div>
+        <div class="stat-label">Resolved</div>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon blue"><i class="fas fa-list-check"></i></div>
+      <div class="stat-info">
+        <div class="stat-num" id="statTotal">0</div>
+        <div class="stat-label">Total Alerts</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="admin-body">
+    <!-- Map -->
+    <div class="map-panel">
+      <div id="admin-map"></div>
+      <!-- Detail panel (slides in when alert selected) -->
+      <div class="detail-panel" id="detailPanel">
+        <div class="detail-header">
+          <h3><i class="fas fa-user-shield"></i> Alert Details</h3>
+          <button class="detail-close" onclick="closeDetail()"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="detail-body" id="detailBody"></div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="sidebar-panel">
+      <div class="sidebar-tabs">
+        <div class="sidebar-tab active" onclick="switchTab('alerts',this)">
+          <i class="fas fa-bell"></i> Alerts <span class="badge" id="alertBadge">0</span>
+        </div>
+        <div class="sidebar-tab" onclick="switchTab('log',this)">
+          <i class="fas fa-clock-rotate-left"></i> Log
+        </div>
+      </div>
+
+      <!-- Filter bar -->
+      <div class="filter-bar" id="filterBar">
+        <div class="filter-chip active" onclick="filterAlerts('all',this)">All</div>
+        <div class="filter-chip" onclick="filterAlerts('pending',this)">Pending</div>
+        <div class="filter-chip" onclick="filterAlerts('responding',this)">Responding</div>
+        <div class="filter-chip" onclick="filterAlerts('resolved',this)">Resolved</div>
+      </div>
+
+      <div class="sidebar-content" id="sidebarContent">
+        <div id="alertsList"></div>
+        <div id="logView" style="display:none">
+          <table class="log-table">
+            <thead>
+              <tr><th>Time</th><th>Type</th><th>User</th><th>Status</th></tr>
+            </thead>
+            <tbody id="logTableBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"><i class="fas fa-bell"></i> <span id="toastMsg"></span></div>
+
+<script>
+// ==================== STATE ====================
+let currentStep = 1;
+let selectedEmergency = null;
+let userLat = null, userLng = null;
+let alerts = [];
+let currentFilter = 'all';
+let selectedAlertId = null;
+let map = null;
+let markers = [];
+
+// Preload demo alerts
+const demoAlerts = [
+  {
+    id: 'ALT-2024-001', name: 'Maria Santos', govId: 'PHN-8823-4412', phone: '09171234567',
+    type: 'Fire', lat: 14.5995, lng: 120.9842, status: 'pending',
+    message: 'House fire on 2nd floor. 3 people trapped.', time: new Date(Date.now()-300000)
+  },
+  {
+    id: 'ALT-2024-002', name: 'Roberto Cruz', govId: 'PHN-5567-8901', phone: '09281234567',
+    type: 'Flood', lat: 14.5547, lng: 121.0244, status: 'responding',
+    message: 'Waist-deep flooding. Family of 5 needs evacuation.', time: new Date(Date.now()-600000)
+  },
+  {
+    id: 'ALT-2024-003', name: 'Ana Reyes', govId: 'PHN-3345-6789', phone: '09351234567',
+    type: 'Medical', lat: 14.5764, lng: 120.9932, status: 'pending',
+    message: 'Elderly person having chest pains. Need ambulance.', time: new Date(Date.now()-120000)
+  },
+  {
+    id: 'ALT-2024-004', name: 'Carlos Garcia', govId: 'PHN-1122-3344', phone: '09451234567',
+    type: 'Earthquake', lat: 14.6091, lng: 121.0223, status: 'resolved',
+    message: 'Building partially collapsed. All occupants evacuated.', time: new Date(Date.now()-1800000)
+  },
+  {
+    id: 'ALT-2024-005', name: 'Liza Mendoza', govId: 'PHN-9988-7766', phone: '09561234567',
+    type: 'Accident', lat: 14.5869, lng: 121.0615, status: 'pending',
+    message: 'Multi-vehicle accident on highway. Possible injuries.', time: new Date(Date.now()-60000)
+  }
+];
+
+// ==================== NAVIGATION ====================
+function showApp(which) {
+  document.getElementById('landingPage').style.display = 'none';
+  document.getElementById('userApp').style.display = 'none';
+  document.getElementById('adminApp').style.display = 'none';
+
+  if (which === 'landing') {
+    document.getElementById('landingPage').style.display = 'flex';
+  } else if (which === 'user') {
+    document.getElementById('userApp').style.display = 'block';
+    resetUserForm();
+  } else if (which === 'admin') {
+    document.getElementById('adminApp').style.display = 'block';
+    if (alerts.length === 0) alerts = [...demoAlerts];
+    initMap();
+    renderAlerts();
+    updateStats();
+    startClock();
+  }
+}
+
+// ==================== USER FLOW ====================
+function goToStep(step) {
+  if (step === 2) {
+    // Validate step 1
+    let valid = true;
+    const name = document.getElementById('userName').value.trim();
+    const id = document.getElementById('userId').value.trim();
+    const phone = document.getElementById('userPhone').value.trim();
+
+    if (!name) { showError('userName','nameError'); valid=false; } else { hideError('userName','nameError'); }
+    if (!id) { showError('userId','idError'); valid=false; } else { hideError('userId','idError'); }
+    if (!phone || phone.length < 7) { showError('userPhone','phoneError'); valid=false; } else { hideError('userPhone','phoneError'); }
+
+    if (!valid) return;
+
+    document.getElementById('step1').style.display = 'none';
+    document.getElementById('step2').style.display = 'block';
+    document.getElementById('step2').classList.add('fade-in');
+    updateSteps(2);
+  } else if (step === 3) {
+    // Validate step 2
+    let valid = true;
+    if (!selectedEmergency) {
+      document.getElementById('emergencyError').classList.add('show'); valid=false;
+    } else { document.getElementById('emergencyError').classList.remove('show'); }
+    if (!userLat) {
+      document.getElementById('gpsError').classList.add('show'); valid=false;
+    } else { document.getElementById('gpsError').classList.remove('show'); }
+
+    if (!valid) return;
+
+    // Create alert
+    const alert = {
+      id: 'ALT-' + new Date().getFullYear() + '-' + String(alerts.length+1).padStart(3,'0'),
+      name: document.getElementById('userName').value.trim(),
+      govId: document.getElementById('userId').value.trim(),
+      phone: document.getElementById('userPhone').value.trim(),
+      type: selectedEmergency,
+      lat: userLat,
+      lng: userLng,
+      status: 'pending',
+      message: document.getElementById('userMessage').value.trim(),
+      time: new Date()
+    };
+    alerts.unshift(alert);
+
+    document.getElementById('refNum').textContent = alert.id;
+    document.getElementById('step2').style.display = 'none';
+    document.getElementById('step3').style.display = 'block';
+    updateSteps(3);
+  }
+}
+
+function updateSteps(step) {
+  currentStep = step;
+  for (let i=1; i<=3; i++) {
+    const circle = document.getElementById('stepCircle'+i);
+    circle.classList.remove('active','done');
+    if (i < step) { circle.classList.add('done'); circle.innerHTML='<i class="fas fa-check" style="font-size:0.8rem"></i>'; }
+    else if (i === step) circle.classList.add('active');
+  }
+  for (let i=1; i<=2; i++) {
+    const line = document.getElementById('stepLine'+i);
+    line.classList.remove('active','done');
+    if (i < step) line.classList.add('done');
+    else if (i === step) line.classList.add('active');
+  }
+}
+
+function selectEmergency(el, type) {
+  document.querySelectorAll('.emergency-option').forEach(o => o.classList.remove('selected'));
+  el.classList.add('selected');
+  selectedEmergency = type;
+  document.getElementById('emergencyError').classList.remove('show');
+}
+
+function getLocation() {
+  const gpsBox = document.getElementById('gpsBox');
+  const coordsEl = document.getElementById('gpsCoords');
+
+  if (navigator.geolocation) {
+    coordsEl.textContent = 'Acquiring GPS signal...';
+    navigator.geolocation.getCurrentPosition(pos => {
+      userLat = pos.coords.latitude;
+      userLng = pos.coords.longitude;
+      coordsEl.textContent = `${userLat.toFixed(6)}, ${userLng.toFixed(6)}`;
+      gpsBox.classList.add('located');
+      gpsBox.querySelector('.gps-label').textContent = 'Location Acquired';
+      gpsBox.querySelector('.gps-btn').innerHTML = '<i class="fas fa-check"></i> Location Shared';
+      document.getElementById('gpsError').classList.remove('show');
+    }, () => {
+      // Fallback demo coords (Manila area)
+      userLat = 14.5995 + (Math.random()-0.5)*0.05;
+      userLng = 120.9842 + (Math.random()-0.5)*0.05;
+      coordsEl.textContent = `${userLat.toFixed(6)}, ${userLng.toFixed(6)}`;
+      gpsBox.classList.add('located');
+      gpsBox.querySelector('.gps-label').textContent = 'Location Acquired';
+      gpsBox.querySelector('.gps-btn').innerHTML = '<i class="fas fa-check"></i> Location Shared';
+      document.getElementById('gpsError').classList.remove('show');
+    });
+  } else {
+    userLat = 14.5995 + (Math.random()-0.5)*0.05;
+    userLng = 120.9842 + (Math.random()-0.5)*0.05;
+    coordsEl.textContent = `${userLat.toFixed(6)}, ${userLng.toFixed(6)}`;
+    gpsBox.classList.add('located');
+  }
+}
+
+function showError(inputId, errorId) {
+  document.getElementById(inputId).classList.add('error');
+  document.getElementById(errorId).classList.add('show');
+}
+function hideError(inputId, errorId) {
+  document.getElementById(inputId).classList.remove('error');
+  document.getElementById(errorId).classList.remove('show');
+}
+
+function resetUser() { showApp('landing'); }
+function resetUserForm() {
+  currentStep=1; selectedEmergency=null; userLat=null; userLng=null;
+  document.getElementById('step1').style.display='block';
+  document.getElementById('step2').style.display='none';
+  document.getElementById('step3').style.display='none';
+  document.getElementById('userName').value='';
+  document.getElementById('userId').value='';
+  document.getElementById('userPhone').value='';
+  document.getElementById('userMessage').value='';
+  document.querySelectorAll('.emergency-option').forEach(o => o.classList.remove('selected'));
+  document.getElementById('gpsBox').classList.remove('located');
+  document.getElementById('gpsCoords').textContent='Tap below to share your location';
+  document.getElementById('gpsBox').querySelector('.gps-btn').innerHTML='<i class="fas fa-crosshairs"></i> Share My Location';
+  document.querySelectorAll('.error-text').forEach(e => e.classList.remove('show'));
+  document.querySelectorAll('.form-input').forEach(e => e.classList.remove('error'));
+  updateSteps(1);
+}
+
+// ==================== ADMIN ====================
+function initMap() {
+  const mapDiv = document.getElementById('admin-map');
+  // Build a simulated map with a dark background and grid
+  mapDiv.innerHTML = '';
+  mapDiv.style.position = 'relative';
+  mapDiv.style.overflow = 'hidden';
+
+  // Create map background with a styled image
+  const mapBg = document.createElement('div');
+  mapBg.style.cssText = `
+    position:absolute; inset:0;
+    background:
+      linear-gradient(rgba(15,20,38,0.3), rgba(15,20,38,0.3)),
+      url('https://maps.googleapis.com/maps/api/staticmap?center=14.5895,121.02&zoom=12&size=1200x800&scale=2&maptype=roadmap&style=element:geometry%7Ccolor:0x1d2c4d&style=element:labels.text.fill%7Ccolor:0x8ec3b9&style=element:labels.text.stroke%7Ccolor:0x1a3646&style=feature:administrative.country%7Celement:geometry.stroke%7Ccolor:0x4b6878&style=feature:land%7Celement:geometry%7Ccolor:0x1d2c4d&style=feature:road%7Celement:geometry%7Ccolor:0x304a7d&style=feature:road%7Celement:geometry.stroke%7Ccolor:0x255763&style=feature:water%7Celement:geometry%7Ccolor:0x0e1626&key=NO_KEY');
+    background-size: cover; background-position: center;
+  `;
+  mapDiv.appendChild(mapBg);
+
+  // Fallback styled grid for when API key not available
+  const gridCanvas = document.createElement('canvas');
+  gridCanvas.width = mapDiv.offsetWidth || 1200;
+  gridCanvas.height = mapDiv.offsetHeight || 800;
+  gridCanvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;';
+  mapDiv.appendChild(gridCanvas);
+
+  const ctx = gridCanvas.getContext('2d');
+  drawStyledMap(ctx, gridCanvas.width, gridCanvas.height);
+
+  // Place markers
+  renderMapMarkers(mapDiv);
+}
+
+function drawStyledMap(ctx, w, h) {
+  // Dark map background
+  ctx.fillStyle = '#0c1426';
+  ctx.fillRect(0, 0, w, h);
+
+  // Water bodies
+  ctx.fillStyle = '#0e1626';
+  ctx.beginPath();
+  ctx.ellipse(w*0.85, h*0.7, w*0.25, h*0.35, 0.3, 0, Math.PI*2);
+  ctx.fill();
+
+  // Land areas with subtle gradient
+  const grad = ctx.createRadialGradient(w*0.4, h*0.4, 0, w*0.4, h*0.4, w*0.6);
+  grad.addColorStop(0, '#1a2744');
+  grad.addColorStop(1, '#0f1a2e');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, w*0.75, h);
+
+  // Road grid
+  ctx.strokeStyle = '#1e3350';
+  ctx.lineWidth = 1;
+
+  // Major roads
+  const majorRoads = [
+    [[0,h*0.3],[w*0.8,h*0.3]], [[0,h*0.6],[w*0.7,h*0.55]],
+    [[w*0.2,0],[w*0.25,h]], [[w*0.5,0],[w*0.45,h]],
+    [[w*0.15,h*0.1],[w*0.7,h*0.85]], [[w*0.6,h*0.1],[w*0.3,h*0.9]]
+  ];
+  ctx.strokeStyle = '#243b5c';
+  ctx.lineWidth = 2;
+  majorRoads.forEach(r => {
+    ctx.beginPath(); ctx.moveTo(r[0][0],r[0][1]); ctx.lineTo(r[1][0],r[1][1]); ctx.stroke();
+  });
+
+  // Minor roads
+  ctx.strokeStyle = '#1a2d48';
+  ctx.lineWidth = 1;
+  for(let i=0; i<20; i++) {
+    ctx.beginPath();
+    ctx.moveTo(Math.random()*w*0.7, Math.random()*h);
+    ctx.lineTo(Math.random()*w*0.7, Math.random()*h);
+    ctx.stroke();
+  }
+
+  // City blocks
+  ctx.fillStyle = '#162035';
+  for(let i=0; i<30; i++) {
+    const bx = Math.random()*w*0.65 + w*0.05;
+    const by = Math.random()*h*0.8 + h*0.1;
+    ctx.fillRect(bx, by, 15+Math.random()*30, 10+Math.random()*25);
+  }
+
+  // Labels
+  ctx.fillStyle = '#2d4a6f';
+  ctx.font = '11px Inter, sans-serif';
+  ctx.fillText('Manila Bay', w*0.78, h*0.55);
+  ctx.fillText('Quezon City', w*0.35, h*0.2);
+  ctx.fillText('Makati', w*0.4, h*0.65);
+  ctx.fillText('Taguig', w*0.55, h*0.8);
+  ctx.fillText('Pasig', w*0.55, h*0.35);
+  ctx.fillText('Mandaluyong', w*0.42, h*0.4);
+
+  // Scale bar
+  ctx.fillStyle = '#334155';
+  ctx.fillRect(20, h-30, 80, 2);
+  ctx.font = '10px Inter, sans-serif';
+  ctx.fillStyle = '#64748b';
+  ctx.fillText('5 km', 45, h-15);
+}
+
+function renderMapMarkers(mapDiv) {
+  // Remove old markers
+  mapDiv.querySelectorAll('.map-marker').forEach(m => m.remove());
+
+  const w = mapDiv.offsetWidth || 1200;
+  const h = mapDiv.offsetHeight || 800;
+
+  alerts.forEach((alert, i) => {
+    if (currentFilter !== 'all' && alert.status !== currentFilter) return;
+
+    // Map lat/lng to pixel position (rough mapping for Metro Manila area)
+    const x = ((alert.lng - 120.93) / 0.18) * w * 0.7 + w * 0.1;
+    const y = ((14.63 - alert.lat) / 0.1) * h * 0.8 + h * 0.1;
+
+    const marker = document.createElement('div');
+    marker.className = 'map-marker';
+    marker.style.left = Math.max(20, Math.min(x, w-20)) + 'px';
+    marker.style.top = Math.max(20, Math.min(y, h-20)) + 'px';
+
+    const typeLower = alert.type.toLowerCase();
+    if (alert.status === 'resolved') {
+      marker.innerHTML = `<div class="pin" style="background:#22c55e;width:14px;height:14px;opacity:0.5"><div style="display:none"></div></div>`;
+    } else {
+      marker.innerHTML = `<div class="pin pin-${typeLower}"></div>`;
+    }
+
+    marker.onclick = () => selectAlert(alert.id);
+    marker.title = `${alert.type} - ${alert.name}`;
+    mapDiv.appendChild(marker);
+  });
+}
+
+function renderAlerts() {
+  const container = document.getElementById('alertsList');
+  const filtered = currentFilter==='all' ? alerts : alerts.filter(a => a.status===currentFilter);
+
+  container.innerHTML = filtered.map(a => {
+    const typeLower = a.type.toLowerCase();
+    const priorityClass = a.status==='pending' ? 'priority-critical' : a.status==='responding' ? 'priority-high' : 'priority-medium';
+    const isSelected = selectedAlertId === a.id ? 'selected' : '';
+
+    return `
+      <div class="alert-card ${priorityClass} ${isSelected} ${a.status==='pending' && a.time > new Date(Date.now()-120000) ? 'new' : ''}"
+           onclick="selectAlert('${a.id}')">
+        <div class="alert-top">
+          <span class="alert-type-badge badge-${typeLower}">
+            <i class="fas fa-${getTypeIcon(a.type)}"></i> ${a.type}
+          </span>
+          <span class="alert-time">${formatTime(a.time)}</span>
+        </div>
+        <div class="alert-user">${a.name}</div>
+        <div class="alert-location"><i class="fas fa-location-dot"></i> ${a.lat.toFixed(4)}, ${a.lng.toFixed(4)}</div>
+        <div class="alert-status status-${a.status}">
+          <i class="fas fa-${a.status==='pending'?'clock':a.status==='responding'?'truck-fast':'circle-check'}"></i>
+          ${a.status.charAt(0).toUpperCase()+a.status.slice(1)}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  // Update badge
+  const pendingCount = alerts.filter(a => a.status==='pending').length;
+  document.getElementById('alertBadge').textContent = pendingCount;
+  document.getElementById('alertBadge').style.display = pendingCount > 0 ? 'inline-flex' : 'none';
+
+  // Update log
+  renderLog();
+  updateStats();
+
+  // Re-render map markers
+  const mapDiv = document.getElementById('admin-map');
+  if (mapDiv) renderMapMarkers(mapDiv);
+}
+
+function renderLog() {
+  const tbody = document.getElementById('logTableBody');
+  tbody.innerHTML = alerts.map(a => `
+    <tr>
+      <td>${formatTime(a.time)}</td>
+      <td><span class="alert-type-badge badge-${a.type.toLowerCase()}" style="font-size:0.7rem">${a.type}</span></td>
+      <td>${a.name}</td>
+      <td><span class="alert-status status-${a.status}" style="font-size:0.68rem">
+        ${a.status.charAt(0).toUpperCase()+a.status.slice(1)}
+      </span></td>
+    </tr>
+  `).join('');
+}
+
+function selectAlert(id) {
+  selectedAlertId = id;
+  const alert = alerts.find(a => a.id === id);
+  if (!alert) return;
+
+  const panel = document.getElementById('detailPanel');
+  const body = document.getElementById('detailBody');
+
+  body.innerHTML = `
+    <div class="detail-section">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px">
+        <span class="alert-type-badge badge-${alert.type.toLowerCase()}" style="font-size:0.85rem;padding:6px 14px">
+          <i class="fas fa-${getTypeIcon(alert.type)}"></i> ${alert.type} Emergency
+        </span>
+        <span class="alert-status status-${alert.status}" style="font-size:0.78rem;padding:5px 12px">
+          ${alert.status.charAt(0).toUpperCase()+alert.status.slice(1)}
+        </span>
+      </div>
+    </div>
+
+    <div class="detail-section">
+      <h4><i class="fas fa-user"></i> Person Details</h4>
+      <div class="detail-row"><span class="label">Full Name</span><span class="value">${alert.name}</span></div>
+      <div class="detail-row"><span class="label">Gov. ID</span><span class="value">${alert.govId}</span></div>
+      <div class="detail-row"><span class="label">Phone</span><span class="value">${alert.phone}</span></div>
+      <div class="detail-row"><span class="label">Alert ID</span><span class="value">${alert.id}</span></div>
+    </div>
+
+    <div class="detail-section">
+      <h4><i class="fas fa-location-dot"></i> Location</h4>
+      <div class="detail-row"><span class="label">Latitude</span><span class="value">${alert.lat.toFixed(6)}</span></div>
+      <div class="detail-row"><span class="label">Longitude</span><span class="value">${alert.lng.toFixed(6)}</span></div>
+      <div class="detail-row"><span class="label">Time</span><span class="value">${formatTimeFull(alert.time)}</span></div>
+    </div>
+
+    ${alert.message ? `
+    <div class="detail-section">
+      <h4><i class="fas fa-comment"></i> Message</h4>
+      <p style="color:#cbd5e1;font-size:0.9rem;line-height:1.5;background:#0f172a;padding:12px;border-radius:8px">${alert.message}</p>
+    </div>` : ''}
+
+    <div class="detail-section">
+      <h4><i class="fas fa-sliders"></i> Update Status</h4>
+      <select class="status-select" onchange="updateAlertStatus('${alert.id}', this.value)">
+        <option value="pending" ${alert.status==='pending'?'selected':''}>🔴 Pending</option>
+        <option value="responding" ${alert.status==='responding'?'selected':''}>🟡 On the Way</option>
+        <option value="resolved" ${alert.status==='resolved'?'selected':''}>🟢 Resolved / Rescued</option>
+      </select>
+    </div>
+
+    <div class="action-buttons">
+      <button class="action-btn btn-respond" onclick="updateAlertStatus('${alert.id}','responding')">
+        <i class="fas fa-truck-fast"></i> Mark "On the Way"
+      </button>
+      <button class="action-btn btn-call" onclick="callUser('${alert.phone}')">
+        <i class="fas fa-phone"></i> Call ${alert.name}
+      </button>
+      <button class="action-btn btn-resolve" onclick="updateAlertStatus('${alert.id}','resolved')">
+        <i class="fas fa-circle-check"></i> Mark Resolved
+      </button>
+    </div>
+  `;
+
+  panel.style.display = 'block';
+  panel.classList.add('slide-in');
+  renderAlerts();
+}
+
+function closeDetail() {
+  document.getElementById('detailPanel').style.display = 'none';
+  selectedAlertId = null;
+  renderAlerts();
+}
+
+function updateAlertStatus(id, status) {
+  const alert = alerts.find(a => a.id === id);
+  if (alert) {
+    alert.status = status;
+    showToast(`${alert.name} — Status updated to "${status.charAt(0).toUpperCase()+status.slice(1)}"`);
+    selectAlert(id);
+  }
+}
+
+function callUser(phone) {
+  showToast(`Calling ${phone}...`);
+  // In a real app: window.open('tel:'+phone)
+}
+
+function filterAlerts(filter, el) {
+  currentFilter = filter;
+  document.querySelectorAll('.filter-chip').forEach(c => c.classList.remove('active'));
+  if (el) el.classList.add('active');
+  renderAlerts();
+}
+
+function switchTab(tab, el) {
+  document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('alertsList').style.display = tab==='alerts' ? 'block' : 'none';
+  document.getElementById('logView').style.display = tab==='log' ? 'block' : 'none';
+  document.getElementById('filterBar').style.display = tab==='alerts' ? 'flex' : 'none';
+}
+
+function updateStats() {
+  document.getElementById('statPending').textContent = alerts.filter(a=>a.status==='pending').length;
+  document.getElementById('statResponding').textContent = alerts.filter(a=>a.status==='responding').length;
+  document.getElementById('statResolved').textContent = alerts.filter(a=>a.status==='resolved').length;
+  document.getElementById('statTotal').textContent = alerts.length;
+}
+
+// ==================== HELPERS ====================
+function getTypeIcon(type) {
+  const icons = { Fire:'fire', Flood:'water', Medical:'heartbeat', Earthquake:'house-crack', Accident:'car-burst', Other:'circle-exclamation' };
+  return icons[type] || 'circle-exclamation';
+}
+
+function formatTime(d) {
+  const now = new Date();
+  const diff = Math.floor((now - d) / 60000);
+  if (diff < 1) return 'Just now';
+  if (diff < 60) return diff + ' min ago';
+  return d.toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit'});
+}
+
+function formatTimeFull(d) {
+  return d.toLocaleString('en-US', {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit'});
+}
+
+function startClock() {
+  const update = () => {
+    const el = document.getElementById('adminClock');
+    if (el) el.textContent = new Date().toLocaleTimeString('en-US', {hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  };
+  update();
+  setInterval(update, 1000);
+}
+
+function showToast(msg) {
+  const toast = document.getElementById('toast');
+  document.getElementById('toastMsg').textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3500);
+}
+
+// Handle resize for map
+window.addEventListener('resize', () => {
+  if (document.getElementById('adminApp').style.display === 'block') initMap();
+});
+</script>
+</body>
+</html>
