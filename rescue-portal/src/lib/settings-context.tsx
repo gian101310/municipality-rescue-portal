@@ -22,8 +22,8 @@ const STORAGE_KEY = 'rescue_portal_settings'
 const DEFAULT_SETTINGS: PortalSettings = {
   municipalityName: DEMO_ORGANIZATION.name,
   hotline: DEMO_ORGANIZATION.emergency_hotline,
-  secondaryHotline: DEMO_ORGANIZATION.secondary_hotline || '',
-  email: DEMO_ORGANIZATION.email,
+  secondaryHotline: DEMO_ORGANIZATION.secondary_hotline ?? '',
+  email: DEMO_ORGANIZATION.email ?? '',
   mapCenterLat: DEMO_ORGANIZATION.map_center.lat,
   mapCenterLng: DEMO_ORGANIZATION.map_center.lng,
 }
