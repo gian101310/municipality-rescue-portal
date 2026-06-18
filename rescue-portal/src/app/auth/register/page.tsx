@@ -13,7 +13,6 @@ import { Progress } from '@/components/ui/progress'
 import { DemoBanner } from '@/components/demo-banner'
 import { DEMO_BARANGAYS } from '@/lib/demo-data'
 import {
-  COVERAGE_LOCK_STORAGE_KEY,
   DEMO_TENANT_GEO_SCOPE,
   getLocalitiesForProvince,
   getLocalitiesForRegionWithoutProvince,
@@ -24,6 +23,7 @@ import {
   PSGC_VERSION_LABEL,
 } from '@/lib/philippines-geography'
 import type { TenantGeographyScope } from '@/lib/philippines-geography'
+import { loadCoverageLock } from '@/lib/coverage-lock-client'
 import { generateDemoReferenceNumber } from '@/lib/utils'
 import { toast } from 'sonner'
 
@@ -98,49 +98,25 @@ export default function RegisterPage() {
   useEffect(() => {
     let cancelled = false
 
-    function loadLocalCoverageLock() {
-      try {
-        const stored = window.localStorage.getItem(COVERAGE_LOCK_STORAGE_KEY)
-        return stored ? JSON.parse(stored) as TenantGeographyScope : null
-      } catch {
-        return null
-      }
+    async function loadSavedCoverageLock() {
+      const result = await loadCoverageLock()
+      if (cancelled) return
+
+      setGeoScope(result.scope)
+      setForm((prev) => ({
+        ...prev,
+        region: '',
+        regionCode: '',
+        province: '',
+        provinceCode: '',
+        municipality: '',
+        municipalityCode: '',
+        barangay: '',
+      }))
+      setGeoScopePersistence(result.persistence)
     }
 
-    async function loadCoverageLock() {
-      try {
-        const response = await fetch('/api/coverage-lock', { cache: 'no-store' })
-        const payload = await response.json()
-        if (cancelled) return
-
-        const nextScope = response.ok && payload.scope
-          ? payload.scope as TenantGeographyScope
-          : loadLocalCoverageLock()
-
-        if (nextScope) {
-          setGeoScope(nextScope)
-          setForm((prev) => ({
-            ...prev,
-            region: '',
-            regionCode: '',
-            province: '',
-            provinceCode: '',
-            municipality: '',
-            municipalityCode: '',
-            barangay: '',
-          }))
-        }
-        setGeoScopePersistence(response.ok ? 'supabase' : 'demo')
-      } catch {
-        if (!cancelled) {
-          const localScope = loadLocalCoverageLock()
-          if (localScope) setGeoScope(localScope)
-          setGeoScopePersistence('demo')
-        }
-      }
-    }
-
-    loadCoverageLock()
+    loadSavedCoverageLock()
 
     return () => {
       cancelled = true

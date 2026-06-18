@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { MapPin, Filter, RefreshCw, Radio } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Crosshair, MapPin, Filter, RefreshCw, Radio } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -10,33 +10,101 @@ import { MapView } from '@/components/map-view'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
-import { DEMO_INCIDENTS, DEMO_RESCUE_UNITS, DEMO_ORGANIZATION } from '@/lib/demo-data'
+import { DEMO_INCIDENTS, DEMO_RESCUE_UNITS } from '@/lib/demo-data'
 import { formatRelativeTime, getSeverityHexColor } from '@/lib/utils'
 import { isActiveStatus } from '@/lib/utils'
+import {
+  COVERAGE_LOCK_CHANGED_EVENT,
+  getBuyerDetails,
+  loadCoverageLock,
+  resolveCoverageMapFocus,
+} from '@/lib/coverage-lock-client'
+import { DEMO_TENANT_GEO_SCOPE } from '@/lib/philippines-geography'
+import type { TenantGeographyScope } from '@/lib/philippines-geography'
 import Link from 'next/link'
 import type { DemoIncident } from '@/lib/types'
 
 const activeIncidents = DEMO_INCIDENTS.filter((i) => isActiveStatus(i.status))
 
+function deterministicOffset(seed: string, axis: 'lat' | 'lng') {
+  const input = `${seed}:${axis}`
+  let hash = 0
+
+  for (let index = 0; index < input.length; index += 1) {
+    hash = (hash * 31 + input.charCodeAt(index)) >>> 0
+  }
+
+  return ((hash % 1000) / 1000 - 0.5) * 0.035
+}
+
 export default function LiveMapPage() {
   const [selectedIncident, setSelectedIncident] = useState<DemoIncident | null>(null)
   const [filterSeverity, setFilterSeverity] = useState<string>('all')
   const [refreshing, setRefreshing] = useState(false)
+  const [coverageScope, setCoverageScope] = useState<TenantGeographyScope>(DEMO_TENANT_GEO_SCOPE)
+  const [mapCenter, setMapCenter] = useState({ lat: 12.8797, lng: 121.7740 })
+  const [mapZoom, setMapZoom] = useState(6)
+  const [focusSource, setFocusSource] = useState('Loading focus')
 
   const filteredIncidents = activeIncidents.filter((i) =>
     filterSeverity === 'all' || i.severity === filterSeverity
   )
 
-  const mapCenter = DEMO_ORGANIZATION.map_center
+  const buyerDetails = getBuyerDetails(coverageScope)
 
-  const markers = filteredIncidents.map((inc) => ({
-    id: inc.id,
-    lat: inc.latitude ?? (mapCenter.lat + (Math.random() - 0.5) * 0.05),
-    lng: inc.longitude ?? (mapCenter.lng + (Math.random() - 0.5) * 0.05),
-    color: getSeverityHexColor(inc.severity),
-    label: inc.reference_number,
-    severity: inc.severity,
-  }))
+  useEffect(() => {
+    let cancelled = false
+
+    async function applyScope(scope: TenantGeographyScope) {
+      setCoverageScope(scope)
+      const focus = await resolveCoverageMapFocus(scope)
+      if (cancelled) return
+
+      setMapCenter(focus.center)
+      setMapZoom(focus.zoom)
+      setFocusSource(focus.source === 'geocoded'
+        ? 'Focused from map search'
+        : focus.source === 'cache'
+        ? 'Focused from saved map search'
+        : 'Focused from regional fallback')
+    }
+
+    async function loadFocus() {
+      const result = await loadCoverageLock()
+      await applyScope(result.scope)
+    }
+
+    function handleCoverageChange(event: Event) {
+      const customEvent = event as CustomEvent<TenantGeographyScope>
+      if (customEvent.detail) void applyScope(customEvent.detail)
+    }
+
+    loadFocus()
+    window.addEventListener(COVERAGE_LOCK_CHANGED_EVENT, handleCoverageChange)
+
+    return () => {
+      cancelled = true
+      window.removeEventListener(COVERAGE_LOCK_CHANGED_EVENT, handleCoverageChange)
+    }
+  }, [])
+
+  const markers = useMemo(() => [
+    {
+      id: 'coverage-focus',
+      lat: mapCenter.lat,
+      lng: mapCenter.lng,
+      color: '#38bdf8',
+      label: `Focus: ${buyerDetails.locationName}`,
+    },
+    ...filteredIncidents.map((inc) => ({
+      id: inc.id,
+      lat: mapCenter.lat + deterministicOffset(inc.id, 'lat'),
+      lng: mapCenter.lng + deterministicOffset(inc.id, 'lng'),
+      color: getSeverityHexColor(inc.severity),
+      label: inc.reference_number,
+      severity: inc.severity,
+    })),
+  ], [buyerDetails.locationName, filteredIncidents, mapCenter.lat, mapCenter.lng])
 
   async function handleRefresh() {
     setRefreshing(true)
@@ -54,7 +122,7 @@ export default function LiveMapPage() {
             Live Incident Map
           </h1>
           <p className="text-slate-400 text-sm mt-0.5">
-            Real-time view of active incidents and rescue units
+            Focused on {buyerDetails.locationName}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -90,6 +158,10 @@ export default function LiveMapPage() {
           </SelectContent>
         </Select>
         <span className="text-slate-400 text-sm">{filteredIncidents.length} active incident{filteredIncidents.length !== 1 ? 's' : ''}</span>
+        <Badge variant="outline" className="border-blue-500/30 text-blue-300 bg-blue-500/10">
+          <Crosshair className="w-3 h-3 mr-1" />
+          {focusSource}
+        </Badge>
       </div>
 
       {/* Map + Sidebar layout */}
@@ -99,7 +171,7 @@ export default function LiveMapPage() {
           <Card className="bg-slate-900 border-slate-700 overflow-hidden">
             <MapView
               center={mapCenter}
-              zoom={13}
+              zoom={mapZoom}
               markers={markers}
               selectedMarkerId={selectedIncident?.id}
               onMarkerClick={(id) => {

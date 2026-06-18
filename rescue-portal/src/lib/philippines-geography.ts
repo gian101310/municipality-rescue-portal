@@ -31,9 +31,33 @@ export interface TenantGeographyScope {
 
 export const PSGC_VERSION_LABEL = geographyData.versionLabel
 export const COVERAGE_LOCK_STORAGE_KEY = 'rescue-portal.coverage-lock'
+export const COVERAGE_LOCK_GEOCODE_STORAGE_KEY = 'rescue-portal.coverage-lock.geocodes'
 export const PH_REGIONS = geographyData.regions as RegionOption[]
 export const PH_PROVINCES = geographyData.provinces as ProvinceOption[]
 export const PH_LOCALITIES = geographyData.localities as LocalityOption[]
+
+export const PHILIPPINES_MAP_CENTER = { lat: 12.8797, lng: 121.7740 }
+
+export const REGION_MAP_CENTERS: Record<string, { lat: number; lng: number }> = {
+  '1300000000': { lat: 14.5995, lng: 120.9842 },
+  '1400000000': { lat: 17.3513, lng: 121.1719 },
+  '0100000000': { lat: 16.0832, lng: 120.6199 },
+  '0200000000': { lat: 17.6132, lng: 121.7270 },
+  '0300000000': { lat: 15.4828, lng: 120.7120 },
+  '0400000000': { lat: 14.1008, lng: 121.0794 },
+  '1700000000': { lat: 12.6051, lng: 121.0794 },
+  '0500000000': { lat: 13.4210, lng: 123.4137 },
+  '0600000000': { lat: 11.0050, lng: 122.5373 },
+  '1800000000': { lat: 10.2926, lng: 123.0247 },
+  '0700000000': { lat: 10.3157, lng: 123.8854 },
+  '0800000000': { lat: 11.2446, lng: 125.0388 },
+  '0900000000': { lat: 7.8383, lng: 123.2967 },
+  '1000000000': { lat: 8.0202, lng: 124.6857 },
+  '1100000000': { lat: 7.1907, lng: 125.4553 },
+  '1200000000': { lat: 6.2707, lng: 124.6857 },
+  '1600000000': { lat: 8.8015, lng: 125.7407 },
+  '1900000000': { lat: 6.9568, lng: 124.2422 },
+}
 
 export const DEMO_TENANT_GEO_SCOPE: TenantGeographyScope = {
   level: 'country',
@@ -59,6 +83,72 @@ export function getLocalityLabel(locality: LocalityOption) {
     : 'Municipality'
 
   return `${locality.name} (${suffix})`
+}
+
+export function getScopeLocationDetails(scope: TenantGeographyScope = { level: 'country' }) {
+  const locality = PH_LOCALITIES.find((item) => item.code === scope.municipalityCode)
+  const province = PH_PROVINCES.find((item) => item.code === (scope.provinceCode ?? locality?.provinceCode))
+  const region = PH_REGIONS.find((item) => item.code === (scope.regionCode ?? province?.regionCode ?? locality?.regionCode))
+  const locationName = locality
+    ? getLocalityLabel(locality)
+    : province
+    ? province.name
+    : region
+    ? region.name
+    : 'Philippines'
+  const organizationName = locality
+    ? locality.name.match(/^(City|Municipality) of /i)
+      ? locality.name
+      : `${locality.type === 'city' ? 'City' : 'Municipality'} of ${locality.name}`
+    : province
+    ? `Province of ${province.name}`
+    : region
+    ? region.name
+    : 'Philippines Rescue Portal'
+
+  return {
+    region,
+    province,
+    locality,
+    locationName,
+    organizationName,
+    regionName: region?.name ?? '',
+    provinceName: province?.name ?? '',
+    municipalityName: locality?.name ?? '',
+  }
+}
+
+export function getFallbackMapCenter(scope: TenantGeographyScope = { level: 'country' }) {
+  const details = getScopeLocationDetails(scope)
+  const regionCenter = details.region ? REGION_MAP_CENTERS[details.region.code] : null
+
+  return {
+    center: regionCenter ?? PHILIPPINES_MAP_CENTER,
+    zoom: scope.level === 'country'
+      ? 6
+      : scope.level === 'region'
+      ? 8
+      : scope.level === 'province'
+      ? 10
+      : 13,
+  }
+}
+
+export function getScopeGeocodeQuery(scope: TenantGeographyScope = { level: 'country' }) {
+  const details = getScopeLocationDetails(scope)
+
+  if (details.locality) {
+    return [
+      details.locality.name,
+      details.provinceName,
+      details.regionName,
+      'Philippines',
+    ].filter(Boolean).join(', ')
+  }
+
+  if (details.province) return `${details.province.name}, Philippines`
+  if (details.region) return `${details.region.name}, Philippines`
+  return 'Philippines'
 }
 
 export function getScopedRegions(scope: TenantGeographyScope = { level: 'country' }) {
@@ -110,7 +200,18 @@ export function getLocalitiesForRegionWithoutProvince(regionCode: string, scope:
 
 export function makeTenantScope(level: GeoScopeLevel, code?: string): TenantGeographyScope {
   if (level === 'region') return { level, regionCode: code }
-  if (level === 'province') return { level, provinceCode: code }
-  if (level === 'municipality') return { level, municipalityCode: code }
+  if (level === 'province') {
+    const province = PH_PROVINCES.find((item) => item.code === code)
+    return { level, regionCode: province?.regionCode, provinceCode: code }
+  }
+  if (level === 'municipality') {
+    const locality = PH_LOCALITIES.find((item) => item.code === code)
+    return {
+      level,
+      regionCode: locality?.regionCode,
+      provinceCode: locality?.provinceCode ?? undefined,
+      municipalityCode: code,
+    }
+  }
   return { level: 'country' }
 }

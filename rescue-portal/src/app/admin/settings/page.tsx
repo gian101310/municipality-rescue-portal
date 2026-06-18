@@ -13,7 +13,6 @@ import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { DEMO_ORGANIZATION, DEMO_EMERGENCY_TYPES, DEMO_BARANGAYS } from '@/lib/demo-data'
 import {
-  COVERAGE_LOCK_STORAGE_KEY,
   DEMO_TENANT_GEO_SCOPE,
   PH_LOCALITIES,
   PH_PROVINCES,
@@ -29,6 +28,11 @@ import {
 } from '@/lib/philippines-geography'
 import type { GeoScopeLevel } from '@/lib/philippines-geography'
 import type { TenantGeographyScope } from '@/lib/philippines-geography'
+import {
+  getBuyerDetails,
+  loadCoverageLock,
+  saveCoverageLock,
+} from '@/lib/coverage-lock-client'
 import { toast } from 'sonner'
 
 const SCOPE_LEVEL_LABELS: Record<GeoScopeLevel, string> = {
@@ -45,6 +49,10 @@ export default function SettingsPage() {
   const [orgName, setOrgName] = useState(DEMO_ORGANIZATION.name)
   const [hotline, setHotline] = useState(DEMO_ORGANIZATION.emergency_hotline)
   const [province, setProvince] = useState(DEMO_ORGANIZATION.province)
+  const [region, setRegion] = useState(DEMO_ORGANIZATION.region)
+  const [municipality, setMunicipality] = useState('Bayani')
+  const [mapLat, setMapLat] = useState(String(DEMO_ORGANIZATION.map_center.lat))
+  const [mapLng, setMapLng] = useState(String(DEMO_ORGANIZATION.map_center.lng))
   const [scopeLevel, setScopeLevel] = useState<GeoScopeLevel>(DEMO_TENANT_GEO_SCOPE.level)
   const [scopeRegionCode, setScopeRegionCode] = useState(DEMO_TENANT_GEO_SCOPE.regionCode ?? '')
   const [scopeProvinceCode, setScopeProvinceCode] = useState(DEMO_TENANT_GEO_SCOPE.provinceCode ?? '')
@@ -86,53 +94,32 @@ export default function SettingsPage() {
     || (scopeLevel === 'municipality' && Boolean(scopeMunicipalityCode))
 
   function applyCoverageScope(scope: TenantGeographyScope) {
+    const details = getBuyerDetails(scope)
+
     setScopeLevel(scope.level)
-    setScopeRegionCode(scope.regionCode ?? '')
-    setScopeProvinceCode(scope.provinceCode ?? '')
+    setScopeRegionCode(scope.regionCode ?? details.region?.code ?? '')
+    setScopeProvinceCode(scope.provinceCode ?? details.province?.code ?? '')
     setScopeMunicipalityCode(scope.municipalityCode ?? '')
-  }
-
-  function loadLocalCoverageLock() {
-    try {
-      const stored = window.localStorage.getItem(COVERAGE_LOCK_STORAGE_KEY)
-      return stored ? JSON.parse(stored) as TenantGeographyScope : null
-    } catch {
-      return null
-    }
-  }
-
-  function saveLocalCoverageLock(scope: TenantGeographyScope) {
-    window.localStorage.setItem(COVERAGE_LOCK_STORAGE_KEY, JSON.stringify(scope))
+    setOrgName(details.organizationName)
+    setProvince(details.provinceName || 'Philippines')
+    setRegion(details.regionName || 'Philippines')
+    setMunicipality(details.municipalityName || '')
+    setMapLat(String(details.mapCenter.lat))
+    setMapLng(String(details.mapCenter.lng))
   }
 
   useEffect(() => {
     let cancelled = false
 
-    async function loadCoverageLock() {
-      try {
-        const response = await fetch('/api/coverage-lock', { cache: 'no-store' })
-        const payload = await response.json()
-        if (cancelled) return
+    async function loadSavedCoverageLock() {
+      const result = await loadCoverageLock()
+      if (cancelled) return
 
-        if (response.ok && payload.scope) {
-          applyCoverageScope(payload.scope)
-          setCoveragePersistence('supabase')
-          return
-        }
-
-        const localScope = loadLocalCoverageLock()
-        if (localScope) applyCoverageScope(localScope)
-        setCoveragePersistence('demo')
-      } catch {
-        if (!cancelled) {
-          const localScope = loadLocalCoverageLock()
-          if (localScope) applyCoverageScope(localScope)
-          setCoveragePersistence('demo')
-        }
-      }
+      applyCoverageScope(result.scope)
+      setCoveragePersistence(result.persistence)
     }
 
-    loadCoverageLock()
+    loadSavedCoverageLock()
 
     return () => {
       cancelled = true
@@ -152,25 +139,14 @@ export default function SettingsPage() {
     setSavingCoverage(true)
 
     try {
-      const response = await fetch('/api/coverage-lock', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ scope: currentScope }),
-      })
-      const payload = await response.json()
-
-      if (!response.ok) {
-        throw new Error(payload.message ?? 'Unable to save coverage lock.')
-      }
-
-      applyCoverageScope(payload.scope)
-      setCoveragePersistence('supabase')
-      toast.success('Coverage lock saved to Supabase')
+      const result = await saveCoverageLock(currentScope)
+      applyCoverageScope(result.scope)
+      setCoveragePersistence(result.persistence)
+      toast.success(result.persistence === 'supabase'
+        ? 'Coverage lock saved to Supabase'
+        : 'Coverage lock saved for testing')
     } catch (error) {
-      saveLocalCoverageLock(currentScope)
-      setCoveragePersistence('demo')
-      toast.success('Coverage lock saved in this browser for testing')
-      console.warn(error instanceof Error ? error.message : 'Unable to save coverage lock to Supabase.')
+      toast.error(error instanceof Error ? error.message : 'Unable to save coverage lock.')
     } finally {
       setSavingCoverage(false)
     }
@@ -211,7 +187,11 @@ export default function SettingsPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-slate-300">Region</Label>
-                  <Input defaultValue={DEMO_ORGANIZATION.region} className="bg-slate-800 border-slate-600 text-white" />
+                  <Input value={region} onChange={(e) => setRegion(e.target.value)} className="bg-slate-800 border-slate-600 text-white" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-slate-300">City / Municipality</Label>
+                  <Input value={municipality} onChange={(e) => setMunicipality(e.target.value)} placeholder="Entire province / region" className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-slate-300">Emergency Hotline</Label>
@@ -230,12 +210,18 @@ export default function SettingsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-slate-300">Map Center Latitude</Label>
-                  <Input defaultValue={DEMO_ORGANIZATION.map_center.lat} type="number" className="bg-slate-800 border-slate-600 text-white" />
+                  <Input value={mapLat} onChange={(e) => setMapLat(e.target.value)} type="number" className="bg-slate-800 border-slate-600 text-white" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-slate-300">Map Center Longitude</Label>
-                  <Input defaultValue={DEMO_ORGANIZATION.map_center.lng} type="number" className="bg-slate-800 border-slate-600 text-white" />
+                  <Input value={mapLng} onChange={(e) => setMapLng(e.target.value)} type="number" className="bg-slate-800 border-slate-600 text-white" />
                 </div>
+              </div>
+              <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
+                <p className="text-xs font-semibold text-blue-200">Location follows Coverage Lock</p>
+                <p className="mt-1 text-xs text-blue-100/80">
+                  Save a region, province, or city/municipality in Coverage Lock to update these General details and the live map focus.
+                </p>
               </div>
               <div className="border-2 border-dashed border-slate-700 rounded-lg p-8 text-center">
                 <p className="text-slate-500 text-sm">Logo Upload</p>
