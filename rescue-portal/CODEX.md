@@ -32,9 +32,11 @@ A municipal emergency response web app for Philippine LGUs. Residents register, 
 | Deployment  | Vercel (pnpm, auto-detected Next.js)              |
 | Toasts      | Sonner                                            |
 
-## Current Mode
+## Modes
 
-The app runs in **demo mode** (`NEXT_PUBLIC_DEMO_MODE=true`). All data comes from `src/lib/demo-data.ts` — no real Supabase connection needed. Demo accounts (password: `demo123456`):
+### Demo Mode (`NEXT_PUBLIC_DEMO_MODE=true`)
+
+All data comes from `src/lib/demo-data.ts` — no real Supabase connection needed. Demo accounts (password: `demo123456`):
 
 | Role         | Email                        | Redirect   |
 |-------------|------------------------------|------------|
@@ -42,6 +44,20 @@ The app runs in **demo mode** (`NEXT_PUBLIC_DEMO_MODE=true`). All data comes fro
 | Dispatcher  | dispatcher@rescueportal.ph   | /admin     |
 | Team Leader | teamlead@rescueportal.ph     | /admin     |
 | Resident    | resident@rescueportal.ph     | /resident  |
+
+### Real Supabase Auth (`NEXT_PUBLIC_DEMO_MODE=false`)
+
+Set these Vercel env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`.
+
+Then run `supabase/migrations/003_one_time_supabase_repair_and_owner_setup.sql` in Supabase SQL Editor once. This creates the schema, seeds the owner organization, and provisions the initial admin login.
+
+Owner login (change password after first login):
+
+| Role         | Email                 | Temporary Password     |
+|-------------|-----------------------|------------------------|
+| Super Admin | admin@rescueportal.ph | Rescue!Portal2026#     |
+
+After running the SQL, redeploy on Vercel so the new env vars take effect.
 
 ## Project Structure
 
