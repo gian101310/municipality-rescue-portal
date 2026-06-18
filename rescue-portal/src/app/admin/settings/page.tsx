@@ -1,0 +1,250 @@
+'use client'
+
+import { useState } from 'react'
+import { Save, Plus, Edit2, Eye, EyeOff } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
+import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
+import { DEMO_ORGANIZATION, DEMO_EMERGENCY_TYPES, DEMO_BARANGAYS } from '@/lib/demo-data'
+import { toast } from 'sonner'
+
+export default function SettingsPage() {
+  const [showToken, setShowToken] = useState(false)
+  const [orgName, setOrgName] = useState(DEMO_ORGANIZATION.name)
+  const [hotline, setHotline] = useState(DEMO_ORGANIZATION.emergency_hotline)
+  const [province, setProvince] = useState(DEMO_ORGANIZATION.province)
+
+  function save() {
+    toast.success('Settings saved (demo mode — not persisted)')
+  }
+
+  return (
+    <div className="p-4 md:p-6 space-y-5 max-w-4xl mx-auto">
+      <div>
+        <h1 className="text-2xl font-bold text-white">Settings</h1>
+        <p className="text-slate-400 text-sm">Organization configuration and system settings</p>
+      </div>
+
+      <Tabs defaultValue="general">
+        <TabsList className="bg-slate-800 border border-slate-700 flex-wrap h-auto gap-1">
+          {['General', 'Emergency Types', 'Barangays', 'Telegram', 'Notifications'].map((t) => (
+            <TabsTrigger key={t} value={t.toLowerCase().replace(' ', '_')} className="data-[active]:bg-slate-700 data-[active]:text-white text-slate-400 text-sm">
+              {t}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+
+        {/* General */}
+        <TabsContent value="general" className="mt-4">
+          <Card className="bg-slate-900 border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-white text-base">General Settings</CardTitle>
+              <CardDescription className="text-slate-400">Basic organization information.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-slate-300">Organization Name</Label>
+                  <Input value={orgName} onChange={(e) => setOrgName(e.target.value)} className="bg-slate-800 border-slate-600 text-white" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-slate-300">Province</Label>
+                  <Input value={province} onChange={(e) => setProvince(e.target.value)} className="bg-slate-800 border-slate-600 text-white" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-slate-300">Region</Label>
+                  <Input defaultValue={DEMO_ORGANIZATION.region} className="bg-slate-800 border-slate-600 text-white" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-slate-300">Emergency Hotline</Label>
+                  <Input value={hotline} onChange={(e) => setHotline(e.target.value)} className="bg-slate-800 border-slate-600 text-white" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-slate-300">Secondary Hotline</Label>
+                  <Input defaultValue={DEMO_ORGANIZATION.secondary_hotline || ''} className="bg-slate-800 border-slate-600 text-white" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-slate-300">Email</Label>
+                  <Input defaultValue={DEMO_ORGANIZATION.email || ''} type="email" className="bg-slate-800 border-slate-600 text-white" />
+                </div>
+              </div>
+              <Separator className="bg-slate-800" />
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-1.5">
+                  <Label className="text-slate-300">Map Center Latitude</Label>
+                  <Input defaultValue={DEMO_ORGANIZATION.map_center.lat} type="number" className="bg-slate-800 border-slate-600 text-white" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-slate-300">Map Center Longitude</Label>
+                  <Input defaultValue={DEMO_ORGANIZATION.map_center.lng} type="number" className="bg-slate-800 border-slate-600 text-white" />
+                </div>
+              </div>
+              <div className="border-2 border-dashed border-slate-700 rounded-lg p-8 text-center">
+                <p className="text-slate-500 text-sm">Logo Upload</p>
+                <p className="text-slate-600 text-xs mt-1">Click to upload organization logo (PNG, SVG)</p>
+              </div>
+              <Button onClick={save} className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Save className="w-4 h-4 mr-1" /> Save Changes
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Emergency Types */}
+        <TabsContent value="emergency_types" className="mt-4">
+          <Card className="bg-slate-900 border-slate-700">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-white text-base">Emergency Types</CardTitle>
+                  <CardDescription className="text-slate-400">Configure available emergency categories.</CardDescription>
+                </div>
+                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => toast.info('Demo: Add type dialog')}>
+                  <Plus className="w-4 h-4 mr-1" /> Add Type
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {DEMO_EMERGENCY_TYPES.map((et) => (
+                  <div key={et.id} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                    <div className="flex items-center gap-3">
+                      <div className="w-3 h-3 rounded-full" style={{ background: et.color }} />
+                      <span className="text-sm text-white">{et.name}</span>
+                      <Badge variant="outline" className="text-xs border-slate-600 text-slate-400">{et.triage_questions.length} questions</Badge>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Switch checked={et.is_active} onCheckedChange={() => toast.info('Demo: Toggle type')} />
+                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-slate-400 hover:text-white" onClick={() => toast.info('Demo: Edit type')}>
+                        <Edit2 className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Barangays */}
+        <TabsContent value="barangays" className="mt-4">
+          <Card className="bg-slate-900 border-slate-700">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle className="text-white text-base">Barangays</CardTitle>
+                  <CardDescription className="text-slate-400">Manage barangay list and captains.</CardDescription>
+                </div>
+                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => toast.info('Demo: Add barangay')}>
+                  <Plus className="w-4 h-4 mr-1" /> Add
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                {DEMO_BARANGAYS.map((b) => (
+                  <div key={b.id} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
+                    <div>
+                      <p className="text-sm text-white">{b.name}</p>
+                      <p className="text-xs text-slate-400">{b.captain_name} · {b.captain_phone}</p>
+                    </div>
+                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-slate-400 hover:text-white" onClick={() => toast.info('Demo: Edit barangay')}>
+                      <Edit2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Telegram */}
+        <TabsContent value="telegram" className="mt-4">
+          <Card className="bg-slate-900 border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-white text-base">Telegram Integration</CardTitle>
+              <CardDescription className="text-slate-400">Configure Telegram bot for team notifications.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="space-y-1.5">
+                <Label className="text-slate-300">Bot Token</Label>
+                <div className="relative">
+                  <Input
+                    type={showToken ? 'text' : 'password'}
+                    defaultValue="1234567890:ABCDefGHIjklMNOpqRSTuvWXyz"
+                    className="bg-slate-800 border-slate-600 text-white pr-10"
+                  />
+                  <button
+                    onClick={() => setShowToken(!showToken)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                  >
+                    {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500">Get your bot token from @BotFather on Telegram</p>
+              </div>
+              <Separator className="bg-slate-800" />
+              <div>
+                <p className="text-sm text-slate-300 mb-2">Team Chat IDs</p>
+                <div className="space-y-2">
+                  {['-1001000000001', '-1001000000002', '-1001000000003', '-1001000000004'].map((id, idx) => (
+                    <div key={id} className="flex items-center gap-3 p-2.5 bg-slate-800 rounded-lg">
+                      <span className="text-xs font-mono text-slate-300">{id}</span>
+                      <span className="text-xs text-slate-500">Team {['Alpha', 'Bravo', 'Charlie', 'Delta'][idx]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={() => toast.success('Demo: Test message sent to all chats')} className="bg-blue-600 hover:bg-blue-700 text-white">
+                  Test Connection
+                </Button>
+                <Button onClick={save} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800">
+                  <Save className="w-4 h-4 mr-1" /> Save
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Notifications */}
+        <TabsContent value="notifications" className="mt-4">
+          <Card className="bg-slate-900 border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-white text-base">Notification Settings</CardTitle>
+              <CardDescription className="text-slate-400">Configure when and how notifications are sent.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {[
+                { label: 'New incident submitted', desc: 'Alert dispatchers when a new incident is received', on: true },
+                { label: 'Critical incident alert', desc: 'Send urgent notifications for critical severity incidents', on: true },
+                { label: 'Team dispatch confirmation', desc: 'Notify reporter when a rescue team is dispatched', on: true },
+                { label: 'Incident resolved', desc: 'Notify reporter when their incident is resolved', on: true },
+                { label: 'Registration approved', desc: 'Notify resident when their account is verified', on: true },
+                { label: 'Registration rejected', desc: 'Notify resident when their account is rejected', on: false },
+                { label: 'Team status updates', desc: 'Notify dispatcher when team status changes', on: true },
+                { label: 'System health alerts', desc: 'Alert admins when system health degrades', on: false },
+              ].map((item) => (
+                <div key={item.label} className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm text-white">{item.label}</p>
+                    <p className="text-xs text-slate-400">{item.desc}</p>
+                  </div>
+                  <Switch defaultChecked={item.on} onCheckedChange={() => toast.info('Demo: Toggle notification')} />
+                </div>
+              ))}
+              <Button onClick={save} className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Save className="w-4 h-4 mr-1" /> Save Preferences
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}

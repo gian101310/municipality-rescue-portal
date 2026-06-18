@@ -1,0 +1,8 @@
+.vercel
+node_modules
+.next
+.env*
+*.tsbuildinfo
+next-env.d.ts
+.DS_Store
+pnpm-workspace.yaml

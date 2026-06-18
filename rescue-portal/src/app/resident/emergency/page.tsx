@@ -1,0 +1,341 @@
+'use client'
+
+import { useState } from 'react'
+import { useRouter } from 'next/navigation'
+import {
+  ArrowLeft, MapPin, Camera, ChevronRight, CheckCircle2,
+  AlertTriangle, Users, Shield
+} from 'lucide-react'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { Label } from '@/components/ui/label'
+import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
+import { Card, CardContent } from '@/components/ui/card'
+import { IncidentStatusBadge } from '@/components/incident-status-badge'
+import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
+import { DEMO_EMERGENCY_TYPES } from '@/lib/demo-data'
+import { generateDemoReferenceNumber } from '@/lib/utils'
+import { toast } from 'sonner'
+import type { EmergencyType } from '@/lib/types'
+
+type Step = 'select' | 'details' | 'confirm' | 'submitted'
+
+export default function EmergencyPage() {
+  const router = useRouter()
+  const [step, setStep] = useState<Step>('select')
+  const [selectedType, setSelectedType] = useState<EmergencyType | null>(null)
+  const [description, setDescription] = useState('')
+  const [affectedCount, setAffectedCount] = useState(1)
+  const [hasUnconscious, setHasUnconscious] = useState(false)
+  const [hasFire, setHasFire] = useState(false)
+  const [hasFlooding, setHasFlooding] = useState(false)
+  const [hasViolence, setHasViolence] = useState(false)
+  const [locationGranted, setLocationGranted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [refNumber, setRefNumber] = useState('')
+
+  function selectType(type: EmergencyType) {
+    setSelectedType(type)
+    setStep('details')
+    // Auto-set toggles based on type
+    setHasFire(type.id === 'et-fire')
+    setHasFlooding(type.id === 'et-flood')
+    setHasViolence(type.id === 'et-crime')
+  }
+
+  function requestLocation() {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        () => { setLocationGranted(true); toast.success('Location captured') },
+        () => { setLocationGranted(true); toast.info('Using approximate location') }
+      )
+    } else {
+      setLocationGranted(true)
+      toast.info('Using approximate location')
+    }
+  }
+
+  async function handleSubmit() {
+    if (!description.trim()) { toast.error('Please describe the emergency'); return }
+    if (!locationGranted) { toast.error('Please share your location first'); return }
+
+    setSubmitting(true)
+    await new Promise((r) => setTimeout(r, 2000))
+    const ref = generateDemoReferenceNumber()
+    setRefNumber(ref)
+    setStep('submitted')
+    setSubmitting(false)
+  }
+
+  // Submitted / Success screen
+  if (step === 'submitted') {
+    return (
+      <div className="px-4 py-8 flex flex-col items-center text-center space-y-6">
+        <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center">
+          <CheckCircle2 className="w-10 h-10 text-green-600" />
+        </div>
+        <div>
+          <h2 className="text-2xl font-bold text-slate-900 mb-2">Emergency Reported!</h2>
+          <p className="text-slate-500 text-sm">Your report has been received by our dispatch team.</p>
+        </div>
+        <div className="bg-slate-100 rounded-xl p-5 w-full">
+          <p className="text-xs text-slate-500 mb-1">Reference Number</p>
+          <p className="text-xl font-mono font-bold text-slate-900">{refNumber}</p>
+        </div>
+
+        {/* Live Status */}
+        <div className="w-full space-y-2">
+          <div className="flex items-center gap-3 p-3 bg-green-50 rounded-lg">
+            <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+            <span className="text-sm text-green-700 font-medium">Report submitted</span>
+          </div>
+          <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg">
+            <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+            <span className="text-sm text-blue-700 font-medium">Dispatcher reviewing your report...</span>
+          </div>
+        </div>
+
+        <p className="text-xs text-slate-400 max-w-xs">
+          Save your reference number. You&apos;ll receive updates as rescue teams are dispatched.
+        </p>
+
+        <div className="flex flex-col gap-2 w-full">
+          <Button className="bg-slate-900 hover:bg-slate-800 text-white" render={<Link href="/resident" />}>
+            Return to Home
+          </Button>
+          <Button variant="outline" className="border-slate-300" render={<Link href="/resident/history" />}>
+            View My Reports
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col min-h-full">
+      {/* Header */}
+      <div className="px-4 py-4 flex items-center gap-3 bg-white border-b border-slate-200">
+        <Button
+          variant="ghost"
+          size="icon"
+          className="text-slate-600"
+          onClick={() => step === 'select' ? router.push('/resident') : setStep(step === 'confirm' ? 'details' : 'select')}
+        >
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <h1 className="font-bold text-slate-900">
+          {step === 'select' ? 'Report Emergency' : step === 'details' ? 'Emergency Details' : 'Confirm Report'}
+        </h1>
+        {step !== 'select' && (
+          <div className="ml-auto">
+            <IncidentStatusBadge status="submitted" />
+          </div>
+        )}
+      </div>
+
+      <div className="flex-1 px-4 py-5 space-y-5">
+        {/* Step 1: Type Selection */}
+        {step === 'select' && (
+          <div>
+            <p className="text-slate-500 text-sm mb-4">Select the type of emergency</p>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {DEMO_EMERGENCY_TYPES.map((et) => (
+                <button
+                  key={et.id}
+                  onClick={() => selectType(et)}
+                  className="flex flex-col items-center gap-2 p-4 rounded-xl border-2 border-slate-200 hover:border-slate-400 active:scale-95 transition-all bg-white text-center"
+                >
+                  <div
+                    className="w-12 h-12 rounded-xl flex items-center justify-center"
+                    style={{ background: et.color + '20' }}
+                  >
+                    <EmergencyTypeIcon iconName={et.icon} className="w-6 h-6" style={{ color: et.color }} />
+                  </div>
+                  <span className="text-xs font-semibold text-slate-800 leading-tight">{et.name}</span>
+                </button>
+              ))}
+            </div>
+            <Card className="mt-4 bg-red-50 border-red-200">
+              <CardContent className="p-3 flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-red-500 shrink-0 mt-0.5" />
+                <p className="text-xs text-red-700">For life-threatening emergencies, call <strong>911</strong> immediately while using this app.</p>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Step 2: Details */}
+        {step === 'details' && selectedType && (
+          <div className="space-y-5">
+            {/* Type reminder */}
+            <div className="flex items-center gap-3 p-3 rounded-xl border border-slate-200 bg-white">
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ background: selectedType.color + '20' }}>
+                <EmergencyTypeIcon iconName={selectedType.icon} className="w-5 h-5" style={{ color: selectedType.color }} />
+              </div>
+              <div>
+                <p className="font-semibold text-slate-900 text-sm">{selectedType.name}</p>
+                <button onClick={() => setStep('select')} className="text-xs text-blue-600">Change type</button>
+              </div>
+            </div>
+
+            {/* Location */}
+            <div>
+              <Label className="text-slate-700 font-semibold mb-2 block">Location *</Label>
+              {!locationGranted ? (
+                <Button
+                  onClick={requestLocation}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12"
+                >
+                  <MapPin className="w-4 h-4 mr-2" /> Share My Location
+                </Button>
+              ) : (
+                <div className="flex items-center gap-2 p-3 bg-green-50 border border-green-200 rounded-lg">
+                  <MapPin className="w-4 h-4 text-green-600" />
+                  <p className="text-sm text-green-700 font-medium">Location captured ✓</p>
+                </div>
+              )}
+            </div>
+
+            {/* Description */}
+            <div>
+              <Label htmlFor="desc" className="text-slate-700 font-semibold mb-2 block">Describe the emergency *</Label>
+              <Textarea
+                id="desc"
+                placeholder="What is happening? Include any important details about the situation, number of people involved, hazards, etc."
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                className="min-h-[100px] border-slate-300"
+              />
+            </div>
+
+            {/* Affected count */}
+            <div>
+              <Label className="text-slate-700 font-semibold mb-2 block">How many people are affected?</Label>
+              <Input
+                type="number"
+                min={0}
+                value={affectedCount}
+                onChange={(e) => setAffectedCount(Number(e.target.value))}
+                className="border-slate-300"
+              />
+            </div>
+
+            {/* Danger toggles */}
+            <div className="space-y-3">
+              <p className="text-slate-700 font-semibold text-sm">Additional Hazards</p>
+              {[
+                { label: 'Someone is unconscious or unresponsive', state: hasUnconscious, set: setHasUnconscious, urgent: true },
+                { label: 'There is fire present', state: hasFire, set: setHasFire, urgent: true },
+                { label: 'There is flooding or water hazard', state: hasFlooding, set: setHasFlooding },
+                { label: 'There is violence or threat of violence', state: hasViolence, set: setHasViolence, urgent: true },
+              ].map(({ label, state, set, urgent }) => (
+                <div key={label} className="flex items-center justify-between p-3 bg-white border border-slate-200 rounded-lg">
+                  <span className={`text-sm ${urgent && state ? 'text-red-700 font-medium' : 'text-slate-700'}`}>{label}</span>
+                  <Switch checked={state} onCheckedChange={set} />
+                </div>
+              ))}
+            </div>
+
+            {/* Photo */}
+            <div>
+              <Label className="text-slate-700 font-semibold mb-2 block">Photos (optional)</Label>
+              <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
+                <Camera className="w-6 h-6 text-slate-400 mx-auto mb-2" />
+                <p className="text-xs text-slate-400">Tap to take or upload photos</p>
+              </div>
+            </div>
+
+            <Button
+              onClick={() => setStep('confirm')}
+              className="w-full bg-red-600 hover:bg-red-700 text-white h-12 font-semibold"
+              disabled={!description.trim() || !locationGranted}
+            >
+              Continue to Confirm
+              <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+          </div>
+        )}
+
+        {/* Step 3: Confirm */}
+        {step === 'confirm' && selectedType && (
+          <div className="space-y-5">
+            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+                <p className="font-bold text-red-700">Confirm Emergency Report</p>
+              </div>
+              <p className="text-sm text-red-600">
+                By submitting, you confirm this is a real emergency. False alerts may result in legal consequences.
+              </p>
+            </div>
+
+            {/* Summary */}
+            <Card className="border-slate-200">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: selectedType.color + '20' }}>
+                    <EmergencyTypeIcon iconName={selectedType.icon} className="w-4 h-4" style={{ color: selectedType.color }} />
+                  </div>
+                  <span className="font-semibold text-slate-900">{selectedType.name}</span>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Description</p>
+                  <p className="text-sm text-slate-800">{description}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="text-slate-500">Affected</p>
+                    <div className="flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5" />
+                      <p className="font-medium">{affectedCount} person{affectedCount !== 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Location</p>
+                    <div className="flex items-center gap-1 text-green-600">
+                      <MapPin className="w-3.5 h-3.5" />
+                      <p className="font-medium">Captured</p>
+                    </div>
+                  </div>
+                </div>
+                {(hasUnconscious || hasFire || hasFlooding || hasViolence) && (
+                  <div className="flex flex-wrap gap-1">
+                    {hasUnconscious && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Unconscious</span>}
+                    {hasFire && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Fire</span>}
+                    {hasFlooding && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Flooding</span>}
+                    {hasViolence && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Violence</span>}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <div className="flex flex-col gap-3">
+              <Button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="w-full bg-red-600 hover:bg-red-700 text-white h-14 text-base font-bold shadow-lg shadow-red-500/30"
+              >
+                {submitting ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Submitting...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Shield className="w-5 h-5" />
+                    Submit Emergency Report
+                  </span>
+                )}
+              </Button>
+              <Button variant="outline" onClick={() => setStep('details')} className="border-slate-300 text-slate-700 h-11">
+                Back to Edit
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
