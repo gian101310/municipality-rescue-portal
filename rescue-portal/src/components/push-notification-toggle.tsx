@@ -10,10 +10,14 @@ export function PushNotificationToggle() {
   const [supported, setSupported] = useState(false)
 
   useEffect(() => {
-    if ('Notification' in window) {
-      setSupported(true)
-      setPermission(Notification.permission)
-    }
+    const id = window.setTimeout(() => {
+      if ('Notification' in window) {
+        setSupported(true)
+        setPermission(Notification.permission)
+      }
+    }, 0)
+
+    return () => window.clearTimeout(id)
   }, [])
 
   async function requestPermission() {

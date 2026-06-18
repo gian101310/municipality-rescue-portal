@@ -12,6 +12,34 @@ interface VoiceSOSProps {
 
 const SOS_KEYWORDS = ['help', 'emergency', 'tulong', 'saklolo', 'sunog', 'fire', 'rescue']
 
+interface SpeechRecognitionResultEventLike {
+  results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }>
+}
+
+interface SpeechRecognitionLike {
+  continuous: boolean
+  interimResults: boolean
+  lang: string
+  onresult: ((event: SpeechRecognitionResultEventLike) => void) | null
+  onerror: (() => void) | null
+  onend: (() => void) | null
+  start: () => void
+  stop: () => void
+}
+
+type SpeechRecognitionConstructor = new () => SpeechRecognitionLike
+
+interface SpeechRecognitionWindow extends Window {
+  SpeechRecognition?: SpeechRecognitionConstructor
+  webkitSpeechRecognition?: SpeechRecognitionConstructor
+}
+
+function getSpeechRecognitionConstructor() {
+  if (typeof window === 'undefined') return null
+  const recognitionWindow = window as SpeechRecognitionWindow
+  return recognitionWindow.SpeechRecognition ?? recognitionWindow.webkitSpeechRecognition ?? null
+}
+
 export function VoiceSOS({ onTranscript, onSOSTrigger }: VoiceSOSProps) {
   const [listening, setListening] = useState(false)
   const [supported, setSupported] = useState(false)
@@ -19,16 +47,15 @@ export function VoiceSOS({ onTranscript, onSOSTrigger }: VoiceSOSProps) {
   const recognitionRef = useRef<ReturnType<typeof createRecognition> | null>(null)
 
   useEffect(() => {
-    const SpeechRecognition = (window as /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ any).SpeechRecognition
-      || (window as /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ any).webkitSpeechRecognition
-    if (SpeechRecognition) {
-      setSupported(true)
-    }
+    const id = window.setTimeout(() => {
+      setSupported(Boolean(getSpeechRecognitionConstructor()))
+    }, 0)
+
+    return () => window.clearTimeout(id)
   }, [])
 
   function createRecognition() {
-    const SpeechRecognition = (window as /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ any).SpeechRecognition
-      || (window as /* eslint-disable-next-line @typescript-eslint/no-explicit-any */ any).webkitSpeechRecognition
+    const SpeechRecognition = getSpeechRecognitionConstructor()
     if (!SpeechRecognition) return null
 
     const recognition = new SpeechRecognition()
@@ -36,7 +63,7 @@ export function VoiceSOS({ onTranscript, onSOSTrigger }: VoiceSOSProps) {
     recognition.interimResults = true
     recognition.lang = 'en-PH' // Filipino-English
 
-    recognition.onresult = (event: { results: ArrayLike<{ isFinal: boolean; 0: { transcript: string } }> }) => {
+    recognition.onresult = (event: SpeechRecognitionResultEventLike) => {
       let fullTranscript = ''
       for (let i = 0; i < event.results.length; i++) {
         fullTranscript += event.results[i][0].transcript

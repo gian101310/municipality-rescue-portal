@@ -157,17 +157,16 @@ export function isResponderRole(role: UserRole): boolean {
 export function getDefaultRoute(role: UserRole): string {
   switch (role) {
     case 'super_admin':
+      return '/super-admin'
     case 'admin':
-      return '/admin/dashboard'
     case 'dispatcher':
-      return '/admin/dispatch'
+    case 'verifier':
+      return '/admin'
     case 'team_leader':
     case 'responder':
-      return '/responder/dashboard'
-    case 'verifier':
-      return '/admin/residents'
+      return '/admin/teams'
     case 'resident':
-      return '/resident/dashboard'
+      return '/resident'
     default:
       return '/'
   }
@@ -218,23 +217,23 @@ export async function getUserProfile(): Promise<UserProfile | null> {
 /**
  * Server-side auth guard. Call at the top of a Server Component or Server Action.
  *
- * - If no user is authenticated, redirects to /login.
- * - If allowedRoles is provided and the user's role is not included, redirects to /unauthorized.
+ * - If no user is authenticated, redirects to /auth/login.
+ * - If allowedRoles is provided and the user's role is not included, redirects with an unauthorized error.
  * - Returns the UserProfile on success.
  */
 export async function requireAuth(allowedRoles?: UserRole[]): Promise<UserProfile> {
   const profile = await getUserProfile()
 
   if (!profile) {
-    redirect('/login')
+    redirect('/auth/login')
   }
 
   if (!profile.is_active) {
-    redirect('/account-suspended')
+    redirect('/auth/login?error=account-suspended')
   }
 
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(profile.role)) {
-    redirect('/unauthorized')
+    redirect('/auth/login?error=unauthorized')
   }
 
   return profile
@@ -242,7 +241,7 @@ export async function requireAuth(allowedRoles?: UserRole[]): Promise<UserProfil
 
 /**
  * Requires the user to be any staff member (not a resident).
- * Redirects to /unauthorized if the user is a resident.
+ * Redirects with an unauthorized error if the user is a resident.
  */
 export async function requireStaff(): Promise<UserProfile> {
   return requireAuth(['super_admin', 'admin', 'dispatcher', 'team_leader', 'responder', 'verifier'])
@@ -256,12 +255,12 @@ export async function requireAdmin(): Promise<UserProfile> {
 }
 
 /**
- * Requires a specific permission. Redirects to /unauthorized if not met.
+ * Requires a specific permission. Redirects with an unauthorized error if not met.
  */
 export async function requirePermission(permission: Permission): Promise<UserProfile> {
   const profile = await requireAuth()
   if (!hasPermission(profile.role, permission)) {
-    redirect('/unauthorized')
+    redirect('/auth/login?error=unauthorized')
   }
   return profile
 }

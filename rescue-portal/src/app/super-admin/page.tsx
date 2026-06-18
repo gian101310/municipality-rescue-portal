@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import {
-  Shield, Building2, Users, Plus, Search,
+  Shield, Building2, Plus, Search,
   Lock, Eye, CheckCircle2, XCircle, Clock, LogOut, Loader2
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -51,11 +51,7 @@ export default function SuperAdminPage() {
   const [search, setSearch] = useState('')
   const [tenants, setTenants] = useState<Tenant[]>([])
 
-  useEffect(() => {
-    checkAuth()
-  }, [])
-
-  async function checkAuth() {
+  const checkAuth = useCallback(async () => {
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
 
@@ -65,14 +61,13 @@ export default function SuperAdminPage() {
       return
     }
 
-    // Check if super_admin
     const { data: profile } = await supabase
-      .from('profiles')
-      .select('platform_role, full_name')
-      .eq('id', user.id)
-      .single() as { data: { platform_role: string; full_name: string } | null }
+      .from('user_profiles')
+      .select('role, full_name')
+      .eq('user_id', user.id)
+      .single() as { data: { role: string; full_name: string } | null }
 
-    if (profile?.platform_role !== 'super_admin') {
+    if (profile?.role !== 'super_admin') {
       toast.error('Access denied. Super Admin only.')
       router.push('/')
       return
@@ -92,7 +87,15 @@ export default function SuperAdminPage() {
     }
 
     setLoading(false)
-  }
+  }, [router])
+
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      void checkAuth()
+    }, 0)
+
+    return () => window.clearTimeout(id)
+  }, [checkAuth])
 
   async function handleSignOut() {
     const supabase = createClient()

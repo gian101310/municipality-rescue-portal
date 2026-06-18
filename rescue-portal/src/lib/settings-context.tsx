@@ -49,13 +49,7 @@ const SettingsContext = createContext<SettingsContextValue>({
 })
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<PortalSettings>(DEFAULT_SETTINGS)
-  const [loaded, setLoaded] = useState(false)
-
-  useEffect(() => {
-    setSettings(loadSettings())
-    setLoaded(true)
-  }, [])
+  const [settings, setSettings] = useState<PortalSettings>(() => loadSettings())
 
   function updateSettings(patch: Partial<PortalSettings>) {
     setSettings((prev) => {

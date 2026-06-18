@@ -14,6 +14,7 @@ import { formatDate } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { RegistrationStatus } from '@/lib/types'
+import { createClient } from '@/lib/supabase/client'
 
 const currentResident = DEMO_RESIDENTS[0]
 
@@ -64,7 +65,9 @@ export default function ProfilePage() {
   const [newDepPhone, setNewDepPhone] = useState('')
   const [newDepRelationship, setNewDepRelationship] = useState('')
 
-  function handleLogout() {
+  async function handleLogout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
     sessionStorage.removeItem('demo_role')
     sessionStorage.removeItem('demo_email')
     router.push('/auth/login')

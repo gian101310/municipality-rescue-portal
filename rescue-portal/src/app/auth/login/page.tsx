@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import type { UserRole } from '@/lib/types'
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -62,26 +63,36 @@ function LoginContent() {
         return
       }
 
-      // Fetch profile to determine role
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, platform_role')
-        .eq('id', authData.user.id)
-        .single() as { data: { role: string; platform_role: string } | null }
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('role, is_active')
+        .eq('user_id', authData.user.id)
+        .single() as {
+          data: { role: UserRole; is_active: boolean } | null
+          error: { message?: string } | null
+        }
 
-      const platformRole = profile?.platform_role
-      const userRole = profile?.role
+      if (profileError || !profile) {
+        await supabase.auth.signOut()
+        toast.error('No RescuePortal profile was found for this account.')
+        return
+      }
 
-      // Route based on role
-      if (platformRole === 'super_admin') {
+      if (!profile.is_active) {
+        await supabase.auth.signOut()
+        toast.error('This account is suspended. Please contact your administrator.')
+        return
+      }
+
+      if (profile.role === 'super_admin') {
         toast.success('Welcome back, Boss!')
         router.push('/super-admin')
-      } else if (userRole === 'admin' || platformRole === 'tenant_admin') {
-        toast.success('Signed in as Admin')
-        router.push('/admin')
-      } else {
+      } else if (profile.role === 'resident') {
         toast.success('Signed in successfully')
         router.push('/resident')
+      } else {
+        toast.success('Signed in as Staff')
+        router.push('/admin')
       }
     } catch {
       toast.error('An unexpected error occurred')

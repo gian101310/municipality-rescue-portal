@@ -31,6 +31,7 @@ import {
   loadCoverageLock,
 } from '@/lib/coverage-lock-client'
 import type { TenantGeographyScope } from '@/lib/philippines-geography'
+import { createClient } from '@/lib/supabase/client'
 
 const NAV_ITEMS = [
   { href: '/admin', label: 'Command Center', icon: LayoutDashboard, exact: true },
@@ -173,7 +174,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [])
 
-  function handleLogout() {
+  async function handleLogout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
     sessionStorage.removeItem('demo_role')
     sessionStorage.removeItem('demo_email')
     router.push('/auth/login')

@@ -127,8 +127,12 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>('en')
 
   useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY) as Locale | null
-    if (saved === 'en' || saved === 'fil') setLocaleState(saved)
+    const id = window.setTimeout(() => {
+      const saved = localStorage.getItem(STORAGE_KEY) as Locale | null
+      if (saved === 'en' || saved === 'fil') setLocaleState(saved)
+    }, 0)
+
+    return () => window.clearTimeout(id)
   }, [])
 
   function setLocale(l: Locale) {

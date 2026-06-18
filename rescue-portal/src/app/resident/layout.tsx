@@ -14,6 +14,7 @@ import { DemoBanner } from '@/components/demo-banner'
 import { LanguageSwitcher } from '@/components/language-switcher'
 import { DEMO_NOTIFICATIONS } from '@/lib/demo-data'
 import { cn } from '@/lib/utils'
+import { createClient } from '@/lib/supabase/client'
 
 const NAV_ITEMS = [
   { href: '/resident', label: 'Home', icon: Home, exact: true },
@@ -27,7 +28,9 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
   const router = useRouter()
   const unread = DEMO_NOTIFICATIONS.filter((n) => !n.is_read && n.user_id === 'uid-res-001').length
 
-  function handleLogout() {
+  async function handleLogout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
     sessionStorage.removeItem('demo_role')
     sessionStorage.removeItem('demo_email')
     router.push('/auth/login')
