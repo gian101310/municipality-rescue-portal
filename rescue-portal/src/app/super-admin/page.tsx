@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Shield, Building2, Plus, Search,
-  Lock, Eye, CheckCircle2, XCircle, Clock, LogOut, Loader2, X
+  Lock, Eye, EyeOff, CheckCircle2, XCircle, Clock, LogOut, Loader2, X
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -36,6 +36,9 @@ type TenantForm = {
   slug: string
   contactEmail: string
   emergencyHotline: string
+  adminFullName: string
+  adminEmail: string
+  adminPassword: string
   provinceCode: string
   municipalityCode: string
   plan: TenantPlan
@@ -47,6 +50,9 @@ const initialTenantForm: TenantForm = {
   slug: '',
   contactEmail: '',
   emergencyHotline: '911',
+  adminFullName: '',
+  adminEmail: '',
+  adminPassword: '',
   provinceCode: '',
   municipalityCode: '',
   plan: 'starter',
@@ -77,6 +83,7 @@ export default function SuperAdminPage() {
   const [addOpen, setAddOpen] = useState(false)
   const [tenantForm, setTenantForm] = useState<TenantForm>(initialTenantForm)
   const [tenantSaving, setTenantSaving] = useState(false)
+  const [showAdminPassword, setShowAdminPassword] = useState(false)
 
   const loadTenants = useCallback(async () => {
     const response = await fetch('/api/super-admin/tenants', { cache: 'no-store' })
@@ -173,6 +180,11 @@ export default function SuperAdminPage() {
 
     if (!tenantForm.municipalityCode) {
       toast.error('Choose the tenant municipality first.')
+      return
+    }
+
+    if (!tenantForm.adminEmail.trim() || !tenantForm.adminPassword) {
+      toast.error('Enter the municipality admin email and temporary password.')
       return
     }
 
@@ -472,17 +484,78 @@ export default function SuperAdminPage() {
                     className="bg-slate-800 border-slate-600 text-white"
                   />
                 </div>
+              </div>
+
+              <div className="rounded-lg border border-amber-700/30 bg-amber-950/10 p-4">
+                <div className="mb-3">
+                  <h3 className="text-sm font-semibold text-amber-200">Municipality Admin Login</h3>
+                  <p className="mt-1 text-xs text-amber-200/70">
+                    This creates the first admin account for the tenant municipality.
+                  </p>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="tenant-admin-name" className="text-slate-300">Admin Full Name</Label>
+                    <Input
+                      id="tenant-admin-name"
+                      value={tenantForm.adminFullName}
+                      onChange={(event) => updateTenantForm('adminFullName', event.target.value)}
+                      placeholder="Municipality Admin"
+                      className="bg-slate-800 border-slate-600 text-white"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="tenant-admin-email" className="text-slate-300">Admin Email *</Label>
+                    <Input
+                      id="tenant-admin-email"
+                      type="email"
+                      value={tenantForm.adminEmail}
+                      onChange={(event) => updateTenantForm('adminEmail', event.target.value)}
+                      placeholder="admin@municipality.gov.ph"
+                      className="bg-slate-800 border-slate-600 text-white"
+                      required
+                    />
+                  </div>
+                </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="tenant-hotline" className="text-slate-300">Emergency Hotline</Label>
-                  <Input
-                    id="tenant-hotline"
-                    value={tenantForm.emergencyHotline}
-                    onChange={(event) => updateTenantForm('emergencyHotline', event.target.value)}
-                    placeholder="911"
-                    className="bg-slate-800 border-slate-600 text-white"
-                  />
+                  <Label htmlFor="tenant-admin-password" className="text-slate-300">Temporary Password *</Label>
+                  <div className="relative">
+                    <Input
+                      id="tenant-admin-password"
+                      type={showAdminPassword ? 'text' : 'password'}
+                      value={tenantForm.adminPassword}
+                      onChange={(event) => updateTenantForm('adminPassword', event.target.value)}
+                      placeholder="At least 8 chars, upper/lower/number/symbol"
+                      className="bg-slate-800 border-slate-600 text-white pr-10"
+                      required
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowAdminPassword((current) => !current)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                      aria-label={showAdminPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showAdminPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    Give this temporary password only to the authorized municipality admin.
+                  </p>
                 </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="tenant-hotline" className="text-slate-300">Emergency Hotline</Label>
+                <Input
+                  id="tenant-hotline"
+                  value={tenantForm.emergencyHotline}
+                  onChange={(event) => updateTenantForm('emergencyHotline', event.target.value)}
+                  placeholder="911"
+                  className="bg-slate-800 border-slate-600 text-white"
+                />
               </div>
 
               <div className="grid gap-4 md:grid-cols-2">

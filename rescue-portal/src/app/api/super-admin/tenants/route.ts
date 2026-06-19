@@ -50,6 +50,7 @@ type SupabaseQueryBuilder = PromiseLike<QueryResult<unknown>> & {
   order(column: string, options: { ascending: boolean }): SupabaseQueryBuilder
   insert(values: Record<string, unknown> | Record<string, unknown>[]): SupabaseQueryBuilder
   upsert(values: Record<string, unknown>, options: { onConflict: string }): SupabaseQueryBuilder
+  delete(): SupabaseQueryBuilder
   maybeSingle<T = Record<string, unknown>>(): Promise<QueryResult<T>>
   single<T = Record<string, unknown>>(): Promise<QueryResult<T>>
 }
@@ -75,6 +76,18 @@ function slugify(value: string) {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 48)
+}
+
+function isValidEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function isStrongPassword(value: string) {
+  return value.length >= 8
+    && /[A-Z]/.test(value)
+    && /[a-z]/.test(value)
+    && /\d/.test(value)
+    && /[^A-Za-z0-9]/.test(value)
 }
 
 function planToTier(plan: TenantPlan) {
@@ -174,6 +187,11 @@ export async function POST(request: Request) {
   const auth = await requireSuperAdmin()
   if ('error' in auth) return auth.error
 
+  let adminClient: Awaited<ReturnType<typeof createAdminClient>> | null = null
+  let dataAdmin: SupabaseDataClient | null = null
+  let createdOrganizationId: string | null = null
+  let createdAuthUserId: string | null = null
+
   try {
     const body = await request.json()
     const municipalityCode = String(body?.municipalityCode ?? '')
@@ -196,10 +214,22 @@ export async function POST(request: Request) {
     if (!baseSlug) throw new Error('Tenant slug could not be generated.')
 
     const emergencyHotline = String(body?.emergencyHotline ?? '').trim() || '911'
-    const contactEmail = String(body?.contactEmail ?? '').trim()
+    const adminEmail = String(body?.adminEmail ?? '').trim().toLowerCase()
+    const adminPassword = String(body?.adminPassword ?? '')
+    const adminFullName = String(body?.adminFullName ?? '').trim() || `${details.organizationName} Admin`
+    const contactEmail = String(body?.contactEmail ?? '').trim() || adminEmail
 
-    const admin = await createAdminClient() as unknown as SupabaseDataClient
-    const { data: existing } = await admin
+    if (!isValidEmail(adminEmail)) {
+      throw new Error('Enter a valid municipality admin email address.')
+    }
+
+    if (!isStrongPassword(adminPassword)) {
+      throw new Error('Admin password must be at least 8 characters and include uppercase, lowercase, number, and special character.')
+    }
+
+    adminClient = await createAdminClient()
+    dataAdmin = adminClient as unknown as SupabaseDataClient
+    const { data: existing } = await dataAdmin
       .from('organizations')
       .select('id')
       .eq('slug', baseSlug)
@@ -213,7 +243,7 @@ export async function POST(request: Request) {
       province: province?.name ?? '',
       region: region.name,
       emergency_hotline: emergencyHotline,
-      email: contactEmail || null,
+      email: contactEmail,
       address: [getLocalityLabel(locality), province?.name, region.name, 'Philippines'].filter(Boolean).join(', '),
       map_center_lat: fallbackMap.center.lat,
       map_center_lng: fallbackMap.center.lng,
@@ -230,13 +260,14 @@ export async function POST(request: Request) {
       },
     }
 
-    const { data: organization, error: orgError } = await admin
+    const { data: organization, error: orgError } = await dataAdmin
       .from('organizations')
       .insert(organizationPayload)
       .select('id, name, slug, province, region, email, emergency_hotline, branding, is_active, subscription_tier, created_at')
       .single() as QueryResult<OrganizationRow>
 
     if (orgError || !organization) throw new Error(orgError?.message ?? 'Unable to create organization.')
+    createdOrganizationId = organization.id
 
     const municipalityPayload: Record<string, unknown> = {
       organization_id: organization.id,
@@ -249,7 +280,7 @@ export async function POST(request: Request) {
       is_active: true,
     }
 
-    const { data: municipality, error: municipalityError } = await admin
+    const { data: municipality, error: municipalityError } = await dataAdmin
       .from('municipalities')
       .insert(municipalityPayload)
       .select('id, organization_id, name, province, region')
@@ -266,7 +297,7 @@ export async function POST(request: Request) {
       psgc_version: PSGC_VERSION_LABEL,
     }
 
-    const { error: scopeError } = await admin
+    const { error: scopeError } = await dataAdmin
       .from('organization_geo_scopes')
       .upsert(
         scopePayload,
@@ -275,11 +306,71 @@ export async function POST(request: Request) {
 
     if (scopeError) throw new Error(scopeError.message)
 
+    const { data: authUserData, error: authUserError } = await adminClient.auth.admin.createUser({
+      email: adminEmail,
+      password: adminPassword,
+      email_confirm: true,
+      user_metadata: {
+        full_name: adminFullName,
+        role: 'admin',
+        organization_id: organization.id,
+      },
+    })
+
+    if (authUserError || !authUserData.user?.id) {
+      throw new Error(authUserError?.message ?? 'Unable to create municipality admin login.')
+    }
+
+    createdAuthUserId = authUserData.user.id
+
+    const adminProfilePayload: Record<string, unknown> = {
+      user_id: authUserData.user.id,
+      role: 'admin',
+      full_name: adminFullName,
+      email: adminEmail,
+      organization_id: organization.id,
+      municipality_id: municipality.id,
+      is_active: true,
+      department: 'Emergency Response',
+      position: 'Municipality Admin',
+      municipality: locality.name,
+      province: province?.name ?? '',
+      registration_status: 'approved',
+      verified_at: new Date().toISOString(),
+    }
+
+    const { error: profileError } = await dataAdmin
+      .from('user_profiles')
+      .insert(adminProfilePayload) as QueryResult<unknown>
+
+    if (profileError) throw new Error(profileError.message ?? 'Unable to create municipality admin profile.')
+
     return NextResponse.json(
-      { tenant: rowToTenant(organization, municipality) },
+      {
+        tenant: rowToTenant(organization, municipality),
+        admin: {
+          email: adminEmail,
+          full_name: adminFullName,
+        },
+      },
       { status: 201 }
     )
   } catch (error) {
+    if (createdAuthUserId && adminClient) {
+      await adminClient.auth.admin.deleteUser(createdAuthUserId).catch(() => null)
+    }
+
+    if (createdOrganizationId && dataAdmin) {
+      try {
+        await dataAdmin
+          .from('organizations')
+          .delete()
+          .eq('id', createdOrganizationId)
+      } catch {
+        // Best-effort rollback only; return the original creation error below.
+      }
+    }
+
     return NextResponse.json(
       { message: getErrorMessage(error, 'Unable to create tenant.') },
       { status: 400 }
