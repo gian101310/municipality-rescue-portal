@@ -27,6 +27,10 @@ const TENANT_PLANS: TenantPlan[] = ['starter', 'professional', 'enterprise', 'on
 const TENANT_STATUSES: TenantStatus[] = ['trial', 'active', 'suspended', 'cancelled']
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+function isNonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && Boolean(value.trim())
+}
+
 export type SettingsTabValue = 'general' | 'coverage_lock' | 'emergency_types' | 'barangays' | 'telegram' | 'notifications'
 
 export type SettingsTab = {
@@ -57,15 +61,15 @@ export function buildTenantBranding(
 }
 
 export function validateTenantEditorInput(value: TenantEditInput): string | null {
-  if (!String(value.municipalityCode ?? '').trim()) return 'Choose a valid city or municipality.'
-  if (!String(value.name ?? '').trim()) return 'Tenant name is required.'
-  if (!String(value.slug ?? '').trim()) return 'Tenant slug is required.'
-  if (!EMAIL_PATTERN.test(String(value.contactEmail ?? '').trim())) return 'Enter a valid contact email address.'
-  if (!String(value.adminFullName ?? '').trim()) return 'Municipality admin name is required.'
-  if (!EMAIL_PATTERN.test(String(value.adminEmail ?? '').trim())) return 'Enter a valid municipality admin email address.'
-  if (!String(value.emergencyHotline ?? '').trim()) return 'Emergency hotline is required.'
-  if (!TENANT_PLANS.includes(value.plan as TenantPlan)) return 'Choose a valid tenant plan.'
-  if (!TENANT_STATUSES.includes(value.status as TenantStatus)) return 'Choose a valid tenant status.'
+  if (!isNonEmptyString(value.municipalityCode)) return 'Choose a valid city or municipality.'
+  if (!isNonEmptyString(value.name)) return 'Tenant name is required.'
+  if (!isNonEmptyString(value.slug)) return 'Tenant slug is required.'
+  if (typeof value.contactEmail !== 'string' || !EMAIL_PATTERN.test(value.contactEmail.trim())) return 'Enter a valid contact email address.'
+  if (!isNonEmptyString(value.adminFullName)) return 'Municipality admin name is required.'
+  if (typeof value.adminEmail !== 'string' || !EMAIL_PATTERN.test(value.adminEmail.trim())) return 'Enter a valid municipality admin email address.'
+  if (!isNonEmptyString(value.emergencyHotline)) return 'Emergency hotline is required.'
+  if (typeof value.plan !== 'string' || !TENANT_PLANS.includes(value.plan as TenantPlan)) return 'Choose a valid tenant plan.'
+  if (typeof value.status !== 'string' || !TENANT_STATUSES.includes(value.status as TenantStatus)) return 'Choose a valid tenant status.'
   return null
 }
 

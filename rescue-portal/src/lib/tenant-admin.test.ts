@@ -48,6 +48,45 @@ test('rejects an edit with a malformed municipality admin email', () => {
   )
 })
 
+test('rejects non-string tenant editor fields even when string coercion would look valid', () => {
+  const validInput = {
+    municipalityCode: '035416000',
+    name: 'San Fernando Emergency Rescue Portal',
+    slug: 'san-fernando-pampanga',
+    contactEmail: 'contact@sanfernando.gov.ph',
+    emergencyHotline: '911',
+    adminFullName: 'Maria Cruz',
+    adminEmail: 'admin@sanfernando.gov.ph',
+    plan: 'professional',
+    status: 'active',
+  }
+
+  assert.equal(
+    validateTenantEditorInput({ ...validInput, municipalityCode: ['035416000'] }),
+    'Choose a valid city or municipality.'
+  )
+  assert.equal(
+    validateTenantEditorInput({ ...validInput, name: ['San Fernando Emergency Rescue Portal'] }),
+    'Tenant name is required.'
+  )
+  assert.equal(
+    validateTenantEditorInput({ ...validInput, slug: ['san-fernando-pampanga'] }),
+    'Tenant slug is required.'
+  )
+  assert.equal(
+    validateTenantEditorInput({ ...validInput, emergencyHotline: ['911'] }),
+    'Emergency hotline is required.'
+  )
+  assert.equal(
+    validateTenantEditorInput({ ...validInput, contactEmail: ['contact@sanfernando.gov.ph'] }),
+    'Enter a valid contact email address.'
+  )
+  assert.equal(
+    validateTenantEditorInput({ ...validInput, adminEmail: ['admin@sanfernando.gov.ph'] }),
+    'Enter a valid municipality admin email address.'
+  )
+})
+
 test('preserves unrelated branding while replacing tenant editor values', () => {
   const branding = buildEditedTenantBranding({ logo_url: 'seal.svg', custom: true }, {
     plan: 'enterprise',
