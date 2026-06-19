@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Check, Shield, Upload } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, Shield, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -24,7 +24,7 @@ import {
 } from '@/lib/philippines-geography'
 import type { TenantGeographyScope } from '@/lib/philippines-geography'
 import { loadCoverageLock } from '@/lib/coverage-lock-client'
-import { generateDemoReferenceNumber } from '@/lib/utils'
+import { getPasswordRequirementText, isStrongPassword, isValidEmail } from '@/lib/auth-validation'
 import { toast } from 'sonner'
 
 const TOTAL_STEPS = 6
@@ -48,6 +48,8 @@ interface FormData {
   full_name: string
   phone: string
   email: string
+  password: string
+  confirmPassword: string
   date_of_birth: string
   region: string
   regionCode: string
@@ -70,10 +72,12 @@ export default function RegisterPage() {
   const [step, setStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
   const [refNumber, setRefNumber] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [geoScope, setGeoScope] = useState<TenantGeographyScope>(DEMO_TENANT_GEO_SCOPE)
   const [geoScopePersistence, setGeoScopePersistence] = useState<'checking' | 'supabase' | 'demo'>('checking')
   const [form, setForm] = useState<FormData>({
-    full_name: '', phone: '', email: '', date_of_birth: '',
+    full_name: '', phone: '', email: '', password: '', confirmPassword: '', date_of_birth: '',
     region: '', regionCode: '', province: '', provinceCode: '',
     municipality: '', municipalityCode: '', barangay: '', address: '',
     id_type: '', id_number: '',
@@ -127,6 +131,50 @@ export default function RegisterPage() {
     setForm((prev) => ({ ...prev, [field]: value }))
   }
 
+  function validateStep(currentStep: number) {
+    if (currentStep === 1) {
+      if (!form.full_name.trim() || !form.phone.trim() || !form.date_of_birth.trim()) {
+        toast.error('Complete your personal details first.')
+        return false
+      }
+      if (!isValidEmail(form.email)) {
+        toast.error('Enter a valid email address.')
+        return false
+      }
+      if (form.password !== form.confirmPassword) {
+        toast.error('Passwords do not match.')
+        return false
+      }
+      if (!isStrongPassword(form.password)) {
+        toast.error(getPasswordRequirementText())
+        return false
+      }
+    }
+
+    if (currentStep === 2) {
+      if (!form.regionCode || !form.municipalityCode || !form.barangay || !form.address.trim()) {
+        toast.error('Complete your address before continuing.')
+        return false
+      }
+    }
+
+    if (currentStep === 3) {
+      if (!form.id_type || !form.id_number.trim()) {
+        toast.error('Enter your government ID details.')
+        return false
+      }
+    }
+
+    if (currentStep === 4) {
+      if (!form.ec_name.trim() || !form.ec_phone.trim() || !form.ec_relationship) {
+        toast.error('Complete your emergency contact details.')
+        return false
+      }
+    }
+
+    return true
+  }
+
   function selectRegion(regionCode: string) {
     setForm((prev) => ({
       ...prev,
@@ -163,6 +211,7 @@ export default function RegisterPage() {
   }
 
   function next() {
+    if (!validateStep(step)) return
     if (step < TOTAL_STEPS) setStep((s) => s + 1)
   }
   function back() {
@@ -171,12 +220,26 @@ export default function RegisterPage() {
 
   async function submit() {
     setSubmitting(true)
-    await new Promise((r) => setTimeout(r, 1500))
-    const ref = generateDemoReferenceNumber()
-    setRefNumber(ref)
-    setStep(6)
-    setSubmitting(false)
-    toast.success('Registration submitted successfully!')
+    try {
+      const response = await fetch('/api/auth/register-resident', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const payload = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(payload?.message ?? 'Unable to submit registration.')
+      }
+
+      setRefNumber(payload?.referenceNumber ?? 'Pending')
+      setStep(6)
+      toast.success('Registration submitted for approval.')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to submit registration.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const progress = ((step - 1) / (TOTAL_STEPS - 1)) * 100
@@ -228,6 +291,47 @@ export default function RegisterPage() {
                   <div className="space-y-1.5">
                     <Label className="text-slate-300">Email Address *</Label>
                     <Input type="email" placeholder="juan@email.com" value={form.email} onChange={(e) => update('email', e.target.value)} className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-slate-300">Password *</Label>
+                    <div className="relative">
+                      <Input
+                        type={showPassword ? 'text' : 'password'}
+                        placeholder="Enter a secure password"
+                        value={form.password}
+                        onChange={(e) => update('password', e.target.value)}
+                        className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword((value) => !value)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-500">{getPasswordRequirementText()}</p>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-slate-300">Confirm Password *</Label>
+                    <div className="relative">
+                      <Input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        placeholder="Re-enter your password"
+                        value={form.confirmPassword}
+                        onChange={(e) => update('confirmPassword', e.target.value)}
+                        className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 pr-10"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword((value) => !value)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                        aria-label={showConfirmPassword ? 'Hide password confirmation' : 'Show password confirmation'}
+                      >
+                        {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
                   </div>
                 </CardContent>
               </>
@@ -421,12 +525,11 @@ export default function RegisterPage() {
                   <div className="bg-slate-800 rounded-lg p-4 text-xs text-slate-400 leading-relaxed max-h-40 overflow-y-auto">
                     <p className="font-semibold text-slate-300 mb-2">Privacy Policy Summary</p>
                     <p>
-                      The Municipality of Bayani Rescue Portal collects your personal information for the purpose of
-                      providing emergency response services. Your data including name, contact details, location, and
-                      ID information will be stored securely and used only for emergency coordination.
-                      We do not share your information with third parties except as required by law or for emergency coordination
-                      with authorized agencies. You have the right to request access, correction, or deletion of your data
-                      by contacting the Municipal Rescue Office.
+                      Emergency Rescue Portal collects your personal information for emergency response services.
+                      Your name, contact details, location, address, and ID information are stored for verification,
+                      dispatch coordination, and audit purposes. Authorized local emergency response personnel may use
+                      this information only for legitimate safety, rescue, and incident follow-up work. You may request
+                      access, correction, or deletion through the active portal administrator.
                     </p>
                   </div>
                   <div className="flex items-start gap-3">
@@ -474,14 +577,14 @@ export default function RegisterPage() {
                 </div>
                 <h2 className="text-xl font-bold text-white mb-2">Registration Submitted!</h2>
                 <p className="text-slate-400 text-sm mb-4">
-                  Your registration has been received and is pending verification by our team.
+                  Your registration has been received and is pending administrator approval.
                 </p>
                 <div className="bg-slate-800 rounded-lg p-4 mb-6">
                   <p className="text-xs text-slate-400 mb-1">Reference Number</p>
                   <p className="text-lg font-mono font-bold text-white">{refNumber}</p>
                 </div>
                 <p className="text-xs text-slate-500 mb-6">
-                  You will be notified via SMS once your account is verified. This typically takes 1–3 business days.
+                  You can sign in only after your account is approved by the local emergency response administrator.
                 </p>
                 <Button className="w-full bg-red-600 hover:bg-red-700 text-white" render={<Link href="/auth/login?role=resident" />}>
                   Go to Login

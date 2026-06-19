@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { Toaster } from '@/components/ui/sonner'
@@ -13,15 +13,18 @@ const inter = Inter({
 })
 
 export const metadata: Metadata = {
-  title: 'RescuePortal | Municipal Emergency Response System',
-  description: 'Municipal Emergency Response System — report emergencies and coordinate rescue operations.',
+  title: 'Emergency Rescue Portal | Municipal Emergency Response System',
+  description: 'Municipal emergency response portal for resident verification, emergency reporting, and rescue coordination.',
   manifest: '/manifest.json',
-  themeColor: '#dc2626',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'RescuePortal',
+    title: 'Emergency Rescue Portal',
   },
+}
+
+export const viewport: Viewport = {
+  themeColor: '#dc2626',
 }
 
 export default function RootLayout({

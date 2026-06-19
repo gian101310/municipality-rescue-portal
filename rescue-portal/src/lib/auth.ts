@@ -232,6 +232,19 @@ export async function requireAuth(allowedRoles?: UserRole[]): Promise<UserProfil
     redirect('/auth/login?error=account-suspended')
   }
 
+  const registrationStatus = (profile as UserProfile & { registration_status?: string | null }).registration_status
+  if (registrationStatus === 'suspended') {
+    redirect('/auth/login?error=account-suspended')
+  }
+
+  if (profile.role === 'resident' && registrationStatus !== 'approved') {
+    redirect('/auth/login?error=account-pending')
+  }
+
+  if (profile.role !== 'resident' && registrationStatus && registrationStatus !== 'approved') {
+    redirect('/auth/login?error=account-pending')
+  }
+
   if (allowedRoles && allowedRoles.length > 0 && !allowedRoles.includes(profile.role)) {
     redirect('/auth/login?error=unauthorized')
   }

@@ -14,7 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
-import type { UserRole } from '@/lib/types'
+import type { RegistrationStatus, UserRole } from '@/lib/types'
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -65,22 +65,34 @@ function LoginContent() {
 
       const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
-        .select('role, is_active')
+        .select('role, is_active, registration_status')
         .eq('user_id', authData.user.id)
         .single() as {
-          data: { role: UserRole; is_active: boolean } | null
+          data: { role: UserRole; is_active: boolean; registration_status: RegistrationStatus | null } | null
           error: { message?: string } | null
         }
 
       if (profileError || !profile) {
         await supabase.auth.signOut()
-        toast.error('No RescuePortal profile was found for this account.')
+        toast.error('No Emergency Rescue Portal profile was found for this account.')
         return
       }
 
-      if (!profile.is_active) {
+      const registrationStatus = profile.registration_status ?? 'submitted'
+
+      if (!profile.is_active || registrationStatus === 'suspended') {
         await supabase.auth.signOut()
         toast.error('This account is suspended. Please contact your administrator.')
+        return
+      }
+
+      if (registrationStatus !== 'approved') {
+        await supabase.auth.signOut()
+        if (registrationStatus === 'rejected') {
+          toast.error('This account was rejected. Please contact the local emergency response administrator.')
+        } else {
+          toast.error('Your account is still pending approval. Please wait for the administrator to approve it before logging in.')
+        }
         return
       }
 
@@ -119,7 +131,7 @@ function LoginContent() {
                 </div>
               </div>
               <CardTitle className="text-white text-2xl">Welcome back</CardTitle>
-              <CardDescription className="text-slate-400">Sign in to RescuePortal</CardDescription>
+              <CardDescription className="text-slate-400">Sign in to Emergency Rescue Portal</CardDescription>
             </CardHeader>
             <CardContent className="space-y-5">
               <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'resident' | 'staff')}>
@@ -165,6 +177,12 @@ function LoginContent() {
                     </button>
                   </div>
                   {errors.password && <p className="text-xs text-red-400">{errors.password.message}</p>}
+                </div>
+
+                <div className="flex justify-end">
+                  <Link href="/auth/forgot-password" className="text-sm text-blue-400 hover:text-blue-300 underline">
+                    Forgot password?
+                  </Link>
                 </div>
 
                 <Button type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white" disabled={loading}>
