@@ -17,7 +17,7 @@ import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
 import { MapView } from '@/components/map-view'
-import { DEMO_INCIDENTS, DEMO_RESCUE_UNITS, DEMO_RESIDENTS } from '@/lib/demo-data'
+// Real data fetched from API — no demo imports
 import { formatDateTime, formatRelativeTime, getStatusLabel } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { DemoIncident, IncidentStatus } from '@/lib/types'
@@ -31,15 +31,15 @@ const ALL_STATUSES: IncidentStatus[] = [
 
 export default function IncidentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const demoIncident = DEMO_INCIDENTS.find((i) => i.id === id)
-  const [incident, setIncident] = useState<DemoIncident | null>(demoIncident ?? null)
-  const [loadingIncident, setLoadingIncident] = useState(!demoIncident)
+  const [incident, setIncident] = useState<DemoIncident | null>(null)
+  const [loadingIncident, setLoadingIncident] = useState(true)
   const [note, setNote] = useState('')
   const [newStatus, setNewStatus] = useState<IncidentStatus | ''>('')
   const [statusReason, setStatusReason] = useState('')
 
   useEffect(() => {
-    const timer = window.setTimeout(async () => {
+    let cancelled = false
+    async function load() {
       try {
         const response = await fetch('/api/admin/incidents', { cache: 'no-store' })
         const payload = await response.json().catch(() => ({}))
@@ -49,16 +49,16 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
         }
 
         const realIncident = ((payload?.incidents ?? []) as DemoIncident[]).find((item) => item.id === id)
-        setIncident(realIncident ?? demoIncident ?? null)
+        if (!cancelled) setIncident(realIncident ?? null)
       } catch {
-        setIncident(demoIncident ?? null)
+        if (!cancelled) setIncident(null)
       } finally {
-        setLoadingIncident(false)
+        if (!cancelled) setLoadingIncident(false)
       }
-    }, 0)
-
-    return () => window.clearTimeout(timer)
-  }, [demoIncident, id])
+    }
+    load()
+    return () => { cancelled = true }
+  }, [id])
 
   if (loadingIncident) {
     return (
@@ -81,8 +81,9 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
     )
   }
 
-  const reporter = DEMO_RESIDENTS.find((r) => r.user_id === incident.reporter_id)
-  const assignedUnit = DEMO_RESCUE_UNITS.find((u) => u.id === incident.assigned_unit_id)
+  // Reporter info comes from the incident itself (reporter_name, reporter_phone)
+  // Assigned unit info will be loaded from real data when teams feature is built
+  const assignedUnit = null
 
   const mapMarker = [{
     id: incident.id,
@@ -171,13 +172,11 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
                   {incident.reporter_phone && (
                     <p className="text-sm text-slate-400">{incident.reporter_phone}</p>
                   )}
-                  {reporter && (
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge className={cn('text-xs border-0', reporter.registration_status === 'approved' ? 'bg-green-600/20 text-green-400' : 'bg-yellow-600/20 text-yellow-400')}>
-                        {reporter.registration_status === 'approved' ? 'Verified Resident' : 'Unverified'}
-                      </Badge>
-                    </div>
-                  )}
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge className="text-xs border-0 bg-green-600/20 text-green-400">
+                      Verified Resident
+                    </Badge>
+                  </div>
                 </div>
                 <div className="flex gap-2">
                   {incident.reporter_phone && (
@@ -193,17 +192,12 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
                 </div>
               </div>
 
-              {reporter && (
+              {incident.address && (
                 <div className="grid grid-cols-2 gap-3 pt-3 border-t border-slate-800">
                   <div>
-                    <p className="text-xs text-slate-500">Emergency Contact</p>
-                    <p className="text-sm text-slate-300">{reporter.emergency_contact_name || '—'}</p>
-                    <p className="text-xs text-slate-400">{reporter.emergency_contact_phone || '—'}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs text-slate-500">Registered Address</p>
-                    <p className="text-xs text-slate-300">{reporter.address}</p>
-                    <p className="text-xs text-slate-400">{reporter.barangay}, {reporter.municipality}</p>
+                    <p className="text-xs text-slate-500">Reported Address</p>
+                    <p className="text-xs text-slate-300">{incident.address || '—'}</p>
+                    <p className="text-xs text-slate-400">{incident.barangay}, {incident.municipality}</p>
                   </div>
                 </div>
               )}

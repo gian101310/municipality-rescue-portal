@@ -10,7 +10,7 @@ import { MapView } from '@/components/map-view'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
-import { DEMO_RESCUE_UNITS } from '@/lib/demo-data'
+// Rescue units will come from real data in a future phase
 import { formatRelativeTime, getSeverityHexColor } from '@/lib/utils'
 import { isActiveStatus } from '@/lib/utils'
 import {
@@ -90,26 +90,29 @@ export default function LiveMapPage() {
     }
   }, [])
 
-  useEffect(() => {
-    const timer = window.setTimeout(async () => {
-      try {
-        const response = await fetch('/api/admin/incidents', { cache: 'no-store' })
-        const payload = await response.json().catch(() => ({}))
+  const fetchIncidents = async (silent = false) => {
+    try {
+      const response = await fetch('/api/admin/incidents', { cache: 'no-store' })
+      const payload = await response.json().catch(() => ({}))
 
-        if (!response.ok) {
-          throw new Error(payload?.message ?? 'Unable to load incidents.')
-        }
-
-        setIncidents((payload?.incidents ?? []) as DemoIncident[])
-      } catch (error) {
-        toast.error(error instanceof Error ? error.message : 'Unable to load incidents.')
-        setIncidents([])
-      } finally {
-        setLoadingIncidents(false)
+      if (!response.ok) {
+        throw new Error(payload?.message ?? 'Unable to load incidents.')
       }
-    }, 0)
 
-    return () => window.clearTimeout(timer)
+      setIncidents((payload?.incidents ?? []) as DemoIncident[])
+    } catch (error) {
+      if (!silent) toast.error(error instanceof Error ? error.message : 'Unable to load incidents.')
+    } finally {
+      setLoadingIncidents(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchIncidents()
+    // Auto-refresh every 10 seconds
+    const interval = setInterval(() => fetchIncidents(true), 10000)
+    return () => clearInterval(interval)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const markers = useMemo(() => [
@@ -132,7 +135,7 @@ export default function LiveMapPage() {
 
   async function handleRefresh() {
     setRefreshing(true)
-    await new Promise((r) => setTimeout(r, 1200))
+    await fetchIncidents()
     setRefreshing(false)
   }
 
@@ -295,33 +298,13 @@ export default function LiveMapPage() {
             </CardContent>
           </Card>
 
-          {/* Rescue units */}
+          {/* Rescue units — placeholder until teams feature is wired */}
           <Card className="bg-slate-900 border-slate-700">
             <CardHeader className="pb-2 pt-3 px-3">
               <CardTitle className="text-sm text-slate-300">Rescue Units</CardTitle>
             </CardHeader>
-            <CardContent className="px-3 pb-3 space-y-2">
-              {DEMO_RESCUE_UNITS.map((unit) => (
-                <div key={unit.id} className="flex items-center justify-between p-2 bg-slate-800 rounded-lg">
-                  <div>
-                    <p className="text-xs font-semibold text-slate-200">{unit.code}</p>
-                    <p className="text-xs text-slate-500 truncate max-w-[120px]">{unit.team_leader_name}</p>
-                  </div>
-                  <Badge
-                    className={`text-xs border-0 ${
-                      unit.status === 'available'
-                        ? 'bg-green-500/20 text-green-400'
-                        : unit.status === 'dispatched'
-                        ? 'bg-amber-500/20 text-amber-400'
-                        : unit.status === 'on_scene'
-                        ? 'bg-blue-500/20 text-blue-400'
-                        : 'bg-slate-600/40 text-slate-400'
-                    }`}
-                  >
-                    {unit.status.replace('_', ' ')}
-                  </Badge>
-                </div>
-              ))}
+            <CardContent className="px-3 pb-3">
+              <p className="text-xs text-slate-500 text-center py-4">Team data will appear here once rescue units are registered.</p>
             </CardContent>
           </Card>
         </div>

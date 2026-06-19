@@ -23,7 +23,7 @@ import { Badge } from '@/components/ui/badge'
 import { NotificationCenter } from '@/components/notification-center'
 import { DemoBanner } from '@/components/demo-banner'
 import { PushNotificationToggle } from '@/components/push-notification-toggle'
-import { DEMO_ORGANIZATION, DEMO_RESCUE_UNITS, DEMO_STATS } from '@/lib/demo-data'
+// Real data fetched from API — no more demo imports for org/stats
 import { MasterKeyProvider } from '@/components/master-key-provider'
 import { MasterKeyToggle } from '@/components/master-key-toggle'
 import { cn } from '@/lib/utils'
@@ -35,22 +35,44 @@ import {
 import type { TenantGeographyScope } from '@/lib/philippines-geography'
 import { createClient } from '@/lib/supabase/client'
 
-const NAV_ITEMS = [
-  { href: '/admin', label: 'Command Center', icon: LayoutDashboard, exact: true },
-  { href: '/admin/incidents', label: 'Incidents', icon: AlertTriangle, badge: DEMO_STATS.active_incidents },
-  { href: '/admin/map', label: 'Live Map', icon: Map },
-  { href: '/admin/teams', label: 'Rescue Teams', icon: Users },
-  { href: '/admin/residents', label: 'Residents', icon: UserCheck, badge: DEMO_STATS.pending_registrations },
-  { href: '/admin/verification', label: 'Verification', icon: ShieldCheck },
-  { href: '/admin/reports', label: 'Reports', icon: BarChart3 },
-  { href: '/admin/audit', label: 'Audit Logs', icon: ScrollText },
-  { href: '/admin/qr-posters', label: 'QR Posters', icon: QrCode },
-  { href: '/admin/settings', label: 'Settings', icon: Settings },
-  { href: '/admin/health', label: 'System Health', icon: Activity },
-]
+type DashboardStats = {
+  active_incidents: number
+  pending_registrations: number
+}
+
+type AdminProfile = {
+  full_name: string
+  email: string
+  role: string
+  avatar_url: string | null
+}
+
+function buildNavItems(stats: DashboardStats | null) {
+  return [
+    { href: '/admin', label: 'Command Center', icon: LayoutDashboard, exact: true },
+    { href: '/admin/incidents', label: 'Incidents', icon: AlertTriangle, badge: stats?.active_incidents },
+    { href: '/admin/map', label: 'Live Map', icon: Map },
+    { href: '/admin/teams', label: 'Rescue Teams', icon: Users },
+    { href: '/admin/residents', label: 'Residents', icon: UserCheck, badge: stats?.pending_registrations },
+    { href: '/admin/verification', label: 'Verification', icon: ShieldCheck },
+    { href: '/admin/reports', label: 'Reports', icon: BarChart3 },
+    { href: '/admin/audit', label: 'Audit Logs', icon: ScrollText },
+    { href: '/admin/qr-posters', label: 'QR Posters', icon: QrCode },
+    { href: '/admin/settings', label: 'Settings', icon: Settings },
+    { href: '/admin/health', label: 'System Health', icon: Activity },
+  ]
+}
+
+type NavItem = {
+  href: string
+  label: string
+  icon: React.FC<{ className?: string }>
+  exact?: boolean
+  badge?: number
+}
 
 function NavLink({ item, collapsed, onClick }: {
-  item: typeof NAV_ITEMS[number]
+  item: NavItem
   collapsed: boolean
   onClick?: () => void
 }) {
@@ -80,12 +102,13 @@ function NavLink({ item, collapsed, onClick }: {
   )
 }
 
-function Sidebar({ collapsed, setCollapsed, onClick, organizationName, organizationArea }: {
+function Sidebar({ collapsed, setCollapsed, onClick, organizationName, organizationArea, navItems }: {
   collapsed: boolean
   setCollapsed?: (v: boolean) => void
   onClick?: () => void
   organizationName: string
   organizationArea: string
+  navItems: NavItem[]
 }) {
   return (
     <div className={cn('flex flex-col h-full bg-slate-950 border-r border-slate-800', collapsed ? 'w-16' : 'w-60')}>
@@ -107,7 +130,7 @@ function Sidebar({ collapsed, setCollapsed, onClick, organizationName, organizat
 
       {/* Nav */}
       <nav className="flex-1 px-2 py-3 space-y-1 overflow-y-auto">
-        {NAV_ITEMS.map((item) => (
+        {navItems.map((item) => (
           <NavLink key={item.href} item={item} collapsed={collapsed} onClick={onClick} />
         ))}
       </nav>
@@ -146,13 +169,35 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [coverageScope, setCoverageScope] = useState<TenantGeographyScope | null>(null)
+  const [adminProfile, setAdminProfile] = useState<AdminProfile | null>(null)
+  const [dashStats, setDashStats] = useState<DashboardStats | null>(null)
 
-  const availableUnits = DEMO_RESCUE_UNITS.filter((u) => u.status === 'available').length
   const buyerDetails = getBuyerDetails(coverageScope ?? { level: 'country' })
-  const organizationName = coverageScope ? buyerDetails.organizationName : DEMO_ORGANIZATION.name
+  const organizationName = coverageScope ? buyerDetails.organizationName : 'Loading...'
   const organizationArea = coverageScope
     ? [buyerDetails.provinceName, buyerDetails.regionName].filter(Boolean).join(', ') || buyerDetails.locationName
-    : `${DEMO_ORGANIZATION.province}, ${DEMO_ORGANIZATION.region}`
+    : ''
+
+  const navItems = buildNavItems(dashStats)
+
+  // Fetch admin profile and stats
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      try {
+        const res = await fetch('/api/admin/dashboard', { cache: 'no-store' })
+        if (!res.ok) return
+        const data = await res.json()
+        if (cancelled) return
+        if (data.profile) setAdminProfile(data.profile)
+        if (data.stats) setDashStats(data.stats)
+      } catch { /* silent */ }
+    }
+    load()
+    // Refresh stats every 30 seconds
+    const interval = setInterval(load, 30000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -184,6 +229,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push('/auth/login')
   }
 
+  const initials = adminProfile?.full_name
+    ? adminProfile.full_name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
+    : 'AD'
+
   return (
     <MasterKeyProvider>
     <div className="flex flex-col min-h-screen bg-slate-950">
@@ -196,6 +245,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             setCollapsed={setCollapsed}
             organizationName={organizationName}
             organizationArea={organizationArea}
+            navItems={navItems}
           />
         </div>
 
@@ -207,6 +257,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               onClick={() => setMobileOpen(false)}
               organizationName={organizationName}
               organizationArea={organizationArea}
+              navItems={navItems}
             />
           </SheetContent>
         </Sheet>
@@ -236,22 +287,24 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <div className="ml-auto flex items-center gap-2">
               <LiveClock />
               <MasterKeyToggle />
-              <div className="hidden sm:flex items-center gap-1.5 bg-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-300 border border-slate-700">
-                <span className="w-2 h-2 rounded-full bg-green-400" />
-                {availableUnits} responder{availableUnits !== 1 ? 's' : ''} available
-              </div>
+              {dashStats && (
+                <div className="hidden sm:flex items-center gap-1.5 bg-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-300 border border-slate-700">
+                  <span className="w-2 h-2 rounded-full bg-red-400" />
+                  {dashStats.active_incidents} active
+                </div>
+              )}
               <PushNotificationToggle />
               <NotificationCenter />
               <DropdownMenu>
                 <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="rounded-full" />}>
                   <Avatar className="w-8 h-8">
-                    <AvatarFallback className="bg-blue-600 text-white text-xs font-bold">AD</AvatarFallback>
+                    <AvatarFallback className="bg-blue-600 text-white text-xs font-bold">{initials}</AvatarFallback>
                   </Avatar>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 bg-slate-800 border-slate-700">
                   <DropdownMenuLabel className="text-slate-300 text-xs">
-                    <div>Admin User</div>
-                    <div className="text-slate-500 font-normal">admin@rescueportal.ph</div>
+                    <div>{adminProfile?.full_name ?? 'Admin'}</div>
+                    <div className="text-slate-500 font-normal">{adminProfile?.email ?? '...'}</div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator className="bg-slate-700" />
                   <DropdownMenuItem className="text-slate-300 hover:text-white cursor-pointer">

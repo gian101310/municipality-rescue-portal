@@ -1,10 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import {
   AlertTriangle, Users, CheckCircle2, Clock, Activity,
-  TrendingUp, Eye, Plus, Zap, Map, ArrowRight, Search, Phone, X
+  TrendingUp, Eye, Plus, Zap, Map, ArrowRight, Search, Phone, X, RefreshCw
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -16,13 +16,23 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
-import { DEMO_INCIDENTS, DEMO_STATS, DEMO_RESCUE_UNITS, DEMO_EMERGENCY_TYPES } from '@/lib/demo-data'
 import { useSettings } from '@/lib/settings-context'
-import { formatRelativeTime, generateDemoReferenceNumber } from '@/lib/utils'
+import { formatRelativeTime } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import type { DemoIncident, EmergencyType } from '@/lib/types'
 
 const ACTIVE_STATUSES = ['submitted', 'received', 'verification_pending', 'verified', 'assigned', 'dispatched', 'on_the_way', 'arrived', 'operation_in_progress']
+
+type DashboardStats = {
+  total_incidents_today: number
+  active_incidents: number
+  critical_incidents: number
+  resolved_today: number
+  pending_registrations: number
+  average_response_time_minutes: number | null
+  total_incidents: number
+}
 
 function StatCard({
   label, value, icon: Icon, color, pulse
@@ -56,6 +66,13 @@ export default function CommandCenterPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all')
   const [typeFilter, setTypeFilter] = useState<string>('all')
   const [showManualAlert, setShowManualAlert] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+
+  // Real data state
+  const [incidents, setIncidents] = useState<DemoIncident[]>([])
+  const [stats, setStats] = useState<DashboardStats | null>(null)
+  const [emergencyTypes, setEmergencyTypes] = useState<EmergencyType[]>([])
 
   // Manual alert form state
   const [alertType, setAlertType] = useState('')
@@ -65,19 +82,38 @@ export default function CommandCenterPage() {
   const [alertBarangay, setAlertBarangay] = useState('')
   const [alertSeverity, setAlertSeverity] = useState('moderate')
 
-  const activeIncidents = DEMO_INCIDENTS.filter((i) => ACTIVE_STATUSES.includes(i.status))
-  const resolvedToday = DEMO_INCIDENTS.filter((i) => i.status === 'resolved' || i.status === 'closed').length
-  const dispatchedUnits = DEMO_RESCUE_UNITS.filter((u) => u.status === 'dispatched' || u.status === 'on_scene').length
-  const onSceneUnits = DEMO_RESCUE_UNITS.filter((u) => u.status === 'on_scene').length
+  const fetchDashboard = useCallback(async (showRefresh = false) => {
+    if (showRefresh) setRefreshing(true)
+    try {
+      const res = await fetch('/api/admin/dashboard', { cache: 'no-store' })
+      if (!res.ok) throw new Error('Failed to load dashboard')
+      const data = await res.json()
+      setIncidents((data.incidents ?? []) as DemoIncident[])
+      setStats(data.stats ?? null)
+      setEmergencyTypes((data.emergencyTypes ?? []) as EmergencyType[])
+    } catch (err) {
+      if (showRefresh) toast.error(err instanceof Error ? err.message : 'Dashboard load failed')
+    } finally {
+      setLoading(false)
+      setRefreshing(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    fetchDashboard()
+    // Auto-refresh every 15 seconds
+    const interval = setInterval(() => fetchDashboard(), 15000)
+    return () => clearInterval(interval)
+  }, [fetchDashboard])
 
   // Filter incidents
-  const filteredIncidents = DEMO_INCIDENTS.filter((i) => {
+  const filteredIncidents = incidents.filter((i) => {
     if (statusFilter !== 'all' && i.status !== statusFilter) return false
-    if (typeFilter !== 'all' && i.emergency_type.id !== typeFilter) return false
+    if (typeFilter !== 'all' && i.emergency_type?.id !== typeFilter) return false
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase()
-      const matchesRef = i.reference_number.toLowerCase().includes(q)
-      const matchesType = i.emergency_type.name.toLowerCase().includes(q)
+      const matchesRef = i.reference_number?.toLowerCase().includes(q)
+      const matchesType = i.emergency_type?.name?.toLowerCase().includes(q)
       const matchesBarangay = i.barangay?.toLowerCase().includes(q)
       const matchesReporter = i.reporter_name?.toLowerCase().includes(q)
       const matchesDesc = i.description?.toLowerCase().includes(q)
@@ -86,18 +122,12 @@ export default function CommandCenterPage() {
     return true
   })
 
-  // Recent activity feed
-  const recentActivity = DEMO_INCIDENTS.slice(0, 8).flatMap((i) =>
-    (i.timeline || []).slice(-1).map((t) => ({ ...t, reference: i.reference_number, incidentId: i.id, emergencyType: i.emergency_type }))
-  ).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 8)
-
   function handleSubmitManualAlert() {
     if (!alertType || !alertDescription.trim()) {
       toast.error('Please fill in the emergency type and description')
       return
     }
-    const ref = generateDemoReferenceNumber()
-    toast.success(`Alert ${ref} created successfully`)
+    toast.success('Manual alert creation coming soon — use the resident portal for now.')
     setShowManualAlert(false)
     setAlertType('')
     setAlertDescription('')
@@ -105,6 +135,17 @@ export default function CommandCenterPage() {
     setAlertReporterPhone('')
     setAlertBarangay('')
     setAlertSeverity('moderate')
+  }
+
+  if (loading) {
+    return (
+      <div className="p-8 flex items-center justify-center">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin" />
+          <span className="text-sm text-slate-400">Loading dashboard...</span>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -116,6 +157,16 @@ export default function CommandCenterPage() {
           <p className="text-slate-400 text-sm">{settings.municipalityName} — Emergency Operations Dashboard</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant="outline"
+            className="border-slate-600 text-slate-300 hover:bg-slate-800"
+            onClick={() => fetchDashboard(true)}
+            disabled={refreshing}
+          >
+            <RefreshCw className={cn('w-4 h-4 mr-1', refreshing && 'animate-spin')} />
+            Refresh
+          </Button>
           <Button size="sm" variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800" render={<Link href="/admin/incidents" />}>
               <Map className="w-4 h-4 mr-1" />
               View All
@@ -150,7 +201,7 @@ export default function CommandCenterPage() {
                     <SelectValue placeholder="Select type" />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-800 border-slate-600">
-                    {DEMO_EMERGENCY_TYPES.map((et) => (
+                    {emergencyTypes.map((et) => (
                       <SelectItem key={et.id} value={et.id} className="text-white hover:bg-slate-700">{et.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -198,14 +249,13 @@ export default function CommandCenterPage() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="New Alerts" value={DEMO_STATS.total_incidents_today} icon={AlertTriangle} color="text-red-400" pulse />
-        <StatCard label="Active Incidents" value={DEMO_STATS.active_incidents} icon={Activity} color="text-amber-400" />
-        <StatCard label="Critical" value={DEMO_STATS.critical_incidents} icon={Zap} color="text-red-500" pulse />
-        <StatCard label="Dispatched" value={dispatchedUnits} icon={Users} color="text-blue-400" />
-        <StatCard label="On Scene" value={onSceneUnits} icon={CheckCircle2} color="text-teal-400" />
-        <StatCard label="Resolved Today" value={resolvedToday} icon={CheckCircle2} color="text-green-400" />
-        <StatCard label="Avg Response" value={`${DEMO_STATS.average_response_time_minutes} min`} icon={Clock} color="text-purple-400" />
-        <StatCard label="Total Incidents" value={DEMO_INCIDENTS.length} icon={TrendingUp} color="text-slate-400" />
+        <StatCard label="New Today" value={stats?.total_incidents_today ?? 0} icon={AlertTriangle} color="text-red-400" pulse={!!stats?.total_incidents_today} />
+        <StatCard label="Active Incidents" value={stats?.active_incidents ?? 0} icon={Activity} color="text-amber-400" />
+        <StatCard label="Critical" value={stats?.critical_incidents ?? 0} icon={Zap} color="text-red-500" pulse={!!stats?.critical_incidents} />
+        <StatCard label="Resolved Today" value={stats?.resolved_today ?? 0} icon={CheckCircle2} color="text-green-400" />
+        <StatCard label="Pending Regs" value={stats?.pending_registrations ?? 0} icon={Users} color="text-blue-400" />
+        <StatCard label="Avg Response" value={stats?.average_response_time_minutes ? `${stats.average_response_time_minutes} min` : '—'} icon={Clock} color="text-purple-400" />
+        <StatCard label="Total Incidents" value={stats?.total_incidents ?? 0} icon={TrendingUp} color="text-slate-400" />
       </div>
 
       {/* Quick Actions */}
@@ -260,7 +310,7 @@ export default function CommandCenterPage() {
                   </SelectTrigger>
                   <SelectContent className="bg-slate-800 border-slate-600">
                     <SelectItem value="all" className="text-white hover:bg-slate-700">All Types</SelectItem>
-                    {DEMO_EMERGENCY_TYPES.map((et) => (
+                    {emergencyTypes.map((et) => (
                       <SelectItem key={et.id} value={et.id} className="text-white hover:bg-slate-700">{et.name}</SelectItem>
                     ))}
                   </SelectContent>
@@ -285,28 +335,28 @@ export default function CommandCenterPage() {
                     {filteredIncidents.length === 0 ? (
                       <tr>
                         <td colSpan={7} className="px-4 py-8 text-center text-slate-500 text-sm">
-                          No incidents match your filters
+                          {incidents.length === 0 ? 'No incidents yet — reports from residents will appear here.' : 'No incidents match your filters'}
                         </td>
                       </tr>
                     ) : (
                       filteredIncidents.slice(0, 10).map((incident) => (
                         <tr key={incident.id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
                           <td className="px-4 py-3">
-                            <span className="font-mono text-xs text-slate-300">{incident.reference_number.split('-').slice(-1)[0]}</span>
+                            <span className="font-mono text-xs text-slate-300">{incident.reference_number?.split('-').slice(-1)[0]}</span>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1.5">
                               <span
                                 className="w-5 h-5 rounded flex items-center justify-center shrink-0"
-                                style={{ background: incident.emergency_type.color + '30' }}
+                                style={{ background: (incident.emergency_type?.color ?? '#6b7280') + '30' }}
                               >
                                 <EmergencyTypeIcon
-                                  iconName={incident.emergency_type.icon}
+                                  iconName={incident.emergency_type?.icon ?? 'AlertTriangle'}
                                   className="w-3 h-3"
-                                  style={{ color: incident.emergency_type.color }}
+                                  style={{ color: incident.emergency_type?.color ?? '#6b7280' }}
                                 />
                               </span>
-                              <span className="text-xs text-slate-300 hidden sm:block truncate max-w-[80px]">{incident.emergency_type.name}</span>
+                              <span className="text-xs text-slate-300 hidden sm:block truncate max-w-[80px]">{incident.emergency_type?.name ?? 'Unknown'}</span>
                             </div>
                           </td>
                           <td className="px-4 py-3 hidden sm:table-cell">
@@ -354,86 +404,51 @@ export default function CommandCenterPage() {
           </Card>
         </div>
 
-        {/* Activity Feed */}
+        {/* Activity Feed — recent incidents */}
         <div>
           <Card className="bg-slate-900 border-slate-700 h-full">
             <CardHeader className="pb-3">
               <CardTitle className="text-white text-base">Recent Activity</CardTitle>
             </CardHeader>
             <CardContent className="space-y-0 p-0">
-              {recentActivity.map((activity, idx) => (
-                <div key={`${activity.id}-${idx}`} className="flex items-start gap-3 px-4 py-3 border-b border-slate-800/50 last:border-0">
+              {incidents.length === 0 && (
+                <p className="text-slate-500 text-xs text-center px-4 py-8">No activity yet</p>
+              )}
+              {incidents.slice(0, 8).map((incident) => (
+                <Link
+                  key={incident.id}
+                  href={`/admin/incidents/${incident.id}`}
+                  className="flex items-start gap-3 px-4 py-3 border-b border-slate-800/50 last:border-0 hover:bg-slate-800/30 transition-colors"
+                >
                   <div
                     className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ background: (activity.emergencyType?.color || '#6b7280') + '25' }}
+                    style={{ background: (incident.emergency_type?.color || '#6b7280') + '25' }}
                   >
                     <EmergencyTypeIcon
-                      iconName={activity.emergencyType?.icon || 'AlertTriangle'}
+                      iconName={incident.emergency_type?.icon || 'AlertTriangle'}
                       className="w-3.5 h-3.5"
-                      style={{ color: activity.emergencyType?.color || '#6b7280' }}
+                      style={{ color: incident.emergency_type?.color || '#6b7280' }}
                     />
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-1">
-                      <p className="text-xs font-medium text-white truncate">{activity.label}</p>
+                      <p className="text-xs font-medium text-white truncate">{incident.emergency_type?.name ?? 'Alert'}</p>
                       <Badge variant="outline" className="text-xs border-slate-700 text-slate-400 shrink-0">
-                        {activity.reference.split('-').slice(-1)[0]}
+                        {incident.reference_number?.split('-').slice(-1)[0]}
                       </Badge>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5">{activity.actor_name}</p>
-                    <p className="text-xs text-slate-600">{formatRelativeTime(activity.created_at)}</p>
+                    <p className="text-xs text-slate-500 mt-0.5 truncate">{incident.reporter_name ?? 'Anonymous'}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <IncidentStatusBadge status={incident.status} />
+                      <span className="text-xs text-slate-600">{formatRelativeTime(incident.created_at)}</span>
+                    </div>
                   </div>
-                </div>
+                </Link>
               ))}
             </CardContent>
           </Card>
         </div>
       </div>
-
-      {/* Units Status */}
-      <Card className="bg-slate-900 border-slate-700">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-white text-base">Rescue Team Status</CardTitle>
-            <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white text-xs" render={<Link href="/admin/teams" />}>
-              Manage <ArrowRight className="w-3 h-3 ml-1" />
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            {DEMO_RESCUE_UNITS.map((unit) => {
-              const statusColors: Record<string, string> = {
-                available: 'bg-green-500',
-                dispatched: 'bg-amber-500',
-                on_scene: 'bg-blue-500',
-                off_duty: 'bg-slate-500',
-                returning: 'bg-teal-500',
-              }
-              const statusLabels: Record<string, string> = {
-                available: 'Available',
-                dispatched: 'Dispatched',
-                on_scene: 'On Scene',
-                off_duty: 'Off Duty',
-                returning: 'Returning',
-              }
-              return (
-                <div key={unit.id} className="bg-slate-800 rounded-lg p-3 border border-slate-700">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="font-semibold text-sm text-white">{unit.code}</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className={cn('w-2 h-2 rounded-full', statusColors[unit.status] || 'bg-slate-500')} />
-                      <span className="text-xs text-slate-400">{statusLabels[unit.status] || unit.status}</span>
-                    </div>
-                  </div>
-                  <p className="text-xs text-slate-500">{unit.team_leader_name}</p>
-                  <p className="text-xs text-slate-600 mt-1">{unit.members?.length || 0} members</p>
-                </div>
-              )
-            })}
-          </div>
-        </CardContent>
-      </Card>
     </div>
   )
 }

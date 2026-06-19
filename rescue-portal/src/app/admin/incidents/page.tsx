@@ -13,7 +13,7 @@ import {
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
-import { DEMO_EMERGENCY_TYPES } from '@/lib/demo-data'
+import type { EmergencyType } from '@/lib/types'
 import { formatRelativeTime } from '@/lib/utils'
 import type { DemoIncident, IncidentStatus, SeverityLevel } from '@/lib/types'
 import { toast } from 'sonner'
@@ -80,6 +80,17 @@ export default function IncidentsPage() {
     })
   }, [incidents, tab, search, typeFilter, severityFilter])
 
+  // Extract unique emergency types from loaded incidents
+  const uniqueTypes = useMemo(() => {
+    const seen = new Map<string, EmergencyType>()
+    for (const inc of incidents) {
+      if (inc.emergency_type?.id && !seen.has(inc.emergency_type.id)) {
+        seen.set(inc.emergency_type.id, inc.emergency_type)
+      }
+    }
+    return Array.from(seen.values())
+  }, [incidents])
+
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
@@ -121,7 +132,7 @@ export default function IncidentsPage() {
               </SelectTrigger>
               <SelectContent className="bg-slate-800 border-slate-600">
                 <SelectItem value="all" className="text-white">All Types</SelectItem>
-                {DEMO_EMERGENCY_TYPES.map((t) => (
+                {uniqueTypes.map((t) => (
                   <SelectItem key={t.id} value={t.id} className="text-white">{t.name}</SelectItem>
                 ))}
               </SelectContent>

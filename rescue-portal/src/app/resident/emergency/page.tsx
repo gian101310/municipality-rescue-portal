@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, MapPin, Camera, ChevronRight, CheckCircle2,
@@ -15,7 +15,7 @@ import { Switch } from '@/components/ui/switch'
 import { Card, CardContent } from '@/components/ui/card'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
-import { DEMO_EMERGENCY_TYPES } from '@/lib/demo-data'
+// Emergency types fetched from API
 import { useSettings } from '@/lib/settings-context'
 import { toast } from 'sonner'
 import type { EmergencyType } from '@/lib/types'
@@ -74,6 +74,21 @@ export default function EmergencyPage() {
   const [location, setLocation] = useState<{ lat: number; lng: number; accuracy: number | null } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [refNumber, setRefNumber] = useState('')
+  const [emergencyTypes, setEmergencyTypes] = useState<EmergencyType[]>([])
+
+  // Fetch emergency types from API
+  useEffect(() => {
+    async function loadTypes() {
+      try {
+        const res = await fetch('/api/emergency-types', { cache: 'no-store' })
+        if (res.ok) {
+          const data = await res.json()
+          setEmergencyTypes(data.emergencyTypes ?? data ?? [])
+        }
+      } catch { /* silent */ }
+    }
+    loadTypes()
+  }, [])
 
   function selectType(type: EmergencyType) {
     setSelectedType(type)
@@ -267,7 +282,7 @@ export default function EmergencyPage() {
           <div>
             <p className="text-slate-500 text-sm mb-4">Select the type of emergency</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {DEMO_EMERGENCY_TYPES.map((et) => (
+              {emergencyTypes.map((et) => (
                 <button
                   key={et.id}
                   onClick={() => selectType(et)}
