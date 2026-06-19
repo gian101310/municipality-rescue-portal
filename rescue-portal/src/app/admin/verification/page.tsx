@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ShieldCheck, Search, Eye, CheckCircle2, XCircle, MessageSquare, Clock, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,7 +12,6 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from '@/components/ui/dialog'
 import { Separator } from '@/components/ui/separator'
-import { DEMO_RESIDENTS } from '@/lib/demo-data'
 import { formatDate, formatRelativeTime, maskIdNumber } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { ResidentProfile, RegistrationStatus } from '@/lib/types'
@@ -47,7 +46,35 @@ export default function VerificationPage() {
   const [statusFilter, setStatusFilter] = useState<string>('pending')
   const [selected, setSelected] = useState<ResidentProfile | null>(null)
   const [moreInfoNote, setMoreInfoNote] = useState('')
-  const [residents, setResidents] = useState(DEMO_RESIDENTS)
+  const [residents, setResidents] = useState<ResidentProfile[]>([])
+  const [loading, setLoading] = useState(true)
+  const [savingResidentId, setSavingResidentId] = useState<string | null>(null)
+
+  const loadResidents = useCallback(async () => {
+    try {
+      const response = await fetch('/api/admin/residents', { cache: 'no-store' })
+      const payload = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(payload?.message ?? 'Unable to load residents.')
+      }
+
+      setResidents((payload?.residents ?? []) as ResidentProfile[])
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to load residents.')
+      setResidents([])
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      loadResidents()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [loadResidents])
 
   const pendingCount = residents.filter((r) => PENDING_STATUSES.includes(r.registration_status)).length
 
@@ -64,40 +91,48 @@ export default function VerificationPage() {
     return matchesSearch && matchesStatus
   })
 
+  async function updateResidentStatus(resident: ResidentProfile, status: RegistrationStatus, note = '') {
+    setSavingResidentId(resident.id)
+    try {
+      const response = await fetch(`/api/admin/residents/${resident.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, note }),
+      })
+      const payload = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(payload?.message ?? 'Unable to update resident.')
+      }
+
+      const updatedResident = payload?.resident as ResidentProfile
+      setResidents((prev) => prev.map((item) => item.id === resident.id ? updatedResident : item))
+      setSelected((current) => current?.id === resident.id ? updatedResident : current)
+
+      if (status === 'approved') toast.success(`${resident.full_name} has been approved`)
+      if (status === 'rejected') toast.error(`${resident.full_name} has been rejected`)
+      if (status === 'more_info_required') toast.info(`Additional info requested from ${resident.full_name}`)
+
+      if (status !== 'more_info_required') setSelected(null)
+      setMoreInfoNote('')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to update resident.')
+    } finally {
+      setSavingResidentId(null)
+    }
+  }
+
   function handleApprove(resident: ResidentProfile) {
-    setResidents((prev) =>
-      prev.map((r) =>
-        r.id === resident.id
-          ? { ...r, registration_status: 'approved' as RegistrationStatus, verified_at: new Date().toISOString() }
-          : r
-      )
-    )
-    toast.success(`${resident.full_name} has been approved`)
-    setSelected(null)
+    updateResidentStatus(resident, 'approved')
   }
 
   function handleReject(resident: ResidentProfile) {
-    setResidents((prev) =>
-      prev.map((r) =>
-        r.id === resident.id ? { ...r, registration_status: 'rejected' as RegistrationStatus } : r
-      )
-    )
-    toast.error(`${resident.full_name} has been rejected`)
-    setSelected(null)
+    updateResidentStatus(resident, 'rejected')
   }
 
   function handleMoreInfo(resident: ResidentProfile) {
     if (!moreInfoNote.trim()) { toast.error('Please enter the information required'); return }
-    setResidents((prev) =>
-      prev.map((r) =>
-        r.id === resident.id
-          ? { ...r, registration_status: 'more_info_required' as RegistrationStatus, more_info_request: moreInfoNote }
-          : r
-      )
-    )
-    toast.info(`Additional info requested from ${resident.full_name}`)
-    setMoreInfoNote('')
-    setSelected(null)
+    updateResidentStatus(resident, 'more_info_required', moreInfoNote)
   }
 
   const FILTER_TABS = [
@@ -190,7 +225,14 @@ export default function VerificationPage() {
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 && (
+                {loading && (
+                  <tr>
+                    <td colSpan={6} className="text-center py-12 text-slate-500 text-sm">
+                      Loading residents...
+                    </td>
+                  </tr>
+                )}
+                {!loading && filtered.length === 0 && (
                   <tr>
                     <td colSpan={6} className="text-center py-12 text-slate-500 text-sm">
                       No residents match your filters
@@ -235,6 +277,7 @@ export default function VerificationPage() {
                                 size="sm"
                                 className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white"
                                 onClick={() => handleApprove(resident)}
+                                disabled={savingResidentId === resident.id}
                               >
                                 <CheckCircle2 className="w-3 h-3 mr-1" /> Approve
                               </Button>
@@ -242,6 +285,7 @@ export default function VerificationPage() {
                                 size="sm"
                                 className="h-7 px-2 text-xs bg-red-600 hover:bg-red-700 text-white"
                                 onClick={() => handleReject(resident)}
+                                disabled={savingResidentId === resident.id}
                               >
                                 <XCircle className="w-3 h-3 mr-1" /> Reject
                               </Button>
@@ -335,7 +379,7 @@ export default function VerificationPage() {
                     variant="outline"
                     className="mt-2 border-orange-500/40 text-orange-400 hover:bg-orange-500/10"
                     onClick={() => handleMoreInfo(selected)}
-                    disabled={!moreInfoNote.trim()}
+                    disabled={!moreInfoNote.trim() || savingResidentId === selected.id}
                   >
                     <MessageSquare className="w-3.5 h-3.5 mr-1.5" />
                     Send Request
@@ -356,12 +400,14 @@ export default function VerificationPage() {
                 <Button
                   className="bg-red-600 hover:bg-red-700 text-white"
                   onClick={() => handleReject(selected)}
+                  disabled={savingResidentId === selected.id}
                 >
                   <XCircle className="w-4 h-4 mr-1.5" /> Reject
                 </Button>
                 <Button
                   className="bg-green-600 hover:bg-green-700 text-white"
                   onClick={() => handleApprove(selected)}
+                  disabled={savingResidentId === selected.id}
                 >
                   <CheckCircle2 className="w-4 h-4 mr-1.5" /> Approve
                 </Button>
