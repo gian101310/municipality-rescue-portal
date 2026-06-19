@@ -3,9 +3,11 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { generateMasterKey, hashMasterKey } from '@/lib/master-key'
 import {
   TENANT_DISABLED_BAN_DURATION,
+  buildEditedTenantBranding,
   buildTenantBranding,
   isTenantAction,
   normalizeSecretKey,
+  validateTenantEditorInput,
   validateTenantPassword,
 } from '@/lib/tenant-admin'
 import {
@@ -138,7 +140,9 @@ function rowToTenant(org: OrganizationRow, municipality?: MunicipalityRow, admin
     plan,
     status,
     contact_email: org.email ?? '',
+    emergency_hotline: org.emergency_hotline,
     admin_email: adminProfile?.email ?? '',
+    admin_full_name: adminProfile?.full_name ?? '',
     admin_user_id: adminProfile?.user_id ?? null,
     master_key_configured: Boolean(org.master_key_hash),
     created_at: org.created_at,
@@ -418,7 +422,13 @@ export async function POST(request: Request) {
 
     return NextResponse.json(
       {
-        tenant: rowToTenant(organization, municipality),
+        tenant: rowToTenant(organization, municipality, {
+          user_id: authUserData.user.id,
+          organization_id: organization.id,
+          full_name: adminFullName,
+          email: adminEmail,
+          role: 'admin',
+        }),
         admin: {
           email: adminEmail,
           full_name: adminFullName,
@@ -539,7 +549,172 @@ export async function PATCH(request: Request) {
     const { organization, municipality, users, adminProfile } = await getTenantRows(dataAdmin, tenantId)
 
     let updatedOrganization = organization
+    let updatedMunicipality = municipality
+    let updatedAdminProfile = adminProfile
     let masterKeyPlaintext: string | null = null
+
+    if (action === 'edit') {
+      const validationError = validateTenantEditorInput(body ?? {})
+      if (validationError) {
+        return NextResponse.json({ message: validationError }, { status: 400 })
+      }
+
+      const municipalityCode = String(body.municipalityCode).trim()
+      const locality = PH_LOCALITIES.find((item) => item.code === municipalityCode)
+      if (!locality) {
+        return NextResponse.json({ message: 'Choose a valid city or municipality.' }, { status: 400 })
+      }
+
+      const province = locality.provinceCode
+        ? PH_PROVINCES.find((item) => item.code === locality.provinceCode)
+        : null
+      const region = PH_REGIONS.find((item) => item.code === locality.regionCode)
+      if (!region) {
+        return NextResponse.json({ message: 'Selected municipality has no valid region.' }, { status: 400 })
+      }
+
+      const name = String(body.name).trim()
+      const slug = slugify(String(body.slug).trim())
+      const contactEmail = String(body.contactEmail).trim().toLowerCase()
+      const emergencyHotline = String(body.emergencyHotline).trim()
+      const adminFullName = String(body.adminFullName).trim()
+      const adminEmail = String(body.adminEmail).trim().toLowerCase()
+      const plan = body.plan as TenantPlan
+      const status = body.status as TenantStatus
+
+      if (!slug) {
+        return NextResponse.json({ message: 'Tenant slug could not be generated.' }, { status: 400 })
+      }
+
+      const { data: slugOwner, error: slugError } = await dataAdmin
+        .from('organizations')
+        .select('id')
+        .eq('slug', slug)
+        .neq('id', tenantId)
+        .maybeSingle<{ id: string }>()
+
+      if (slugError) throw new Error(slugError.message)
+      if (slugOwner?.id) {
+        return NextResponse.json({ message: `The slug "${slug}" is already used.` }, { status: 400 })
+      }
+
+      if (!adminProfile) {
+        return NextResponse.json({ message: 'No municipality admin login found for this client.' }, { status: 400 })
+      }
+
+      const scope = makeTenantScope('municipality', locality.code)
+      const fallbackMap = getFallbackMapCenter(scope)
+      const provinceName = province?.name ?? ''
+      const address = [getLocalityLabel(locality), provinceName, region.name, 'Philippines']
+        .filter(Boolean)
+        .join(', ')
+
+      const { data: editedOrganization, error: organizationUpdateError } = await dataAdmin
+        .from('organizations')
+        .update({
+          name,
+          slug,
+          province: provinceName,
+          region: region.name,
+          email: contactEmail,
+          emergency_hotline: emergencyHotline,
+          address,
+          map_center_lat: fallbackMap.center.lat,
+          map_center_lng: fallbackMap.center.lng,
+          map_zoom: fallbackMap.zoom,
+          subscription_tier: planToTier(plan),
+          is_active: status !== 'suspended' && status !== 'cancelled',
+          branding: buildEditedTenantBranding(organization.branding, {
+            plan,
+            status,
+            localityCode: locality.code,
+            provinceCode: locality.provinceCode,
+            regionCode: locality.regionCode,
+            municipalityName: locality.name,
+          }),
+        })
+        .eq('id', tenantId)
+        .select('id, name, slug, province, region, email, emergency_hotline, branding, is_active, subscription_tier, master_key_hash, created_at')
+        .single<OrganizationRow>()
+
+      if (organizationUpdateError || !editedOrganization) {
+        throw new Error(organizationUpdateError?.message ?? 'Unable to update client municipality.')
+      }
+      updatedOrganization = editedOrganization
+
+      const municipalityPayload: Record<string, unknown> = {
+        name: locality.name,
+        province: provinceName,
+        region: region.name,
+        map_center_lat: fallbackMap.center.lat,
+        map_center_lng: fallbackMap.center.lng,
+        map_zoom: fallbackMap.zoom,
+      }
+
+      if (municipality) {
+        const { data: editedMunicipality, error: municipalityUpdateError } = await dataAdmin
+          .from('municipalities')
+          .update(municipalityPayload)
+          .eq('id', municipality.id)
+          .eq('organization_id', tenantId)
+          .select('id, organization_id, name, province, region')
+          .single<MunicipalityRow>()
+
+        if (municipalityUpdateError || !editedMunicipality) {
+          throw new Error(municipalityUpdateError?.message ?? 'Unable to update municipality.')
+        }
+        updatedMunicipality = editedMunicipality
+      } else {
+        const { data: createdMunicipality, error: municipalityCreateError } = await dataAdmin
+          .from('municipalities')
+          .insert({ organization_id: tenantId, ...municipalityPayload, is_active: true })
+          .select('id, organization_id, name, province, region')
+          .single<MunicipalityRow>()
+
+        if (municipalityCreateError || !createdMunicipality) {
+          throw new Error(municipalityCreateError?.message ?? 'Unable to create municipality.')
+        }
+        updatedMunicipality = createdMunicipality
+      }
+
+      const { error: scopeError } = await dataAdmin
+        .from('organization_geo_scopes')
+        .upsert({
+          organization_id: tenantId,
+          scope_level: 'municipality',
+          region_code: locality.regionCode,
+          province_code: locality.provinceCode,
+          municipality_code: locality.code,
+          psgc_version: PSGC_VERSION_LABEL,
+        }, { onConflict: 'organization_id' }) as QueryResult<unknown>
+
+      if (scopeError) throw new Error(scopeError.message)
+
+      const { data: editedAdminProfile, error: profileUpdateError } = await dataAdmin
+        .from('user_profiles')
+        .update({
+          full_name: adminFullName,
+          email: adminEmail,
+          municipality_id: updatedMunicipality.id,
+          municipality: locality.name,
+          province: provinceName,
+        })
+        .eq('user_id', adminProfile.user_id)
+        .eq('organization_id', tenantId)
+        .select('user_id, organization_id, full_name, email, role')
+        .single<AdminProfileRow>()
+
+      if (profileUpdateError || !editedAdminProfile) {
+        throw new Error(profileUpdateError?.message ?? 'Unable to update municipality admin profile.')
+      }
+      updatedAdminProfile = editedAdminProfile
+
+      const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(
+        adminProfile.user_id,
+        { email: adminEmail }
+      )
+      if (authUpdateError) throw new Error(authUpdateError.message)
+    }
 
     if (action === 'enable' || action === 'disable') {
       const status: TenantStatus = action === 'enable' ? 'active' : 'suspended'
@@ -619,7 +794,7 @@ export async function PATCH(request: Request) {
     }
 
     return NextResponse.json({
-      tenant: rowToTenant(updatedOrganization, municipality, adminProfile),
+      tenant: rowToTenant(updatedOrganization, updatedMunicipality, updatedAdminProfile),
       master_key: masterKeyPlaintext,
     })
   } catch (error) {
