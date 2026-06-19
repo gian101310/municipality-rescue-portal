@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Search, Filter, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -13,9 +13,10 @@ import {
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
-import { DEMO_INCIDENTS, DEMO_EMERGENCY_TYPES } from '@/lib/demo-data'
+import { DEMO_EMERGENCY_TYPES } from '@/lib/demo-data'
 import { formatRelativeTime } from '@/lib/utils'
-import type { IncidentStatus, SeverityLevel } from '@/lib/types'
+import type { DemoIncident, IncidentStatus, SeverityLevel } from '@/lib/types'
+import { toast } from 'sonner'
 
 const PAGE_SIZE = 8
 
@@ -36,9 +37,33 @@ export default function IncidentsPage() {
   const [typeFilter, setTypeFilter] = useState('all')
   const [severityFilter, setSeverityFilter] = useState<SeverityLevel | 'all'>('all')
   const [page, setPage] = useState(1)
+  const [incidents, setIncidents] = useState<DemoIncident[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch('/api/admin/incidents', { cache: 'no-store' })
+        const payload = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+          throw new Error(payload?.message ?? 'Unable to load incidents.')
+        }
+
+        setIncidents((payload?.incidents ?? []) as DemoIncident[])
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Unable to load incidents.')
+        setIncidents([])
+      } finally {
+        setLoading(false)
+      }
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [])
 
   const filtered = useMemo(() => {
-    return DEMO_INCIDENTS.filter((inc) => {
+    return incidents.filter((inc) => {
       if (tab === 'active' && !ACTIVE_STATUSES.includes(inc.status)) return false
       if (tab === 'resolved' && !RESOLVED_STATUSES.includes(inc.status)) return false
       if (tab === 'closed' && !CLOSED_STATUSES.includes(inc.status)) return false
@@ -53,7 +78,7 @@ export default function IncidentsPage() {
       }
       return true
     })
-  }, [tab, search, typeFilter, severityFilter])
+  }, [incidents, tab, search, typeFilter, severityFilter])
 
   const totalPages = Math.ceil(filtered.length / PAGE_SIZE)
   const paged = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
@@ -129,7 +154,11 @@ export default function IncidentsPage() {
                 </tr>
               </thead>
               <tbody>
-                {paged.length === 0 ? (
+                {loading ? (
+                  <tr>
+                    <td colSpan={9} className="text-center py-12 text-slate-500">Loading incidents...</td>
+                  </tr>
+                ) : paged.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="text-center py-12 text-slate-500">No incidents found</td>
                   </tr>

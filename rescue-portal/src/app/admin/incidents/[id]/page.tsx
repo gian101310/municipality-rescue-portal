@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { use } from 'react'
 import Link from 'next/link'
 import {
@@ -20,7 +20,7 @@ import { MapView } from '@/components/map-view'
 import { DEMO_INCIDENTS, DEMO_RESCUE_UNITS, DEMO_RESIDENTS } from '@/lib/demo-data'
 import { formatDateTime, formatRelativeTime, getStatusLabel } from '@/lib/utils'
 import { toast } from 'sonner'
-import type { IncidentStatus } from '@/lib/types'
+import type { DemoIncident, IncidentStatus } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 const ALL_STATUSES: IncidentStatus[] = [
@@ -31,10 +31,43 @@ const ALL_STATUSES: IncidentStatus[] = [
 
 export default function IncidentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
-  const incident = DEMO_INCIDENTS.find((i) => i.id === id)
+  const demoIncident = DEMO_INCIDENTS.find((i) => i.id === id)
+  const [incident, setIncident] = useState<DemoIncident | null>(demoIncident ?? null)
+  const [loadingIncident, setLoadingIncident] = useState(!demoIncident)
   const [note, setNote] = useState('')
   const [newStatus, setNewStatus] = useState<IncidentStatus | ''>('')
   const [statusReason, setStatusReason] = useState('')
+
+  useEffect(() => {
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch('/api/admin/incidents', { cache: 'no-store' })
+        const payload = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+          throw new Error(payload?.message ?? 'Unable to load incident.')
+        }
+
+        const realIncident = ((payload?.incidents ?? []) as DemoIncident[]).find((item) => item.id === id)
+        setIncident(realIncident ?? demoIncident ?? null)
+      } catch {
+        setIncident(demoIncident ?? null)
+      } finally {
+        setLoadingIncident(false)
+      }
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [demoIncident, id])
+
+  if (loadingIncident) {
+    return (
+      <div className="p-8 text-center">
+        <Clock className="w-12 h-12 text-slate-600 mx-auto mb-3 animate-pulse" />
+        <h2 className="text-white font-semibold mb-2">Loading Incident</h2>
+      </div>
+    )
+  }
 
   if (!incident) {
     return (
@@ -60,11 +93,29 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
     pulse: ['submitted', 'on_the_way', 'arrived'].includes(incident.status),
   }]
 
-  function handleStatusUpdate() {
+  async function handleStatusUpdate() {
     if (!newStatus) return
-    toast.success(`Status updated to ${getStatusLabel(newStatus)}`)
-    setNewStatus('')
-    setStatusReason('')
+    if (!incident) return
+
+    try {
+      const response = await fetch(`/api/admin/incidents/${incident.id}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus, reason: statusReason }),
+      })
+      const payload = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(payload?.message ?? 'Unable to update incident.')
+      }
+
+      setIncident(payload?.incident as DemoIncident)
+      toast.success(`Status updated to ${getStatusLabel(newStatus)}`)
+      setNewStatus('')
+      setStatusReason('')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to update incident.')
+    }
   }
 
   function handleAddNote() {

@@ -17,7 +17,6 @@ import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
 import { DEMO_EMERGENCY_TYPES } from '@/lib/demo-data'
 import { useSettings } from '@/lib/settings-context'
-import { generateDemoReferenceNumber } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { EmergencyType } from '@/lib/types'
 import { calculateSeverity, getSeverityRingProps } from '@/lib/severity-scoring'
@@ -72,6 +71,7 @@ export default function EmergencyPage() {
   const [affectedCount, setAffectedCount] = useState(1)
   const [hazardStates, setHazardStates] = useState<Record<string, boolean>>({})
   const [locationGranted, setLocationGranted] = useState(false)
+  const [location, setLocation] = useState<{ lat: number; lng: number; accuracy: number | null } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [refNumber, setRefNumber] = useState('')
 
@@ -94,18 +94,32 @@ export default function EmergencyPage() {
   function requestLocation() {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        () => { setLocationGranted(true); toast.success('Location captured') },
-        () => { setLocationGranted(true); toast.info('Using approximate location') }
+        (position) => {
+          setLocation({
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            accuracy: position.coords.accuracy,
+          })
+          setLocationGranted(true)
+          toast.success('Location captured')
+        },
+        () => {
+          setLocationGranted(false)
+          setLocation(null)
+          toast.error('Location is required to submit an emergency report.')
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 30000 }
       )
     } else {
-      setLocationGranted(true)
-      toast.info('Using approximate location')
+      setLocationGranted(false)
+      toast.error('This browser cannot share location.')
     }
   }
 
   async function handleSubmit() {
     if (!description.trim()) { toast.error('Please describe the emergency'); return }
-    if (!locationGranted) { toast.error('Please share your location first'); return }
+    if (!locationGranted || !location) { toast.error('Please share your location first'); return }
+    if (!selectedType) { toast.error('Please choose an emergency type'); return }
 
     // Rate limiting
     const limit = checkRateLimit()
@@ -115,12 +129,38 @@ export default function EmergencyPage() {
     }
 
     setSubmitting(true)
-    recordSubmission()
-    await new Promise((r) => setTimeout(r, 2000))
-    const ref = generateDemoReferenceNumber()
-    setRefNumber(ref)
-    setStep('submitted')
-    setSubmitting(false)
+    try {
+      const response = await fetch('/api/resident/incidents', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emergency_type_id: selectedType.id,
+          emergency_type_name: selectedType.name,
+          emergency_type_icon: selectedType.icon,
+          emergency_type_color: selectedType.color,
+          emergency_type_description: selectedType.description,
+          description,
+          affected_count: affectedCount,
+          hazards: activeHazards,
+          latitude: location.lat,
+          longitude: location.lng,
+          gps_accuracy: location.accuracy,
+        }),
+      })
+      const payload = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(payload?.message ?? 'Unable to submit emergency report.')
+      }
+
+      recordSubmission()
+      setRefNumber(payload?.referenceNumber ?? payload?.incident?.reference_number ?? 'Submitted')
+      setStep('submitted')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to submit emergency report.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const activeHazards = Object.entries(hazardStates).filter(([, v]) => v).map(([k]) => k)

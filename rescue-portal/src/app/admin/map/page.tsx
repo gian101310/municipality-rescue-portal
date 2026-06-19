@@ -10,7 +10,7 @@ import { MapView } from '@/components/map-view'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
-import { DEMO_INCIDENTS, DEMO_RESCUE_UNITS } from '@/lib/demo-data'
+import { DEMO_RESCUE_UNITS } from '@/lib/demo-data'
 import { formatRelativeTime, getSeverityHexColor } from '@/lib/utils'
 import { isActiveStatus } from '@/lib/utils'
 import {
@@ -23,8 +23,7 @@ import { DEMO_TENANT_GEO_SCOPE } from '@/lib/philippines-geography'
 import type { TenantGeographyScope } from '@/lib/philippines-geography'
 import Link from 'next/link'
 import type { DemoIncident } from '@/lib/types'
-
-const activeIncidents = DEMO_INCIDENTS.filter((i) => isActiveStatus(i.status))
+import { toast } from 'sonner'
 
 function deterministicOffset(seed: string, axis: 'lat' | 'lng') {
   const input = `${seed}:${axis}`
@@ -45,7 +44,10 @@ export default function LiveMapPage() {
   const [mapCenter, setMapCenter] = useState({ lat: 12.8797, lng: 121.7740 })
   const [mapZoom, setMapZoom] = useState(6)
   const [focusSource, setFocusSource] = useState('Loading focus')
+  const [incidents, setIncidents] = useState<DemoIncident[]>([])
+  const [loadingIncidents, setLoadingIncidents] = useState(true)
 
+  const activeIncidents = incidents.filter((i) => isActiveStatus(i.status))
   const filteredIncidents = activeIncidents.filter((i) =>
     filterSeverity === 'all' || i.severity === filterSeverity
   )
@@ -88,6 +90,28 @@ export default function LiveMapPage() {
     }
   }, [])
 
+  useEffect(() => {
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch('/api/admin/incidents', { cache: 'no-store' })
+        const payload = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+          throw new Error(payload?.message ?? 'Unable to load incidents.')
+        }
+
+        setIncidents((payload?.incidents ?? []) as DemoIncident[])
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Unable to load incidents.')
+        setIncidents([])
+      } finally {
+        setLoadingIncidents(false)
+      }
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [])
+
   const markers = useMemo(() => [
     {
       id: 'coverage-focus',
@@ -98,8 +122,8 @@ export default function LiveMapPage() {
     },
     ...filteredIncidents.map((inc) => ({
       id: inc.id,
-      lat: mapCenter.lat + deterministicOffset(inc.id, 'lat'),
-      lng: mapCenter.lng + deterministicOffset(inc.id, 'lng'),
+      lat: typeof inc.latitude === 'number' ? inc.latitude : mapCenter.lat + deterministicOffset(inc.id, 'lat'),
+      lng: typeof inc.longitude === 'number' ? inc.longitude : mapCenter.lng + deterministicOffset(inc.id, 'lng'),
       color: getSeverityHexColor(inc.severity),
       label: inc.reference_number,
       severity: inc.severity,
@@ -157,7 +181,9 @@ export default function LiveMapPage() {
             <SelectItem value="low" className="text-green-400">Low</SelectItem>
           </SelectContent>
         </Select>
-        <span className="text-slate-400 text-sm">{filteredIncidents.length} active incident{filteredIncidents.length !== 1 ? 's' : ''}</span>
+        <span className="text-slate-400 text-sm">
+          {loadingIncidents ? 'Loading incidents...' : `${filteredIncidents.length} active incident${filteredIncidents.length !== 1 ? 's' : ''}`}
+        </span>
         <Badge variant="outline" className="border-blue-500/30 text-blue-300 bg-blue-500/10">
           <Crosshair className="w-3 h-3 mr-1" />
           {focusSource}

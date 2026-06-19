@@ -1,20 +1,41 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ChevronDown, ChevronUp, Clock } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
-import { DEMO_INCIDENTS, DEMO_RESIDENTS } from '@/lib/demo-data'
 import { formatDateTime, formatRelativeTime } from '@/lib/utils'
-import { cn } from '@/lib/utils'
-
-const currentResident = DEMO_RESIDENTS[0]
-const myIncidents = DEMO_INCIDENTS.filter((i) => i.reporter_id === currentResident.user_id)
+import type { DemoIncident } from '@/lib/types'
+import { toast } from 'sonner'
 
 export default function HistoryPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [myIncidents, setMyIncidents] = useState<DemoIncident[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const timer = window.setTimeout(async () => {
+      try {
+        const response = await fetch('/api/resident/incidents', { cache: 'no-store' })
+        const payload = await response.json().catch(() => ({}))
+
+        if (!response.ok) {
+          throw new Error(payload?.message ?? 'Unable to load reports.')
+        }
+
+        setMyIncidents((payload?.incidents ?? []) as DemoIncident[])
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Unable to load reports.')
+        setMyIncidents([])
+      } finally {
+        setLoading(false)
+      }
+    }, 0)
+
+    return () => window.clearTimeout(timer)
+  }, [])
 
   return (
     <div className="px-4 py-6 space-y-4">
@@ -23,7 +44,12 @@ export default function HistoryPage() {
         <p className="text-slate-500 text-sm">{myIncidents.length} incident{myIncidents.length !== 1 ? 's' : ''} reported</p>
       </div>
 
-      {myIncidents.length === 0 ? (
+      {loading ? (
+        <div className="text-center py-16 text-slate-400">
+          <Clock className="w-10 h-10 mx-auto mb-3 opacity-40" />
+          <p className="text-sm">Loading reports...</p>
+        </div>
+      ) : myIncidents.length === 0 ? (
         <div className="text-center py-16 text-slate-400">
           <Clock className="w-10 h-10 mx-auto mb-3 opacity-40" />
           <p className="text-sm">No past emergency reports</p>
