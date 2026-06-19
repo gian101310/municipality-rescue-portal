@@ -1,5 +1,31 @@
 export type TenantStatus = 'trial' | 'active' | 'suspended' | 'cancelled'
-export type TenantAction = 'enable' | 'disable' | 'kick' | 'change_password' | 'rotate_secret'
+export type TenantPlan = 'starter' | 'professional' | 'enterprise' | 'one_time'
+export type TenantAction = 'enable' | 'disable' | 'kick' | 'change_password' | 'rotate_secret' | 'edit'
+
+export type TenantEditInput = {
+  name?: unknown
+  slug?: unknown
+  contactEmail?: unknown
+  emergencyHotline?: unknown
+  adminFullName?: unknown
+  adminEmail?: unknown
+  municipalityCode?: unknown
+  plan?: unknown
+  status?: unknown
+}
+
+type EditedTenantBrandingFields = {
+  plan: TenantPlan
+  status: TenantStatus
+  localityCode: string
+  provinceCode: string | null | undefined
+  regionCode: string
+  municipalityName: string
+}
+
+const TENANT_PLANS: TenantPlan[] = ['starter', 'professional', 'enterprise', 'one_time']
+const TENANT_STATUSES: TenantStatus[] = ['trial', 'active', 'suspended', 'cancelled']
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export type SettingsTabValue = 'general' | 'coverage_lock' | 'emergency_types' | 'barangays' | 'telegram' | 'notifications'
 
@@ -27,6 +53,34 @@ export function buildTenantBranding(
   return {
     ...(branding ?? {}),
     tenant_status: status,
+  }
+}
+
+export function validateTenantEditorInput(value: TenantEditInput): string | null {
+  if (!String(value.municipalityCode ?? '').trim()) return 'Choose a valid city or municipality.'
+  if (!String(value.name ?? '').trim()) return 'Tenant name is required.'
+  if (!String(value.slug ?? '').trim()) return 'Tenant slug is required.'
+  if (!EMAIL_PATTERN.test(String(value.contactEmail ?? '').trim())) return 'Enter a valid contact email address.'
+  if (!String(value.adminFullName ?? '').trim()) return 'Municipality admin name is required.'
+  if (!EMAIL_PATTERN.test(String(value.adminEmail ?? '').trim())) return 'Enter a valid municipality admin email address.'
+  if (!String(value.emergencyHotline ?? '').trim()) return 'Emergency hotline is required.'
+  if (!TENANT_PLANS.includes(value.plan as TenantPlan)) return 'Choose a valid tenant plan.'
+  if (!TENANT_STATUSES.includes(value.status as TenantStatus)) return 'Choose a valid tenant status.'
+  return null
+}
+
+export function buildEditedTenantBranding(
+  existing: Record<string, unknown> | null | undefined,
+  fields: EditedTenantBrandingFields
+) {
+  return {
+    ...(existing ?? {}),
+    tenant_plan: fields.plan,
+    tenant_status: fields.status,
+    locality_code: fields.localityCode,
+    province_code: fields.provinceCode,
+    region_code: fields.regionCode,
+    municipality_name: fields.municipalityName,
   }
 }
 
@@ -59,4 +113,5 @@ export function isTenantAction(value: unknown): value is TenantAction {
     || value === 'kick'
     || value === 'change_password'
     || value === 'rotate_secret'
+    || value === 'edit'
 }
