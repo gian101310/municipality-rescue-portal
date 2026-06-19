@@ -4,6 +4,10 @@ import { verifyMasterKey } from '@/lib/master-key'
 
 export const dynamic = 'force-dynamic'
 
+type ProfileRow = { organization_id: string | null; role: string }
+type OrgRow = { master_key_hash: string | null }
+type QueryResult<T> = { data: T | null; error: { message?: string } | null }
+
 export async function POST(request: Request) {
   try {
     const supabase = await createClient()
@@ -14,11 +18,11 @@ export async function POST(request: Request) {
 
     const adminClient = await createAdminClient()
 
-    const { data: profileData, error: profileErr } = await adminClient
+    const { data: profileData, error: profileErr } = await (adminClient
       .from('user_profiles')
       .select('organization_id, role')
       .eq('user_id', user.id)
-      .single()
+      .single() as unknown as Promise<QueryResult<ProfileRow>>)
 
     if (profileErr || !profileData) {
       return NextResponse.json({ message: 'User profile not found.' }, { status: 403 })
@@ -33,11 +37,11 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'No organization assigned.' }, { status: 403 })
     }
 
-    const { data: org, error: orgError } = await adminClient
+    const { data: org, error: orgError } = await (adminClient
       .from('organizations')
       .select('master_key_hash')
       .eq('id', organizationId)
-      .single()
+      .single() as unknown as Promise<QueryResult<OrgRow>>)
 
     if (orgError || !org) {
       return NextResponse.json({ message: 'Organization not found.' }, { status: 404 })
