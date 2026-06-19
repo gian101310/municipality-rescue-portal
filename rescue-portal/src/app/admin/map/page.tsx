@@ -303,4 +303,12 @@ export default function LiveMapPage() {
             <CardHeader className="pb-2 pt-3 px-3">
               <CardTitle className="text-sm text-slate-300">Rescue Units</CardTitle>
             </CardHeader>
-            <CardConten
+            <CardContent className="px-3 pb-3">
+              <p className="text-xs text-slate-500 text-center py-4">Team data will appear here once rescue units are registered.</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}

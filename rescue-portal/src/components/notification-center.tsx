@@ -125,4 +125,18 @@ export function NotificationCenter({ userId }: NotificationCenterProps) {
                   </div>
                 </div>
                 {idx < notifications.length - 1 && <Separator className="bg-slate-700/50" />}
-              </
+              </div>
+            ))
+          )}
+        </ScrollArea>
+        <div className="border-t border-slate-700 p-2">
+          <Link href="/admin/audit" className="block">
+            <Button variant="ghost" size="sm" className="w-full text-xs text-slate-400 hover:text-white">
+              View all activity
+            </Button>
+          </Link>
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}

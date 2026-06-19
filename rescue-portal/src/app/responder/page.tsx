@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { SeverityBadge } from '@/components/severity-badge'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
+import type { IncidentStatus } from '@/lib/types'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
 import { toast } from 'sonner'
 
@@ -165,7 +166,7 @@ export default function ResponderPage() {
                   <AlertTriangle className="w-4 h-4" />
                   Active Assignment
                 </CardTitle>
-                <IncidentStatusBadge status={activeIncident.status} />
+                <IncidentStatusBadge status={activeIncident.status as IncidentStatus} />
               </div>
             </CardHeader>
             <CardContent className="space-y-3">

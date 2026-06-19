@@ -261,4 +261,19 @@ export async function requireStaff(): Promise<UserProfile> {
 }
 
 /**
- * Requi
+ * Requires the user to be an admin or super_admin.
+ */
+export async function requireAdmin(): Promise<UserProfile> {
+  return requireAuth(['super_admin', 'admin'])
+}
+
+/**
+ * Requires a specific permission. Redirects with an unauthorized error if not met.
+ */
+export async function requirePermission(permission: Permission): Promise<UserProfile> {
+  const profile = await requireAuth()
+  if (!hasPermission(profile.role, permission)) {
+    redirect('/auth/login?error=unauthorized')
+  }
+  return profile
+}

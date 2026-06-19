@@ -451,4 +451,35 @@ export default function CommandCenterPage() {
                   href={`/admin/incidents/${incident.id}`}
                   className="flex items-start gap-3 px-4 py-3 border-b border-slate-800/50 last:border-0 hover:bg-slate-800/30 transition-colors"
                 >
-    
+                  <div
+                    className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5"
+                    style={{ background: (incident.emergency_type?.color || '#6b7280') + '25' }}
+                  >
+                    <EmergencyTypeIcon
+                      iconName={incident.emergency_type?.icon || 'AlertTriangle'}
+                      className="w-3.5 h-3.5"
+                      style={{ color: incident.emergency_type?.color || '#6b7280' }}
+                    />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-1">
+                      <p className="text-xs font-medium text-white truncate">{incident.emergency_type?.name ?? 'Alert'}</p>
+                      <Badge variant="outline" className="text-xs border-slate-700 text-slate-400 shrink-0">
+                        {incident.reference_number?.split('-').slice(-1)[0]}
+                      </Badge>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5 truncate">{incident.reporter_name ?? 'Anonymous'}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <IncidentStatusBadge status={incident.status} />
+                      <span className="text-xs text-slate-600">{formatRelativeTime(incident.created_at)}</span>
+                    </div>
+                  </div>
+                </Link>
+              ))}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}

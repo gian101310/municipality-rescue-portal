@@ -507,4 +507,126 @@ export default function EmergencyPage() {
               disabled={!description.trim() || !locationGranted}
             >
               Continue to Confirm
-      
+              <ChevronRight className="w-4 h-4 ml-1" />
+            </Button>
+          </div>
+        )}
+
+        {/* Step 3: Confirm */}
+        {step === 'confirm' && selectedType && (
+          <div className="space-y-5">
+            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertTriangle className="w-5 h-5 text-red-600" />
+                <p className="font-bold text-red-700">Confirm Emergency Report</p>
+              </div>
+              <p className="text-sm text-red-600">
+                By submitting, you confirm this is a real emergency. False alerts may result in legal consequences.
+              </p>
+            </div>
+
+            {/* Summary */}
+            <Card className="border-slate-200">
+              <CardContent className="p-4 space-y-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: selectedType.color + '20' }}>
+                    <EmergencyTypeIcon iconName={selectedType.icon} className="w-4 h-4" style={{ color: selectedType.color }} />
+                  </div>
+                  <span className="font-semibold text-slate-900">{selectedType.name}</span>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500">Description</p>
+                  <p className="text-sm text-slate-800">{description}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs">
+                  <div>
+                    <p className="text-slate-500">Affected</p>
+                    <div className="flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5" />
+                      <p className="font-medium">{affectedCount} person{affectedCount !== 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-slate-500">Location</p>
+                    <div className="flex items-center gap-1 text-green-600">
+                      <MapPin className="w-3.5 h-3.5" />
+                      <p className="font-medium">Captured</p>
+                    </div>
+                  </div>
+                </div>
+                {activeHazards.length > 0 && (
+                  <div className="flex flex-wrap gap-1">
+                    {activeHazards.includes('unconscious') && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Unconscious</span>}
+                    {activeHazards.includes('fire') && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Fire</span>}
+                    {activeHazards.includes('flooding') && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Flooding</span>}
+                    {activeHazards.includes('violence') && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Violence</span>}
+                    {activeHazards.includes('trapped') && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Trapped</span>}
+                    {activeHazards.includes('chemical') && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Hazmat</span>}
+                  </div>
+                )}
+
+                {/* Auto Severity Score */}
+                {(() => {
+                  const severity = calculateSeverity({
+                    emergencyType: selectedType.id,
+                    hazards: activeHazards,
+                    affectedCount: parseInt(String(affectedCount)) || 1,
+                    description,
+                  })
+                  const ring = getSeverityRingProps(severity.score)
+                  return (
+                    <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
+                      <svg width="48" height="48" viewBox="0 0 100 100" className="shrink-0">
+                        <circle cx="50" cy="50" r="40" fill="none" stroke="#e2e8f0" strokeWidth="8" />
+                        <circle
+                          cx="50" cy="50" r="40" fill="none"
+                          stroke={severity.color}
+                          strokeWidth="8"
+                          strokeDasharray={ring.circumference}
+                          strokeDashoffset={ring.offset}
+                          strokeLinecap="round"
+                          transform="rotate(-90 50 50)"
+                        />
+                        <text x="50" y="55" textAnchor="middle" fontSize="24" fontWeight="900" fill={severity.color}>
+                          {severity.score}
+                        </text>
+                      </svg>
+                      <div>
+                        <p className="text-xs text-slate-500">Auto Severity Score</p>
+                        <p className="font-bold text-sm" style={{ color: severity.color }}>{severity.label}</p>
+                        <p className="text-xs text-slate-400">Priority triage for dispatchers</p>
+                      </div>
+                    </div>
+                  )
+                })()}
+              </CardContent>
+            </Card>
+
+            <div className="flex flex-col gap-3">
+              <Button
+                onClick={handleSubmit}
+                disabled={submitting}
+                className="w-full bg-red-600 hover:bg-red-700 text-white h-14 text-base font-bold shadow-lg shadow-red-500/30"
+              >
+                {submitting ? (
+                  <span className="flex items-center gap-2">
+                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Submitting...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    <Shield className="w-5 h-5" />
+                    Submit Emergency Report
+                  </span>
+                )}
+              </Button>
+              <Button variant="outline" onClick={() => setStep('details')} className="border-slate-300 text-slate-700 h-11">
+                Back to Edit
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

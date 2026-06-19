@@ -109,4 +109,28 @@ export default function HistoryPage() {
                             {inc.timeline.map((t) => (
                               <div key={t.id} className="flex items-center gap-2 text-xs">
                                 <div className="w-1.5 h-1.5 rounded-full bg-blue-400 shrink-0" />
-                                <
+                                <span className="text-slate-700">{t.label}</span>
+                                <span className="text-slate-400 ml-auto">{formatRelativeTime(t.created_at)}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {inc.resolution_notes && (
+                        <div className="bg-green-50 rounded-lg p-3">
+                          <p className="text-xs font-semibold text-green-700 mb-1">Resolution Notes</p>
+                          <p className="text-xs text-green-600">{inc.resolution_notes}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}

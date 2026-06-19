@@ -70,4 +70,6 @@ self.addEventListener('notificationclick', (event) => {
         if (client.url.includes(url) && 'focus' in client) return client.focus()
       }
       return self.clients.openWindow(url)
-   
+    })
+  )
+})

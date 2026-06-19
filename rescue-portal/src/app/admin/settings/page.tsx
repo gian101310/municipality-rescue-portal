@@ -547,4 +547,29 @@ export default function SettingsPage() {
             <CardContent className="space-y-4">
               {[
                 { label: 'New incident submitted', desc: 'Alert dispatchers when a new incident is received', on: true },
-                { label: 'Critical incident alert', desc: 'Send urgent not
+                { label: 'Critical incident alert', desc: 'Send urgent notifications for critical severity incidents', on: true },
+                { label: 'Team dispatch confirmation', desc: 'Notify reporter when a rescue team is dispatched', on: true },
+                { label: 'Incident resolved', desc: 'Notify reporter when their incident is resolved', on: true },
+                { label: 'Registration approved', desc: 'Notify resident when their account is verified', on: true },
+                { label: 'Registration rejected', desc: 'Notify resident when their account is rejected', on: false },
+                { label: 'Team status updates', desc: 'Notify dispatcher when team status changes', on: true },
+                { label: 'System health alerts', desc: 'Alert admins when system health degrades', on: false },
+              ].map((item) => (
+                <div key={item.label} className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm text-white">{item.label}</p>
+                    <p className="text-xs text-slate-400">{item.desc}</p>
+                  </div>
+                  <Switch defaultChecked={item.on} disabled={!canEditSettings} onCheckedChange={() => toast.info('Demo: Toggle notification')} />
+                </div>
+              ))}
+              <Button onClick={save} disabled={!canEditSettings} className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">
+                <Save className="w-4 h-4 mr-1" /> Save Preferences
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  )
+}

@@ -420,4 +420,30 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
                   <Badge className="bg-amber-600/20 text-amber-400 border border-amber-500/30">{assignedUnit.status}</Badge>
                 </div>
                 <div>
-                  <p className="text-x
+                  <p className="text-xs text-slate-500 mb-1">Team Leader</p>
+                  <p className="text-sm text-slate-300">{assignedUnit.team_leader_name}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-slate-500 mb-1">Members</p>
+                  <div className="space-y-1">
+                    {(assignedUnit.members || []).map((m) => (
+                      <div key={m.id} className="flex items-center gap-2">
+                        <span className={cn('w-1.5 h-1.5 rounded-full', m.role === 'team_leader' ? 'bg-amber-400' : 'bg-slate-500')} />
+                        <span className="text-xs text-slate-400">{m.user_name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                {assignedUnit.contact_number && (
+                  <Button size="sm" className="w-full bg-green-700 hover:bg-green-600 text-white" render={<a href={`tel:${assignedUnit.contact_number}`} />}>
+                    <Phone className="w-3.5 h-3.5 mr-2" /> Call Team
+                  </Button>
+                )}
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}

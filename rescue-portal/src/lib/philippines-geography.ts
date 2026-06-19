@@ -213,4 +213,5 @@ export function makeTenantScope(level: GeoScopeLevel, code?: string): TenantGeog
       municipalityCode: code,
     }
   }
-  return { level: 'cou
+  return { level: 'country' }
+}

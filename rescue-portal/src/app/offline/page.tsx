@@ -35,4 +35,6 @@ export default function OfflinePage() {
         <Shield className="w-4 h-4" />
         <span>Emergency Rescue Portal — Municipal Emergency Response</span>
       </div>
-    </
+    </div>
+  )
+}

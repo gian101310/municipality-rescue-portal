@@ -77,4 +77,6 @@ export function PushNotificationToggle() {
     >
       <BellOff className="w-4 h-4" />
       <span className="text-xs hidden sm:inline">Enable Alerts</span>
-    </But
+    </Button>
+  )
+}

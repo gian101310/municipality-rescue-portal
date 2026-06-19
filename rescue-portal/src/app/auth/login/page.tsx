@@ -187,4 +187,31 @@ function LoginContent() {
 
                 <Button type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white" disabled={loading}>
                   {loading ? (
-                    <span className="fl
+                    <span className="flex items-center gap-2">
+                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      Signing in...
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-2">
+                      <LogIn className="w-4 h-4" />
+                      Sign In
+                    </span>
+                  )}
+                </Button>
+              </form>
+
+              {activeTab === 'resident' && (
+                <p className="text-center text-sm text-slate-400">
+                  No account?{' '}
+                  <Link href="/auth/register" className="text-blue-400 hover:text-blue-300 underline">
+                    Register here
+                  </Link>
+                </p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  )
+}

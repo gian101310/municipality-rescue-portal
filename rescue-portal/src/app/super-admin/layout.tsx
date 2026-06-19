@@ -6,4 +6,5 @@ export const metadata: Metadata = {
 }
 
 export default function SuperAdminLayout({ children }: { children: React.ReactNode }) {
-  ret
+  return <>{children}</>
+}
