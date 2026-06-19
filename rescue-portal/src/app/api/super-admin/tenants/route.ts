@@ -79,6 +79,13 @@ type SupabaseQueryBuilder = PromiseLike<QueryResult<unknown>> & {
 
 type SupabaseDataClient = {
   from(table: string): SupabaseQueryBuilder
+  rpc(functionName: string, args: Record<string, unknown>): PromiseLike<QueryResult<unknown>>
+}
+
+type TenantEditRpcResult = {
+  organization: OrganizationRow
+  municipality: MunicipalityRow
+  admin_profile: AdminProfileRow
 }
 
 const validPlans: TenantPlan[] = ['starter', 'professional', 'enterprise', 'one_time']
@@ -621,105 +628,48 @@ export async function PATCH(request: Request) {
           if (authUpdateError) throw new Error(authUpdateError.message)
         },
         persistTenantEdits: async () => {
-      const { data: editedOrganization, error: organizationUpdateError } = await dataAdmin
-        .from('organizations')
-        .update({
-          name,
-          slug,
-          province: provinceName,
-          region: region.name,
-          email: contactEmail,
-          emergency_hotline: emergencyHotline,
-          address,
-          map_center_lat: fallbackMap.center.lat,
-          map_center_lng: fallbackMap.center.lng,
-          map_zoom: fallbackMap.zoom,
-          subscription_tier: planToTier(plan),
-          is_active: status !== 'suspended' && status !== 'cancelled',
-          branding: buildEditedTenantBranding(organization.branding, {
-            plan,
-            status,
-            localityCode: locality.code,
-            provinceCode: locality.provinceCode,
-            regionCode: locality.regionCode,
-            municipalityName: locality.name,
-          }),
-        })
-        .eq('id', tenantId)
-        .select('id, name, slug, province, region, email, emergency_hotline, branding, is_active, subscription_tier, master_key_hash, created_at')
-        .single<OrganizationRow>()
+          const { data: editedTenant, error: editError } = await dataAdmin
+            .rpc('edit_tenant_settings', {
+              p_organization_id: tenantId,
+              p_admin_user_id: adminProfile.user_id,
+              p_payload: {
+                name,
+                slug,
+                province: provinceName,
+                region: region.name,
+                contact_email: contactEmail,
+                emergency_hotline: emergencyHotline,
+                address,
+                map_center_lat: fallbackMap.center.lat,
+                map_center_lng: fallbackMap.center.lng,
+                map_zoom: fallbackMap.zoom,
+                subscription_tier: planToTier(plan),
+                is_active: status !== 'suspended' && status !== 'cancelled',
+                branding: buildEditedTenantBranding(organization.branding, {
+                  plan,
+                  status,
+                  localityCode: locality.code,
+                  provinceCode: locality.provinceCode,
+                  regionCode: locality.regionCode,
+                  municipalityName: locality.name,
+                }),
+                municipality_name: locality.name,
+                region_code: locality.regionCode,
+                province_code: locality.provinceCode,
+                municipality_code: locality.code,
+                psgc_version: PSGC_VERSION_LABEL,
+                admin_full_name: adminFullName,
+                admin_email: adminEmail,
+              },
+            }) as QueryResult<TenantEditRpcResult>
 
-      if (organizationUpdateError || !editedOrganization) {
-        throw new Error(organizationUpdateError?.message ?? 'Unable to update client municipality.')
-      }
-      updatedOrganization = editedOrganization
+          if (editError || !editedTenant) {
+            throw new Error(editError?.message ?? 'Unable to update client municipality.')
+          }
 
-      const municipalityPayload: Record<string, unknown> = {
-        name: locality.name,
-        province: provinceName,
-        region: region.name,
-        map_center_lat: fallbackMap.center.lat,
-        map_center_lng: fallbackMap.center.lng,
-        map_zoom: fallbackMap.zoom,
-      }
-
-      if (municipality) {
-        const { data: editedMunicipality, error: municipalityUpdateError } = await dataAdmin
-          .from('municipalities')
-          .update(municipalityPayload)
-          .eq('id', municipality.id)
-          .eq('organization_id', tenantId)
-          .select('id, organization_id, name, province, region')
-          .single<MunicipalityRow>()
-
-        if (municipalityUpdateError || !editedMunicipality) {
-          throw new Error(municipalityUpdateError?.message ?? 'Unable to update municipality.')
-        }
-        updatedMunicipality = editedMunicipality
-      } else {
-        const { data: createdMunicipality, error: municipalityCreateError } = await dataAdmin
-          .from('municipalities')
-          .insert({ organization_id: tenantId, ...municipalityPayload, is_active: true })
-          .select('id, organization_id, name, province, region')
-          .single<MunicipalityRow>()
-
-        if (municipalityCreateError || !createdMunicipality) {
-          throw new Error(municipalityCreateError?.message ?? 'Unable to create municipality.')
-        }
-        updatedMunicipality = createdMunicipality
-      }
-
-      const { error: scopeError } = await dataAdmin
-        .from('organization_geo_scopes')
-        .upsert({
-          organization_id: tenantId,
-          scope_level: 'municipality',
-          region_code: locality.regionCode,
-          province_code: locality.provinceCode,
-          municipality_code: locality.code,
-          psgc_version: PSGC_VERSION_LABEL,
-        }, { onConflict: 'organization_id' }) as QueryResult<unknown>
-
-      if (scopeError) throw new Error(scopeError.message)
-
-      const { data: editedAdminProfile, error: profileUpdateError } = await dataAdmin
-        .from('user_profiles')
-        .update({
-          full_name: adminFullName,
-          email: adminEmail,
-          municipality_id: updatedMunicipality.id,
-          municipality: locality.name,
-          province: provinceName,
-        })
-        .eq('user_id', adminProfile.user_id)
-        .eq('organization_id', tenantId)
-        .select('user_id, organization_id, full_name, email, role')
-        .single<AdminProfileRow>()
-
-      if (profileUpdateError || !editedAdminProfile) {
-        throw new Error(profileUpdateError?.message ?? 'Unable to update municipality admin profile.')
-      }
-      updatedAdminProfile = editedAdminProfile
+          updatedOrganization = editedTenant.organization
+          updatedMunicipality = editedTenant.municipality
+          updatedAdminProfile = editedTenant.admin_profile
         },
       })
     }

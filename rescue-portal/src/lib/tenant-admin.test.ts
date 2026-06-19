@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import {
   buildEditedTenantBranding,
   buildTenantBranding,
@@ -156,6 +157,21 @@ test('restores the Auth email when later tenant persistence fails', async () => 
     'new@municipality.gov.ph',
     'old@municipality.gov.ph',
   ])
+})
+
+test('the atomic tenant edit migration updates every database record in one RPC', () => {
+  const migration = readFileSync(
+    new URL('../../supabase/migrations/005_atomic_tenant_edit.sql', import.meta.url),
+    'utf8'
+  )
+
+  assert.match(migration, /create or replace function public\.edit_tenant_settings/i)
+  assert.match(migration, /update organizations/i)
+  assert.match(migration, /insert into municipalities/i)
+  assert.match(migration, /insert into organization_geo_scopes/i)
+  assert.match(migration, /update user_profiles/i)
+  assert.match(migration, /revoke execute on function public\.edit_tenant_settings/i)
+  assert.match(migration, /grant execute on function public\.edit_tenant_settings[^;]*to service_role/i)
 })
 
 test('buildTenantBranding updates tenant status while preserving existing branding', () => {
