@@ -7,6 +7,7 @@ import {
   buildTenantBranding,
   isTenantAction,
   normalizeSecretKey,
+  persistTenantEditWithAuthEmail,
   validateTenantEditorInput,
   validateTenantPassword,
 } from '@/lib/tenant-admin'
@@ -609,6 +610,17 @@ export async function PATCH(request: Request) {
         .filter(Boolean)
         .join(', ')
 
+      await persistTenantEditWithAuthEmail({
+        previousEmail: adminProfile.email,
+        nextEmail: adminEmail,
+        updateAuthEmail: async (email) => {
+          const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(
+            adminProfile.user_id,
+            { email }
+          )
+          if (authUpdateError) throw new Error(authUpdateError.message)
+        },
+        persistTenantEdits: async () => {
       const { data: editedOrganization, error: organizationUpdateError } = await dataAdmin
         .from('organizations')
         .update({
@@ -708,12 +720,8 @@ export async function PATCH(request: Request) {
         throw new Error(profileUpdateError?.message ?? 'Unable to update municipality admin profile.')
       }
       updatedAdminProfile = editedAdminProfile
-
-      const { error: authUpdateError } = await adminClient.auth.admin.updateUserById(
-        adminProfile.user_id,
-        { email: adminEmail }
-      )
-      if (authUpdateError) throw new Error(authUpdateError.message)
+        },
+      })
     }
 
     if (action === 'enable' || action === 'disable') {

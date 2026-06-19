@@ -88,6 +88,36 @@ export function buildEditedTenantBranding(
   }
 }
 
+type TenantEditWithAuthEmailOptions<T> = {
+  previousEmail: string
+  nextEmail: string
+  updateAuthEmail: (email: string) => Promise<void>
+  persistTenantEdits: () => Promise<T>
+}
+
+export async function persistTenantEditWithAuthEmail<T>({
+  previousEmail,
+  nextEmail,
+  updateAuthEmail,
+  persistTenantEdits,
+}: TenantEditWithAuthEmailOptions<T>): Promise<T> {
+  await updateAuthEmail(nextEmail)
+
+  try {
+    return await persistTenantEdits()
+  } catch (error) {
+    try {
+      await updateAuthEmail(previousEmail)
+    } catch (rollbackError) {
+      throw new Error(
+        'Tenant edit failed and the Auth email could not be restored. Manual reconciliation is required.',
+        { cause: rollbackError }
+      )
+    }
+    throw error
+  }
+}
+
 export function getSettingsTabsForRole(role: string | null | undefined) {
   return SETTINGS_TABS.filter((tab) => !tab.platformOnly || role === 'super_admin')
 }

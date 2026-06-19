@@ -6,6 +6,7 @@ import {
   getSettingsTabsForRole,
   isTenantAction,
   normalizeSecretKey,
+  persistTenantEditWithAuthEmail,
   validateTenantEditorInput,
   validateTenantPassword,
 } from './tenant-admin.ts'
@@ -109,6 +110,52 @@ test('preserves unrelated branding while replacing tenant editor values', () => 
 
 test('recognizes edit as a tenant action', () => {
   assert.equal(isTenantAction('edit'), true)
+})
+
+test('does not persist tenant edits when the Auth email update fails', async () => {
+  const authCalls: string[] = []
+  let persisted = false
+
+  await assert.rejects(
+    persistTenantEditWithAuthEmail({
+      previousEmail: 'old@municipality.gov.ph',
+      nextEmail: 'new@municipality.gov.ph',
+      updateAuthEmail: async (email) => {
+        authCalls.push(email)
+        throw new Error('Auth email update failed')
+      },
+      persistTenantEdits: async () => {
+        persisted = true
+      },
+    }),
+    /Auth email update failed/
+  )
+
+  assert.deepEqual(authCalls, ['new@municipality.gov.ph'])
+  assert.equal(persisted, false)
+})
+
+test('restores the Auth email when later tenant persistence fails', async () => {
+  const authCalls: string[] = []
+
+  await assert.rejects(
+    persistTenantEditWithAuthEmail({
+      previousEmail: 'old@municipality.gov.ph',
+      nextEmail: 'new@municipality.gov.ph',
+      updateAuthEmail: async (email) => {
+        authCalls.push(email)
+      },
+      persistTenantEdits: async () => {
+        throw new Error('Database update failed')
+      },
+    }),
+    /Database update failed/
+  )
+
+  assert.deepEqual(authCalls, [
+    'new@municipality.gov.ph',
+    'old@municipality.gov.ph',
+  ])
 })
 
 test('buildTenantBranding updates tenant status while preserving existing branding', () => {
