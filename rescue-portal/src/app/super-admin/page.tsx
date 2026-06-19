@@ -402,6 +402,23 @@ export default function SuperAdminPage() {
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-6">
+        <Card className="border-amber-500/30 bg-amber-500/5">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-semibold text-white">Portal Testing</p>
+              <p className="text-sm text-slate-400">Open either portal with your owner account. Resident reports are marked as drills.</p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" className="border-slate-600 text-slate-200 hover:bg-slate-800" render={<Link href="/admin" />}>
+                Open Admin Portal
+              </Button>
+              <Button className="bg-amber-600 hover:bg-amber-700" render={<Link href="/resident?owner-test-mode=1" />}>
+                Open Resident Test Portal
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[

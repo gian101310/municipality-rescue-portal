@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useState, useEffect, useRef } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
   ArrowLeft, MapPin, Camera, ChevronRight, CheckCircle2,
   AlertTriangle, Users, Shield, Phone, X, Upload
@@ -22,6 +22,7 @@ import type { EmergencyType } from '@/lib/types'
 import { calculateSeverity, getSeverityRingProps } from '@/lib/severity-scoring'
 import { VoiceSOS } from '@/components/voice-sos'
 import { checkRateLimit, recordSubmission } from '@/lib/rate-limiter'
+import { isOwnerTestMode, withOwnerTestMode } from '@/lib/owner-test-mode'
 
 type Step = 'select' | 'details' | 'confirm' | 'submitted'
 
@@ -63,7 +64,17 @@ function getRelevantHazards(typeId: string) {
 }
 
 export default function EmergencyPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <EmergencyPageContent />
+    </Suspense>
+  )
+}
+
+function EmergencyPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const ownerTestMode = isOwnerTestMode(searchParams)
   const { settings } = useSettings()
   const [step, setStep] = useState<Step>('select')
   const [selectedType, setSelectedType] = useState<EmergencyType | null>(null)
@@ -188,7 +199,7 @@ export default function EmergencyPage() {
 
     setSubmitting(true)
     try {
-      const response = await fetch('/api/resident/incidents', {
+      const response = await fetch(withOwnerTestMode('/api/resident/incidents', ownerTestMode), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -224,7 +235,7 @@ export default function EmergencyPage() {
             const fd = new FormData()
             fd.append('file', file)
             fd.append('incident_id', incidentId)
-            await fetch('/api/resident/incidents/attachments', { method: 'POST', body: fd })
+            await fetch(withOwnerTestMode('/api/resident/incidents/attachments', ownerTestMode), { method: 'POST', body: fd })
           } catch {
             toast.error(`Failed to upload ${file.name}`)
           }
@@ -302,10 +313,10 @@ export default function EmergencyPage() {
         </p>
 
         <div className="flex flex-col gap-2 w-full">
-          <Button className="bg-slate-900 hover:bg-slate-800 text-white" render={<Link href="/resident" />}>
+          <Button className="bg-slate-900 hover:bg-slate-800 text-white" render={<Link href={withOwnerTestMode('/resident', ownerTestMode)} />}>
             Return to Home
           </Button>
-          <Button variant="outline" className="border-slate-300" render={<Link href="/resident/history" />}>
+          <Button variant="outline" className="border-slate-300" render={<Link href={withOwnerTestMode('/resident/history', ownerTestMode)} />}>
             View My Reports
           </Button>
         </div>
@@ -321,7 +332,7 @@ export default function EmergencyPage() {
           variant="ghost"
           size="icon"
           className="text-slate-600"
-          onClick={() => step === 'select' ? router.push('/resident') : setStep(step === 'confirm' ? 'details' : 'select')}
+          onClick={() => step === 'select' ? router.push(withOwnerTestMode('/resident', ownerTestMode)) : setStep(step === 'confirm' ? 'details' : 'select')}
         >
           <ArrowLeft className="w-5 h-5" />
         </Button>

@@ -1,7 +1,8 @@
 'use client'
 
+import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { Home, Shield, Clock, User, Bell, LogOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -15,6 +16,7 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { DEMO_NOTIFICATIONS } from '@/lib/demo-data'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
+import { isOwnerTestMode, withOwnerTestMode } from '@/lib/owner-test-mode'
 
 const NAV_ITEMS = [
   { href: '/resident', label: 'Home', icon: Home, exact: true },
@@ -24,9 +26,47 @@ const NAV_ITEMS = [
 ]
 
 export default function ResidentLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <ResidentLayoutContent>{children}</ResidentLayoutContent>
+    </Suspense>
+  )
+}
+
+function ResidentLayoutContent({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const ownerTestMode = isOwnerTestMode(searchParams) && isSuperAdmin
   const unread = DEMO_NOTIFICATIONS.filter((n) => !n.is_read && n.user_id === 'uid-res-001').length
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadProfile() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role, is_active')
+        .eq('user_id', user.id)
+        .single() as { data: { role: string; is_active: boolean } | null }
+
+      if (!cancelled) {
+        setIsSuperAdmin(profile?.role === 'super_admin' && profile.is_active)
+      }
+    }
+
+    void loadProfile()
+    return () => { cancelled = true }
+  }, [])
+
+  function residentHref(path: string) {
+    return withOwnerTestMode(path, ownerTestMode)
+  }
 
   async function handleLogout() {
     const supabase = createClient()
@@ -39,6 +79,11 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       <DemoBanner />
+      {ownerTestMode && (
+        <div className="bg-amber-100 px-4 py-2 text-center text-xs font-semibold text-amber-900">
+          Owner Test Mode — reports from this portal are saved as drills.
+        </div>
+      )}
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white border-b border-slate-200 shadow-sm">
         <div className="max-w-2xl mx-auto px-4 flex items-center justify-between h-14">
@@ -63,9 +108,14 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
                 </Avatar>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuItem render={<Link href="/resident/profile" />}>
+                <DropdownMenuItem render={<Link href={residentHref('/resident/profile')} />}>
                   <User className="w-4 h-4 mr-2" />Profile
                 </DropdownMenuItem>
+                {isSuperAdmin && (
+                  <DropdownMenuItem className="text-amber-700" render={<Link href="/super-admin" />}>
+                    <Shield className="w-4 h-4 mr-2" />Return to Super Admin
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleLogout} className="text-red-600">
                   <LogOut className="w-4 h-4 mr-2" />Logout
@@ -89,7 +139,7 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
             return (
               <Link
                 key={item.href}
-                href={item.href}
+                href={residentHref(item.href)}
                 className={cn(
                   'flex flex-col items-center gap-0.5 px-4 py-1 rounded-lg transition-colors',
                   isActive ? 'text-red-600' : 'text-slate-400 hover:text-slate-600'

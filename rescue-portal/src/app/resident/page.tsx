@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { Shield, Phone, AlertTriangle, Clock, ChevronRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
@@ -9,11 +10,22 @@ import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
 import { formatRelativeTime } from '@/lib/utils'
 import { useSettings } from '@/lib/settings-context'
 import { createClient } from '@/lib/supabase/client'
+import { isOwnerTestMode, withOwnerTestMode } from '@/lib/owner-test-mode'
 import type { DemoIncident } from '@/lib/types'
 import { toast } from 'sonner'
 
 export default function ResidentDashboard() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <ResidentDashboardContent />
+    </Suspense>
+  )
+}
+
+function ResidentDashboardContent() {
   const { settings } = useSettings()
+  const searchParams = useSearchParams()
+  const ownerTestMode = isOwnerTestMode(searchParams)
   const [residentName, setResidentName] = useState('Resident')
   const [residentLocation, setResidentLocation] = useState('')
   const [myIncidents, setMyIncidents] = useState<DemoIncident[]>([])
@@ -46,7 +58,7 @@ export default function ResidentDashboard() {
           }
         }
 
-        const response = await fetch('/api/resident/incidents', { cache: 'no-store' })
+        const response = await fetch(withOwnerTestMode('/api/resident/incidents', ownerTestMode), { cache: 'no-store' })
         const payload = await response.json().catch(() => ({}))
 
         if (!response.ok) {
@@ -63,7 +75,7 @@ export default function ResidentDashboard() {
     }, 0)
 
     return () => window.clearTimeout(timer)
-  }, [])
+  }, [ownerTestMode])
 
   return (
     <div className="px-4 py-6 space-y-6">
@@ -74,7 +86,7 @@ export default function ResidentDashboard() {
       </div>
 
       <div className="flex flex-col items-center py-6">
-        <Link href="/resident/emergency" className="group">
+        <Link href={withOwnerTestMode('/resident/emergency', ownerTestMode)} className="group">
           <div className="relative">
             <div className="absolute inset-0 rounded-full bg-red-500/20 scale-125 group-hover:scale-150 transition-transform duration-700 animate-ping" />
             <div className="absolute inset-0 rounded-full bg-red-500/10 scale-150 group-hover:scale-175 transition-transform duration-1000 animate-ping" style={{ animationDelay: '200ms' }} />
@@ -88,7 +100,7 @@ export default function ResidentDashboard() {
       </div>
 
       {activeIncident && (
-        <Link href="/resident/history">
+        <Link href={withOwnerTestMode('/resident/history', ownerTestMode)}>
           <Card className="border-2 border-amber-400/50 bg-amber-50">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-2">
@@ -148,7 +160,7 @@ export default function ResidentDashboard() {
       <div>
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold text-slate-900">Recent Reports</h2>
-          <Link href="/resident/history" className="text-sm text-blue-600 hover:text-blue-700">View all</Link>
+          <Link href={withOwnerTestMode('/resident/history', ownerTestMode)} className="text-sm text-blue-600 hover:text-blue-700">View all</Link>
         </div>
         <div className="space-y-2">
           {loadingIncidents && (

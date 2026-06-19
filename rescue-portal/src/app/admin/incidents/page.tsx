@@ -6,6 +6,7 @@ import { Search, Filter, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
@@ -176,9 +177,16 @@ export default function IncidentsPage() {
                 ) : paged.map((inc) => (
                   <tr key={inc.id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
                     <td className="px-4 py-3">
-                      <Link href={`/admin/incidents/${inc.id}`} className="font-mono text-xs text-blue-400 hover:text-blue-300">
-                        {inc.reference_number}
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link href={`/admin/incidents/${inc.id}`} className="font-mono text-xs text-blue-400 hover:text-blue-300">
+                          {inc.reference_number}
+                        </Link>
+                        {inc.is_drill && (
+                          <Badge className="border-amber-500/40 bg-amber-500/15 text-[10px] text-amber-300">
+                            TEST DRILL
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-1.5">

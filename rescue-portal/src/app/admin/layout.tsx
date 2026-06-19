@@ -318,6 +318,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <Settings className="w-4 h-4 mr-2" />
                     Settings
                   </DropdownMenuItem>
+                  {adminProfile?.role === 'super_admin' && (
+                    <DropdownMenuItem className="text-amber-300 hover:text-amber-200 cursor-pointer" render={<Link href="/super-admin" />}>
+                      <Shield className="w-4 h-4 mr-2" />
+                      Return to Super Admin
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator className="bg-slate-700" />
                   <DropdownMenuItem
                     onClick={handleLogout}

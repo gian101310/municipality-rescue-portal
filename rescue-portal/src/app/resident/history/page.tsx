@@ -1,16 +1,28 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { ChevronDown, ChevronUp, Clock } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
 import { formatDateTime, formatRelativeTime } from '@/lib/utils'
+import { isOwnerTestMode, withOwnerTestMode } from '@/lib/owner-test-mode'
 import type { DemoIncident } from '@/lib/types'
 import { toast } from 'sonner'
 
 export default function HistoryPage() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-50" />}>
+      <HistoryPageContent />
+    </Suspense>
+  )
+}
+
+function HistoryPageContent() {
+  const searchParams = useSearchParams()
+  const ownerTestMode = isOwnerTestMode(searchParams)
   const [expanded, setExpanded] = useState<string | null>(null)
   const [myIncidents, setMyIncidents] = useState<DemoIncident[]>([])
   const [loading, setLoading] = useState(true)
@@ -18,7 +30,7 @@ export default function HistoryPage() {
   useEffect(() => {
     const timer = window.setTimeout(async () => {
       try {
-        const response = await fetch('/api/resident/incidents', { cache: 'no-store' })
+        const response = await fetch(withOwnerTestMode('/api/resident/incidents', ownerTestMode), { cache: 'no-store' })
         const payload = await response.json().catch(() => ({}))
 
         if (!response.ok) {
@@ -35,7 +47,7 @@ export default function HistoryPage() {
     }, 0)
 
     return () => window.clearTimeout(timer)
-  }, [])
+  }, [ownerTestMode])
 
   return (
     <div className="px-4 py-6 space-y-4">

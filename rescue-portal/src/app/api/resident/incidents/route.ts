@@ -7,6 +7,7 @@ import {
   validateIncidentSubmission,
 } from '@/lib/incident-submission'
 import { attachEmergencyTypes } from '@/lib/incident-presentation'
+import { getResidentAccess, getTestReportMetadata } from '@/lib/owner-test-mode'
 import type { RegistrationStatus, UserRole } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -55,7 +56,7 @@ type EmergencyTypeRow = {
   organization_id: string | null
 }
 
-async function requireApprovedResident() {
+async function requireApprovedResident(request: Request) {
   const supabase = await createClient()
   const { data: { user }, error: userError } = await supabase.auth.getUser()
 
@@ -69,17 +70,15 @@ async function requireApprovedResident() {
     .eq('user_id', user.id)
     .single() as QueryResult<ResidentProfileRow>
 
-  if (
-    profileError ||
-    !profile ||
-    profile.role !== 'resident' ||
-    !profile.is_active ||
-    profile.registration_status !== 'approved'
-  ) {
-    return { error: NextResponse.json({ message: 'Approved resident access required.' }, { status: 403 }) }
+  const access = profile
+    ? getResidentAccess(profile, new URL(request.url).searchParams)
+    : { allowed: false, ownerTestMode: false }
+
+  if (profileError || !profile || !access.allowed) {
+    return { error: NextResponse.json({ message: 'Approved resident or Owner Test Mode access required.' }, { status: 403 }) }
   }
 
-  return { profile }
+  return { profile, access }
 }
 
 function clean(value: unknown) {
@@ -155,8 +154,8 @@ async function findOrCreateEmergencyType(
   return createdType
 }
 
-export async function GET() {
-  const auth = await requireApprovedResident()
+export async function GET(request: Request) {
+  const auth = await requireApprovedResident(request)
   if ('error' in auth) return auth.error
 
   try {
@@ -185,7 +184,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await requireApprovedResident()
+  const auth = await requireApprovedResident(request)
   if ('error' in auth) return auth.error
 
   try {
@@ -213,6 +212,7 @@ export async function POST(request: Request) {
     const admin = await createAdminClient() as unknown as SupabaseDataClient
     const emergencyType = await findOrCreateEmergencyType(admin, auth.profile.organization_id, body as Record<string, unknown>)
     const hazards = normalizeHazards(body?.hazards)
+    const reportMetadata = getTestReportMetadata(auth.access)
     const severity = calculateSeverity({
       emergencyType: mapEmergencyTypeToSeverityKey(typeId, typeName),
       hazards: hazards.severityHazards,
@@ -243,7 +243,7 @@ export async function POST(request: Request) {
       barangay: clean(body?.barangay) || auth.profile.barangay || null,
       municipality: auth.profile.municipality,
       is_anonymous: false,
-      is_drill: false,
+      is_drill: reportMetadata.is_drill,
       created_at: now.toISOString(),
       updated_at: now.toISOString(),
     }
@@ -266,8 +266,10 @@ export async function POST(request: Request) {
         new_status: 'submitted',
         changed_by: auth.profile.user_id,
         changed_by_name: auth.profile.full_name,
-        changed_by_role: 'resident',
-        reason: 'Resident submitted emergency report.',
+        changed_by_role: reportMetadata.changed_by_role,
+        reason: auth.access.ownerTestMode
+          ? 'Super Admin submitted an Owner Test Mode emergency report.'
+          : 'Resident submitted emergency report.',
         metadata: {
           severity_score: severity.score,
           severity_factors: severity.factors,
