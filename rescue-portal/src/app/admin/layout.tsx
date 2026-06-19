@@ -24,6 +24,8 @@ import { NotificationCenter } from '@/components/notification-center'
 import { DemoBanner } from '@/components/demo-banner'
 import { PushNotificationToggle } from '@/components/push-notification-toggle'
 import { DEMO_ORGANIZATION, DEMO_RESCUE_UNITS, DEMO_STATS } from '@/lib/demo-data'
+import { MasterKeyProvider } from '@/components/master-key-provider'
+import { MasterKeyToggle } from '@/components/master-key-toggle'
 import { cn } from '@/lib/utils'
 import {
   COVERAGE_LOCK_CHANGED_EVENT,
@@ -183,6 +185,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
+    <MasterKeyProvider>
     <div className="flex flex-col min-h-screen bg-slate-950">
       <DemoBanner />
       <div className="flex flex-1 overflow-hidden">
@@ -232,6 +235,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
             <div className="ml-auto flex items-center gap-2">
               <LiveClock />
+              <MasterKeyToggle />
               <div className="hidden sm:flex items-center gap-1.5 bg-slate-800 rounded-lg px-2.5 py-1 text-xs text-slate-300 border border-slate-700">
                 <span className="w-2 h-2 rounded-full bg-green-400" />
                 {availableUnits} responder{availableUnits !== 1 ? 's' : ''} available
@@ -278,5 +282,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </div>
     </div>
+    </MasterKeyProvider>
   )
 }

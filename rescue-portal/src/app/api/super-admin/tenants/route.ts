@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { generateMasterKey, hashMasterKey } from '@/lib/master-key'
 import {
   PH_LOCALITIES,
   PH_PROVINCES,
@@ -237,6 +238,10 @@ export async function POST(request: Request) {
 
     if (existing?.id) throw new Error(`The slug "${baseSlug}" is already used.`)
 
+    // Generate a unique master key for this tenant
+    const masterKeyPlaintext = generateMasterKey()
+    const masterKeyHash = hashMasterKey(masterKeyPlaintext)
+
     const organizationPayload: Record<string, unknown> = {
       name: organizationName,
       slug: baseSlug,
@@ -250,6 +255,7 @@ export async function POST(request: Request) {
       map_zoom: fallbackMap.zoom,
       subscription_tier: planToTier(plan),
       is_active: status !== 'suspended' && status !== 'cancelled',
+      master_key_hash: masterKeyHash,
       branding: {
         tenant_plan: plan,
         tenant_status: status,
@@ -352,6 +358,7 @@ export async function POST(request: Request) {
           email: adminEmail,
           full_name: adminFullName,
         },
+        master_key: masterKeyPlaintext,
       },
       { status: 201 }
     )

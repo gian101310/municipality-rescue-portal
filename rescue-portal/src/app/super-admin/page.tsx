@@ -204,7 +204,15 @@ export default function SuperAdminPage() {
       setTenants((current) => [payload.tenant as Tenant, ...current])
       setTenantForm(initialTenantForm)
       setAddOpen(false)
-      toast.success('Tenant municipality created')
+
+      if (payload.master_key) {
+        toast.success(
+          `Tenant created! Master Key: ${payload.master_key} — save this now, it cannot be shown again.`,
+          { duration: 30000 }
+        )
+      } else {
+        toast.success('Tenant municipality created')
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to create tenant.')
     } finally {
