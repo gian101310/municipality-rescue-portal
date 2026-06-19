@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
 import { SeverityBadge } from '@/components/severity-badge'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
-import type { IncidentStatus } from '@/lib/types'
+import type { IncidentStatus, SeverityLevel } from '@/lib/types'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
 import { toast } from 'sonner'
 
@@ -186,7 +186,7 @@ export default function ResponderPage() {
                   <p className="text-white font-semibold">{activeIncident.emergency_type?.name ?? 'Emergency'}</p>
                   <p className="text-xs text-slate-400 font-mono">{activeIncident.reference_number}</p>
                 </div>
-                <SeverityBadge severity={activeIncident.severity} />
+                <SeverityBadge severity={activeIncident.severity as SeverityLevel} />
               </div>
 
               {/* Reporter */}
