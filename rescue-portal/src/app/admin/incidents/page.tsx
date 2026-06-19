@@ -13,12 +13,12 @@ import {
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
-import type { EmergencyType } from '@/lib/types'
 import { formatRelativeTime } from '@/lib/utils'
-import type { DemoIncident, IncidentStatus, SeverityLevel } from '@/lib/types'
+import type { DemoIncident, EmergencyType, IncidentStatus, SeverityLevel } from '@/lib/types'
 import { toast } from 'sonner'
 
 const PAGE_SIZE = 8
+type IncidentEmergencyType = Pick<EmergencyType, 'id' | 'name' | 'icon' | 'color'>
 
 const STATUS_TABS = [
   { value: 'all', label: 'All' },
@@ -82,7 +82,7 @@ export default function IncidentsPage() {
 
   // Extract unique emergency types from loaded incidents
   const uniqueTypes = useMemo(() => {
-    const seen = new Map<string, EmergencyType>()
+    const seen = new Map<string, IncidentEmergencyType>()
     for (const inc of incidents) {
       if (inc.emergency_type?.id && !seen.has(inc.emergency_type.id)) {
         seen.set(inc.emergency_type.id, inc.emergency_type)

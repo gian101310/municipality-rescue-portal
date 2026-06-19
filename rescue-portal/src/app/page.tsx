@@ -109,9 +109,9 @@ export default function HomePage() {
         <div className="mx-auto grid max-w-6xl gap-10 px-4 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
           <div>
             <p className="text-sm font-semibold uppercase tracking-[0.18em] text-red-300">Municipal Staff</p>
-            <h2 className="mt-2 text-3xl font-bold">Tenant access can be locked to one region, province, city, or municipality.</h2>
+            <h2 className="mt-2 text-3xl font-bold">Client municipality access can be locked to one region, province, city, or municipality.</h2>
             <p className="mt-4 text-sm leading-7 text-slate-400">
-              Each buyer can operate inside their configured local scope. Staff accounts are created by
+              Each client municipality can operate inside its configured service area. Staff accounts are created by
               the platform owner or municipality administrator, while residents pass through approval first.
             </p>
           </div>

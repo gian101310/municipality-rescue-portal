@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Shield, Building2, Plus, Search,
-  Lock, Eye, EyeOff, CheckCircle2, XCircle, Clock, LogOut, Loader2, X
+  Lock, Eye, EyeOff, CheckCircle2, XCircle, Clock, LogOut, Loader2, X, KeyRound, UserX
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -28,6 +28,9 @@ interface Tenant {
   plan: TenantPlan
   status: TenantStatus
   contact_email: string
+  admin_email: string
+  admin_user_id: string | null
+  master_key_configured: boolean
   created_at: string
 }
 
@@ -39,6 +42,7 @@ type TenantForm = {
   adminFullName: string
   adminEmail: string
   adminPassword: string
+  masterKey: string
   provinceCode: string
   municipalityCode: string
   plan: TenantPlan
@@ -53,6 +57,7 @@ const initialTenantForm: TenantForm = {
   adminFullName: '',
   adminEmail: '',
   adminPassword: '',
+  masterKey: '',
   provinceCode: '',
   municipalityCode: '',
   plan: 'starter',
@@ -84,6 +89,8 @@ export default function SuperAdminPage() {
   const [tenantForm, setTenantForm] = useState<TenantForm>(initialTenantForm)
   const [tenantSaving, setTenantSaving] = useState(false)
   const [showAdminPassword, setShowAdminPassword] = useState(false)
+  const [showMasterKey, setShowMasterKey] = useState(false)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
 
   const loadTenants = useCallback(async () => {
     const response = await fetch('/api/super-admin/tenants', { cache: 'no-store' })
@@ -175,6 +182,69 @@ export default function SuperAdminPage() {
     })
   }
 
+  function replaceTenant(updatedTenant: Tenant) {
+    setTenants((current) => current.map((tenant) => (
+      tenant.id === updatedTenant.id ? updatedTenant : tenant
+    )))
+  }
+
+  async function patchTenant(tenant: Tenant, body: Record<string, unknown>, successMessage: string) {
+    setActionLoading(`${tenant.id}:${String(body.action)}`)
+    try {
+      const response = await fetch('/api/super-admin/tenants', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId: tenant.id, ...body }),
+      })
+      const payload = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(payload?.message ?? 'Unable to update client municipality.')
+      }
+
+      if (payload.tenant) replaceTenant(payload.tenant as Tenant)
+      toast.success(successMessage)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to update client municipality.')
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  async function handleTenantAction(tenant: Tenant, action: 'enable' | 'disable' | 'kick' | 'change_password' | 'rotate_secret') {
+    if (action === 'change_password') {
+      const password = window.prompt(`New temporary password for ${tenant.admin_email || tenant.name}`)
+      if (!password) return
+      await patchTenant(tenant, { action, adminUserId: tenant.admin_user_id, password }, 'Municipality admin password changed')
+      return
+    }
+
+    if (action === 'rotate_secret') {
+      const secretKey = window.prompt(`New settings secret key for ${tenant.name}`)
+      if (!secretKey) return
+      await patchTenant(tenant, { action, secretKey }, 'Settings secret key updated')
+      return
+    }
+
+    if (action === 'kick' && !window.confirm(`Kick all users for ${tenant.name} for 15 minutes?`)) {
+      return
+    }
+
+    if (action === 'disable' && !window.confirm(`Disable ${tenant.name}? Users under this municipality will not be able to sign in.`)) {
+      return
+    }
+
+    await patchTenant(
+      tenant,
+      { action },
+      action === 'enable'
+        ? 'Client municipality enabled'
+        : action === 'disable'
+        ? 'Client municipality disabled'
+        : 'Client users kicked for 15 minutes'
+    )
+  }
+
   async function handleCreateTenant(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
@@ -207,11 +277,11 @@ export default function SuperAdminPage() {
 
       if (payload.master_key) {
         toast.success(
-          `Tenant created! Master Key: ${payload.master_key} — save this now, it cannot be shown again.`,
+          `Client created! Settings Secret Key: ${payload.master_key} - save this now, it cannot be shown again.`,
           { duration: 30000 }
         )
       } else {
-        toast.success('Tenant municipality created')
+        toast.success('Client municipality created')
       }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to create tenant.')
@@ -265,7 +335,7 @@ export default function SuperAdminPage() {
               View Landing Page
             </Button>
             <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => setAddOpen(true)}>
-              <Plus className="w-4 h-4 mr-1" /> Add Tenant
+              <Plus className="w-4 h-4 mr-1" /> Add Client
             </Button>
             <Button variant="ghost" className="text-slate-400 hover:text-white" onClick={handleSignOut}>
               <LogOut className="w-4 h-4 mr-1" /> Sign Out
@@ -278,7 +348,7 @@ export default function SuperAdminPage() {
         {/* Stats */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            { label: 'Total Tenants', value: stats.total, color: 'text-white' },
+            { label: 'Client Municipalities', value: stats.total, color: 'text-white' },
             { label: 'Active', value: stats.active, color: 'text-green-400' },
             { label: 'On Trial', value: stats.trial, color: 'text-blue-400' },
             { label: 'Suspended', value: stats.suspended, color: 'text-red-400' },
@@ -299,7 +369,7 @@ export default function SuperAdminPage() {
             <Input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search tenants by name, province, or slug..."
+              placeholder="Search clients by name, province, or slug..."
               className="pl-10 bg-slate-900 border-slate-700 text-white"
             />
           </div>
@@ -313,6 +383,7 @@ export default function SuperAdminPage() {
                 <tr className="border-b border-slate-800 text-left">
                   <th className="px-4 py-3 text-slate-400 font-medium">Municipality</th>
                   <th className="px-4 py-3 text-slate-400 font-medium">Province Lock</th>
+                  <th className="px-4 py-3 text-slate-400 font-medium">Admin Login</th>
                   <th className="px-4 py-3 text-slate-400 font-medium">Plan</th>
                   <th className="px-4 py-3 text-slate-400 font-medium">Status</th>
                   <th className="px-4 py-3 text-slate-400 font-medium">Actions</th>
@@ -345,6 +416,12 @@ export default function SuperAdminPage() {
                         </div>
                       </td>
                       <td className="px-4 py-3">
+                        <div>
+                          <p className="text-white text-xs font-medium">{tenant.admin_email || 'No admin account'}</p>
+                          <p className="text-slate-500 text-xs">{tenant.master_key_configured ? 'Secret key configured' : 'No secret key'}</p>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
                         <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${planColors[tenant.plan]}`}>
                           {tenant.plan === 'one_time' ? 'One-Time' : tenant.plan.charAt(0).toUpperCase() + tenant.plan.slice(1)}
                         </span>
@@ -357,18 +434,27 @@ export default function SuperAdminPage() {
                       </td>
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white h-8 w-8 p-0" onClick={() => toast.info(`Viewing ${tenant.name}`)}>
+                          <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white h-8 w-8 p-0" title="View client" onClick={() => toast.info(`Viewing ${tenant.name}`)}>
                             <Eye className="w-4 h-4" />
                           </Button>
                           {tenant.status === 'active' ? (
-                            <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300 h-8 w-8 p-0" onClick={() => toast.warning(`Suspended ${tenant.name}`)}>
+                            <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300 h-8 w-8 p-0" title="Disable client" disabled={Boolean(actionLoading)} onClick={() => handleTenantAction(tenant, 'disable')}>
                               <XCircle className="w-4 h-4" />
                             </Button>
-                          ) : tenant.status === 'suspended' ? (
-                            <Button variant="ghost" size="sm" className="text-green-400 hover:text-green-300 h-8 w-8 p-0" onClick={() => toast.success(`Activated ${tenant.name}`)}>
+                          ) : (
+                            <Button variant="ghost" size="sm" className="text-green-400 hover:text-green-300 h-8 w-8 p-0" title="Enable client" disabled={Boolean(actionLoading)} onClick={() => handleTenantAction(tenant, 'enable')}>
                               <CheckCircle2 className="w-4 h-4" />
                             </Button>
-                          ) : null}
+                          )}
+                          <Button variant="ghost" size="sm" className="text-orange-300 hover:text-orange-200 h-8 w-8 p-0" title="Kick all users" disabled={Boolean(actionLoading)} onClick={() => handleTenantAction(tenant, 'kick')}>
+                            <UserX className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-blue-300 hover:text-blue-200 h-8 w-8 p-0" title="Change admin password" disabled={Boolean(actionLoading) || !tenant.admin_user_id} onClick={() => handleTenantAction(tenant, 'change_password')}>
+                            <Lock className="w-4 h-4" />
+                          </Button>
+                          <Button variant="ghost" size="sm" className="text-amber-300 hover:text-amber-200 h-8 w-8 p-0" title="Set settings secret key" disabled={Boolean(actionLoading)} onClick={() => handleTenantAction(tenant, 'rotate_secret')}>
+                            <KeyRound className="w-4 h-4" />
+                          </Button>
                         </div>
                       </td>
                     </tr>
@@ -376,8 +462,8 @@ export default function SuperAdminPage() {
                 })}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="text-center py-10 text-slate-500">
-                      {tenants.length === 0 ? 'No tenants yet. Add your first municipality!' : 'No tenants found'}
+                    <td colSpan={6} className="text-center py-10 text-slate-500">
+                      {tenants.length === 0 ? 'No clients yet. Add your first municipality!' : 'No clients found'}
                     </td>
                   </tr>
                 )}
@@ -391,11 +477,11 @@ export default function SuperAdminPage() {
           <CardContent className="p-4 flex items-start gap-3">
             <Lock className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
             <div>
-              <p className="text-amber-300 font-semibold text-sm">Province Lock Security</p>
+              <p className="text-amber-300 font-semibold text-sm">Coverage Lock Security</p>
               <p className="text-amber-400/70 text-xs mt-1 leading-relaxed">
                 Province and municipality assignments are protected by a database-level trigger.
-                Only you (super admin) can modify these fields. Tenant admins cannot change
-                their location lock, even with direct API access.
+                Only the platform owner can modify these fields. Municipality admins cannot see
+                or change their location lock.
               </p>
             </div>
           </CardContent>
@@ -407,8 +493,8 @@ export default function SuperAdminPage() {
           <div className="w-full max-w-2xl rounded-lg border border-slate-700 bg-slate-900 shadow-2xl">
             <div className="flex items-start justify-between border-b border-slate-800 p-5">
               <div>
-                <h2 className="text-lg font-bold text-white">Add Tenant Municipality</h2>
-                <p className="mt-1 text-sm text-slate-400">Create a locked municipality account for a buyer.</p>
+                <h2 className="text-lg font-bold text-white">Add Client Municipality</h2>
+                <p className="mt-1 text-sm text-slate-400">Create a locked municipality account for an authorized client.</p>
               </div>
               <button
                 type="button"
@@ -458,7 +544,7 @@ export default function SuperAdminPage() {
 
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-1.5">
-                  <Label htmlFor="tenant-name" className="text-slate-300">Tenant Name</Label>
+                  <Label htmlFor="tenant-name" className="text-slate-300">Client Name</Label>
                   <Input
                     id="tenant-name"
                     value={tenantForm.name}
@@ -498,7 +584,7 @@ export default function SuperAdminPage() {
                 <div className="mb-3">
                   <h3 className="text-sm font-semibold text-amber-200">Municipality Admin Login</h3>
                   <p className="mt-1 text-xs text-amber-200/70">
-                    This creates the first admin account for the tenant municipality.
+                    This creates the first admin account for the client municipality.
                   </p>
                 </div>
 
@@ -551,6 +637,31 @@ export default function SuperAdminPage() {
                   </div>
                   <p className="text-xs text-slate-500">
                     Give this temporary password only to the authorized municipality admin.
+                  </p>
+                </div>
+
+                <div className="space-y-1.5 mt-4">
+                  <Label htmlFor="tenant-master-key" className="text-slate-300">Settings Secret Key</Label>
+                  <div className="relative">
+                    <Input
+                      id="tenant-master-key"
+                      type={showMasterKey ? 'text' : 'password'}
+                      value={tenantForm.masterKey}
+                      onChange={(event) => updateTenantForm('masterKey', event.target.value)}
+                      placeholder="Optional custom key, otherwise auto-generated"
+                      className="bg-slate-800 border-slate-600 text-white pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowMasterKey((current) => !current)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                      aria-label={showMasterKey ? 'Hide secret key' : 'Show secret key'}
+                    >
+                      {showMasterKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                  <p className="text-xs text-slate-500">
+                    This unlocks admin settings editing. Coverage remains hidden from municipality admins.
                   </p>
                 </div>
               </div>
@@ -611,7 +722,7 @@ export default function SuperAdminPage() {
                   ) : (
                     <span className="flex items-center gap-2">
                       <Plus className="h-4 w-4" />
-                      Create Tenant
+                      Create Client
                     </span>
                   )}
                 </Button>

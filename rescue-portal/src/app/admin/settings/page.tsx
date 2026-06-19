@@ -33,7 +33,10 @@ import {
   loadCoverageLock,
   saveCoverageLock,
 } from '@/lib/coverage-lock-client'
+import { getSettingsTabsForRole } from '@/lib/tenant-admin'
 import { useSettings } from '@/lib/settings-context'
+import { createClient } from '@/lib/supabase/client'
+import { useMasterKey } from '@/components/master-key-provider'
 import { toast } from 'sonner'
 
 const SCOPE_LEVEL_LABELS: Record<GeoScopeLevel, string> = {
@@ -45,9 +48,11 @@ const SCOPE_LEVEL_LABELS: Record<GeoScopeLevel, string> = {
 
 export default function SettingsPage() {
   const { settings, updateSettings } = useSettings()
+  const { isUnlocked } = useMasterKey()
   const [showToken, setShowToken] = useState(false)
   const [savingCoverage, setSavingCoverage] = useState(false)
   const [coveragePersistence, setCoveragePersistence] = useState<'checking' | 'supabase' | 'demo'>('checking')
+  const [profileRole, setProfileRole] = useState<string | null>(null)
   const [orgName, setOrgName] = useState(settings.municipalityName || DEMO_ORGANIZATION.name)
   const [hotline, setHotline] = useState(settings.hotline || DEMO_ORGANIZATION.emergency_hotline)
   const [secondaryHotline, setSecondaryHotline] = useState(settings.secondaryHotline || DEMO_ORGANIZATION.secondary_hotline || '')
@@ -83,6 +88,8 @@ export default function SettingsPage() {
   const coveredProvinces = getScopedProvinces(currentScope)
   const coveredLocalities = getScopedLocalities(currentScope)
   const selectedScopeLocality = PH_LOCALITIES.find((item) => item.code === scopeMunicipalityCode)
+  const settingsTabs = getSettingsTabsForRole(profileRole)
+  const canEditSettings = isUnlocked
   const scopeLabel = scopeLevel === 'country'
     ? 'Entire Philippines'
     : scopeLevel === 'region'
@@ -115,6 +122,20 @@ export default function SettingsPage() {
   useEffect(() => {
     let cancelled = false
 
+    async function loadProfileRole() {
+      const supabase = createClient()
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user || cancelled) return
+
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('user_id', user.id)
+        .single() as { data: { role: string } | null }
+
+      if (!cancelled) setProfileRole(profile?.role ?? null)
+    }
+
     async function loadSavedCoverageLock() {
       const result = await loadCoverageLock()
       if (cancelled) return
@@ -123,6 +144,7 @@ export default function SettingsPage() {
       setCoveragePersistence(result.persistence)
     }
 
+    void loadProfileRole()
     loadSavedCoverageLock()
 
     return () => {
@@ -131,6 +153,11 @@ export default function SettingsPage() {
   }, [])
 
   function save() {
+    if (!canEditSettings) {
+      toast.error('Unlock settings with the secret key first.')
+      return
+    }
+
     updateSettings({
       municipalityName: orgName,
       hotline,
@@ -143,6 +170,16 @@ export default function SettingsPage() {
   }
 
   async function saveCoverage() {
+    if (profileRole !== 'super_admin') {
+      toast.error('Coverage lock can only be changed by the platform owner.')
+      return
+    }
+
+    if (!canEditSettings) {
+      toast.error('Unlock settings with the secret key first.')
+      return
+    }
+
     if (!canSaveCoverage) {
       toast.error('Choose the required location before saving.')
       return
@@ -173,9 +210,9 @@ export default function SettingsPage() {
 
       <Tabs defaultValue="general">
         <TabsList className="bg-slate-800 border border-slate-700 flex-wrap h-auto gap-1">
-          {['General', 'Coverage Lock', 'Emergency Types', 'Barangays', 'Telegram', 'Notifications'].map((t) => (
-            <TabsTrigger key={t} value={t.toLowerCase().replace(' ', '_')} className="data-[active]:bg-slate-700 data-[active]:text-white text-slate-400 text-sm">
-              {t}
+          {settingsTabs.map((tab) => (
+            <TabsTrigger key={tab.value} value={tab.value} className="data-[active]:bg-slate-700 data-[active]:text-white text-slate-400 text-sm">
+              {tab.label}
             </TabsTrigger>
           ))}
         </TabsList>
@@ -239,7 +276,7 @@ export default function SettingsPage() {
                 <p className="text-slate-500 text-sm">Logo Upload</p>
                 <p className="text-slate-600 text-xs mt-1">Click to upload organization logo (PNG, SVG)</p>
               </div>
-              <Button onClick={save} className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Button onClick={save} disabled={!canEditSettings} className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">
                 <Save className="w-4 h-4 mr-1" /> Save Changes
               </Button>
             </CardContent>
@@ -376,7 +413,7 @@ export default function SettingsPage() {
                 </p>
               </div>
 
-              <Button onClick={saveCoverage} disabled={savingCoverage || !canSaveCoverage} className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Button onClick={saveCoverage} disabled={savingCoverage || !canSaveCoverage || !canEditSettings || profileRole !== 'super_admin'} className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">
                 <Save className="w-4 h-4 mr-1" /> {savingCoverage ? 'Saving...' : 'Save Coverage'}
               </Button>
             </CardContent>
@@ -392,7 +429,7 @@ export default function SettingsPage() {
                   <CardTitle className="text-white text-base">Emergency Types</CardTitle>
                   <CardDescription className="text-slate-400">Configure available emergency categories.</CardDescription>
                 </div>
-                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => toast.info('Demo: Add type dialog')}>
+                <Button size="sm" disabled={!canEditSettings} className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50" onClick={() => toast.info('Demo: Add type dialog')}>
                   <Plus className="w-4 h-4 mr-1" /> Add Type
                 </Button>
               </div>
@@ -407,8 +444,8 @@ export default function SettingsPage() {
                       <Badge variant="outline" className="text-xs border-slate-600 text-slate-400">{et.triage_questions.length} questions</Badge>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Switch checked={et.is_active} onCheckedChange={() => toast.info('Demo: Toggle type')} />
-                      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-slate-400 hover:text-white" onClick={() => toast.info('Demo: Edit type')}>
+                      <Switch checked={et.is_active} disabled={!canEditSettings} onCheckedChange={() => toast.info('Demo: Toggle type')} />
+                      <Button size="sm" variant="ghost" disabled={!canEditSettings} className="h-7 w-7 p-0 text-slate-400 hover:text-white disabled:opacity-50" onClick={() => toast.info('Demo: Edit type')}>
                         <Edit2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
@@ -428,7 +465,7 @@ export default function SettingsPage() {
                   <CardTitle className="text-white text-base">Barangays</CardTitle>
                   <CardDescription className="text-slate-400">Manage barangay list and captains.</CardDescription>
                 </div>
-                <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => toast.info('Demo: Add barangay')}>
+                <Button size="sm" disabled={!canEditSettings} className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50" onClick={() => toast.info('Demo: Add barangay')}>
                   <Plus className="w-4 h-4 mr-1" /> Add
                 </Button>
               </div>
@@ -441,7 +478,7 @@ export default function SettingsPage() {
                       <p className="text-sm text-white">{b.name}</p>
                       <p className="text-xs text-slate-400">{b.captain_name} · {b.captain_phone}</p>
                     </div>
-                    <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-slate-400 hover:text-white" onClick={() => toast.info('Demo: Edit barangay')}>
+                    <Button size="sm" variant="ghost" disabled={!canEditSettings} className="h-7 w-7 p-0 text-slate-400 hover:text-white disabled:opacity-50" onClick={() => toast.info('Demo: Edit barangay')}>
                       <Edit2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
@@ -492,7 +529,7 @@ export default function SettingsPage() {
                 <Button onClick={() => toast.success('Demo: Test message sent to all chats')} className="bg-blue-600 hover:bg-blue-700 text-white">
                   Test Connection
                 </Button>
-                <Button onClick={save} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800">
+                <Button onClick={save} disabled={!canEditSettings} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 disabled:opacity-50">
                   <Save className="w-4 h-4 mr-1" /> Save
                 </Button>
               </div>
@@ -523,10 +560,10 @@ export default function SettingsPage() {
                     <p className="text-sm text-white">{item.label}</p>
                     <p className="text-xs text-slate-400">{item.desc}</p>
                   </div>
-                  <Switch defaultChecked={item.on} onCheckedChange={() => toast.info('Demo: Toggle notification')} />
+                  <Switch defaultChecked={item.on} disabled={!canEditSettings} onCheckedChange={() => toast.info('Demo: Toggle notification')} />
                 </div>
               ))}
-              <Button onClick={save} className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Button onClick={save} disabled={!canEditSettings} className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">
                 <Save className="w-4 h-4 mr-1" /> Save Preferences
               </Button>
             </CardContent>

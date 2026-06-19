@@ -20,7 +20,7 @@ import { MapView } from '@/components/map-view'
 // Real data fetched from API — no demo imports
 import { formatDateTime, formatRelativeTime, getStatusLabel } from '@/lib/utils'
 import { toast } from 'sonner'
-import type { DemoIncident, IncidentStatus } from '@/lib/types'
+import type { DemoIncident, IncidentStatus, RescueUnit } from '@/lib/types'
 import { cn } from '@/lib/utils'
 
 const ALL_STATUSES: IncidentStatus[] = [
@@ -83,7 +83,7 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
 
   // Reporter info comes from the incident itself (reporter_name, reporter_phone)
   // Assigned unit info will be loaded from real data when teams feature is built
-  const assignedUnit = null
+  const assignedUnit = null as RescueUnit | null
 
   const mapMarker = [{
     id: incident.id,
