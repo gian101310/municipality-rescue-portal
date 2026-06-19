@@ -1,0 +1,41 @@
+-- Seed the shared emergency catalogue without changing tenant-specific types.
+WITH emergency_type_seed (name, icon, color, description, sort_order) AS (
+  VALUES
+    ('Medical Emergency', 'Stethoscope', '#ef4444', 'Urgent medical care, injury, or illness.', 10),
+    ('Fire', 'Flame', '#f97316', 'Structure, vehicle, grass, or wildland fire.', 20),
+    ('Flood', 'Waves', '#0ea5e9', 'Flooding, flash flood, or water rescue.', 30),
+    ('Earthquake', 'Activity', '#a855f7', 'Earthquake damage, trapped persons, or aftershock risk.', 40),
+    ('Typhoon / Severe Storm', 'CloudLightning', '#6366f1', 'Typhoon, severe storm, or weather emergency.', 50),
+    ('Vehicular Accident', 'Car', '#f59e0b', 'Vehicle collision or road traffic emergency.', 60),
+    ('Structure Collapse', 'Building2', '#78716c', 'Collapsed building, landslide, or trapped persons.', 70),
+    ('Crime / Violence', 'ShieldAlert', '#dc2626', 'Violence, threat, or public-safety emergency.', 80),
+    ('Missing Person', 'UserSearch', '#2563eb', 'Missing or lost person report.', 90),
+    ('Animal Rescue', 'PawPrint', '#16a34a', 'Injured, trapped, or dangerous animal.', 100),
+    ('Other Emergency', 'AlertTriangle', '#6b7280', 'An emergency not represented by another category.', 110)
+)
+INSERT INTO emergency_types (
+  organization_id,
+  name,
+  icon,
+  color,
+  description,
+  triage_questions,
+  is_active,
+  sort_order
+)
+SELECT
+  NULL,
+  seed.name,
+  seed.icon,
+  seed.color,
+  seed.description,
+  '[]'::jsonb,
+  TRUE,
+  seed.sort_order
+FROM emergency_type_seed AS seed
+WHERE NOT EXISTS (
+  SELECT 1
+  FROM emergency_types AS existing
+  WHERE existing.organization_id IS NULL
+    AND lower(existing.name) = lower(seed.name)
+);
