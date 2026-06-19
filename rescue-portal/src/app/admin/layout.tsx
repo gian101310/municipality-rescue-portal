@@ -23,6 +23,7 @@ import { Badge } from '@/components/ui/badge'
 import { NotificationCenter } from '@/components/notification-center'
 import { DemoBanner } from '@/components/demo-banner'
 import { PushNotificationToggle } from '@/components/push-notification-toggle'
+import { AdminSoundToggle } from '@/components/admin-sound-toggle'
 // Real data fetched from API — no more demo imports for org/stats
 import { MasterKeyProvider } from '@/components/master-key-provider'
 import { MasterKeyToggle } from '@/components/master-key-toggle'
@@ -294,6 +295,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 </div>
               )}
               <PushNotificationToggle />
+              <AdminSoundToggle />
               <NotificationCenter />
               <DropdownMenu>
                 <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="rounded-full" />}>

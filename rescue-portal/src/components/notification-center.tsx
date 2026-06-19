@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Bell, AlertCircle, Info, CheckCircle2, UserCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -13,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { formatRelativeTime } from '@/lib/utils'
 import { DEMO_NOTIFICATIONS } from '@/lib/demo-data'
+import { getStoredSoundPreference, playAdminNotificationSound } from '@/lib/notification-sound'
 import type { Notification, NotificationType } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import Link from 'next/link'
@@ -43,6 +44,18 @@ export function NotificationCenter({ userId }: NotificationCenterProps) {
   )
 
   const unreadCount = notifications.filter((n) => !n.is_read).length
+  const previousUnreadCount = useRef(unreadCount)
+
+  useEffect(() => {
+    if (
+      unreadCount > previousUnreadCount.current &&
+      getStoredSoundPreference(window.localStorage)
+    ) {
+      playAdminNotificationSound()
+    }
+
+    previousUnreadCount.current = unreadCount
+  }, [unreadCount])
 
   function markAsRead(id: string) {
     setNotifications((prev) =>
