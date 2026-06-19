@@ -104,7 +104,7 @@ export function getScopeLocationDetails(scope: TenantGeographyScope = { level: '
     ? `Province of ${province.name}`
     : region
     ? region.name
-    : 'Philippines Rescue Portal'
+    : 'Philippines Emergency Rescue Portal'
 
   return {
     region,

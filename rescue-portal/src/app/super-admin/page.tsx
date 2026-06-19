@@ -158,7 +158,7 @@ export default function SuperAdminPage() {
         const province = PH_PROVINCES.find((item) => item.code === locality?.provinceCode)
 
         if (!current.name && locality) {
-          next.name = `${locality.type === 'city' ? 'City' : 'Municipality'} of ${locality.name} Rescue Portal`
+          next.name = `${locality.type === 'city' ? 'City' : 'Municipality'} of ${locality.name} Emergency Rescue Portal`
         }
 
         if (!current.slug && locality) {
@@ -323,7 +323,7 @@ export default function SuperAdminPage() {
                           </div>
                           <div>
                             <p className="text-white font-medium">{tenant.name}</p>
-                            <p className="text-xs text-slate-500">{tenant.slug}.rescueportal.ph · {tenant.contact_email}</p>
+                            <p className="text-xs text-slate-500">{tenant.slug}.emergencyrescueportal.ph · {tenant.contact_email}</p>
                           </div>
                         </div>
                       </td>
@@ -455,7 +455,7 @@ export default function SuperAdminPage() {
                     id="tenant-name"
                     value={tenantForm.name}
                     onChange={(event) => updateTenantForm('name', event.target.value)}
-                    placeholder="Municipality of Ramon Rescue Portal"
+                    placeholder="Municipality of Ramon Emergency Rescue Portal"
                     className="bg-slate-800 border-slate-600 text-white"
                   />
                 </div>

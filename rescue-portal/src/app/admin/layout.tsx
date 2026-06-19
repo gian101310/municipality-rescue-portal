@@ -91,7 +91,7 @@ function Sidebar({ collapsed, setCollapsed, onClick, organizationName, organizat
       <div className={cn('flex items-center h-16 border-b border-slate-800 shrink-0', collapsed ? 'justify-center px-2' : 'px-4 gap-2')}>
         <Shield className="w-7 h-7 text-red-500 shrink-0" />
         {!collapsed && (
-          <span className="font-bold text-white tracking-tight">RescuePortal</span>
+          <span className="font-bold text-white tracking-tight">Emergency Rescue Portal</span>
         )}
         {setCollapsed && (
           <button

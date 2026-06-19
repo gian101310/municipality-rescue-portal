@@ -209,7 +209,7 @@ export async function POST(request: Request) {
     const fallbackMap = getFallbackMapCenter(scope)
     const plan = validPlans.includes(body?.plan) ? body.plan as TenantPlan : 'starter'
     const status = validStatuses.includes(body?.status) ? body.status as TenantStatus : 'trial'
-    const organizationName = String(body?.name ?? '').trim() || `${details.organizationName} Rescue Portal`
+    const organizationName = String(body?.name ?? '').trim() || `${details.organizationName} Emergency Rescue Portal`
     const baseSlug = slugify(String(body?.slug ?? '').trim() || `${locality.name}-${province?.name ?? region.name}`)
     if (!baseSlug) throw new Error('Tenant slug could not be generated.')
 

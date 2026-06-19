@@ -189,7 +189,7 @@ export default function QRPostersPage() {
             <div className={`${posterStyle === 'emergency' ? 'bg-red-600' : 'bg-blue-700'} px-8 py-6 text-center`}>
               <div className="flex items-center justify-center gap-3 mb-2">
                 <Shield className="w-8 h-8 text-white" />
-                <span className="text-white font-black text-2xl tracking-tight">RescuePortal</span>
+                <span className="text-white font-black text-2xl tracking-tight">Emergency Rescue Portal</span>
               </div>
               <p className="text-white/90 text-sm font-medium">{settings.municipalityName}</p>
             </div>
@@ -233,7 +233,7 @@ export default function QRPostersPage() {
             {/* Footer */}
             <div className="bg-slate-100 px-8 py-3 text-center">
               <p className="text-xs text-slate-500">
-                Powered by RescuePortal — Municipal Emergency Response System
+                Powered by Emergency Rescue Portal — Municipal Emergency Response System
               </p>
             </div>
           </div>

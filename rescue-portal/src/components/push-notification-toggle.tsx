@@ -33,7 +33,7 @@ export function PushNotificationToggle() {
       if (result === 'granted') {
         toast.success('Push notifications enabled!')
         // Show a test notification
-        new Notification('RescuePortal Alert', {
+        new Notification('Emergency Rescue Portal Alert', {
           body: 'You will now receive real-time emergency alerts.',
           icon: '/icons/icon-192.svg',
           tag: 'test-notification',

@@ -44,7 +44,7 @@ export default function ResidentLayout({ children }: { children: React.ReactNode
         <div className="max-w-2xl mx-auto px-4 flex items-center justify-between h-14">
           <div className="flex items-center gap-2">
             <Shield className="w-6 h-6 text-red-600" />
-            <span className="font-bold text-slate-900">RescuePortal</span>
+            <span className="font-bold text-slate-900">Emergency Rescue Portal</span>
           </div>
           <div className="flex items-center gap-1">
             <LanguageSwitcher variant="compact" />

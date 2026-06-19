@@ -48,7 +48,7 @@ self.addEventListener('fetch', (event) => {
 
 // Push notification handler
 self.addEventListener('push', (event) => {
-  const data = event.data?.json() ?? { title: 'RescuePortal Alert', body: 'New emergency alert received' }
+  const data = event.data?.json() ?? { title: 'Emergency Rescue Portal Alert', body: 'New emergency alert received' }
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,

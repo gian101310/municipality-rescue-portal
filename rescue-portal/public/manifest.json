@@ -1,6 +1,6 @@
 {
-  "name": "RescuePortal - Municipal Emergency Response",
-  "short_name": "RescuePortal",
+  "name": "Emergency Rescue Portal - Municipal Emergency Response",
+  "short_name": "Emergency Rescue Portal",
   "description": "Report emergencies instantly and connect with municipal rescue teams",
   "start_url": "/",
   "display": "standalone",

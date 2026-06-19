@@ -33,7 +33,7 @@ export default function OfflinePage() {
 
       <div className="mt-10 flex items-center gap-2 text-slate-600 text-sm">
         <Shield className="w-4 h-4" />
-        <span>RescuePortal — Municipal Emergency Response</span>
+        <span>Emergency Rescue Portal — Municipal Emergency Response</span>
       </div>
     </div>
   )
