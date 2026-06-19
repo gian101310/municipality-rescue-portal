@@ -206,8 +206,7 @@ export default function AnalyticsPage() {
                     innerRadius={60}
                     outerRadius={100}
                     paddingAngle={2}
-                    {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
-                    label={({ name, percent }: any) => `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                    label={((entry: {name?: string; percent?: number}) => `${entry.name ?? ''} ${((entry.percent ?? 0) * 100).toFixed(0)}%`) as unknown as boolean}
                   >
                     {analytics.byType.map((entry, index) => (
                       <Cell key={entry.name} fill={entry.color || PIE_COLORS[index % PIE_COLORS.length]} />
