@@ -21,6 +21,9 @@ import { formatRelativeTime } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { DemoIncident, EmergencyType } from '@/lib/types'
+import { useRealtimeIncidents } from '@/lib/use-realtime-incidents'
+import { playAdminNotificationSound } from '@/lib/notification-sound'
+import { EscalationMonitor } from '@/components/escalation-monitor'
 
 const ACTIVE_STATUSES = ['submitted', 'received', 'verification_pending', 'verified', 'assigned', 'dispatched', 'on_the_way', 'arrived', 'operation_in_progress']
 
@@ -105,6 +108,28 @@ export default function CommandCenterPage() {
     const interval = setInterval(() => fetchDashboard(), 15000)
     return () => clearInterval(interval)
   }, [fetchDashboard])
+
+  // Realtime subscription for instant updates
+  const { isConnected: realtimeConnected } = useRealtimeIncidents({
+    onNewIncident: (payload) => {
+      const newIncident = payload.new as unknown as DemoIncident
+      setIncidents((prev) => {
+        // Avoid duplicates
+        if (prev.some((i) => i.id === newIncident.id)) return prev
+        return [newIncident, ...prev]
+      })
+      setStats((prev) =>
+        prev ? { ...prev, total_incidents_today: prev.total_incidents_today + 1, active_incidents: prev.active_incidents + 1, total_incidents: prev.total_incidents + 1 } : prev
+      )
+      playAdminNotificationSound()
+      const typeName = newIncident.emergency_type?.name ?? 'Emergency'
+      toast.info(`New incident: ${typeName}`, { description: newIncident.reference_number ?? 'New report received' })
+    },
+    onIncidentUpdate: (payload) => {
+      const updated = payload.new as unknown as DemoIncident
+      setIncidents((prev) => prev.map((i) => (i.id === updated.id ? { ...i, ...updated } : i)))
+    },
+  })
 
   // Filter incidents
   const filteredIncidents = incidents.filter((i) => {
@@ -258,6 +283,9 @@ export default function CommandCenterPage() {
         <StatCard label="Total Incidents" value={stats?.total_incidents ?? 0} icon={TrendingUp} color="text-slate-400" />
       </div>
 
+      {/* Auto-Escalation Monitor */}
+      <EscalationMonitor incidents={incidents} />
+
       {/* Quick Actions */}
       <div className="flex flex-wrap gap-2">
         <Button size="sm" className="bg-red-700 hover:bg-red-600 text-white" onClick={() => setShowManualAlert(true)}>
@@ -277,7 +305,10 @@ export default function CommandCenterPage() {
           <Card className="bg-slate-900 border-slate-700">
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between mb-3">
-                <CardTitle className="text-white text-base">Live Incidents</CardTitle>
+                <CardTitle className="text-white text-base flex items-center gap-2">
+                  Live Incidents
+                  <span className={cn('w-2 h-2 rounded-full', realtimeConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500')} title={realtimeConnected ? 'Realtime connected' : 'Realtime disconnected'} />
+                </CardTitle>
                 <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white text-xs" render={<Link href="/admin/incidents" />}>
                   View all <ArrowRight className="w-3 h-3 ml-1" />
                 </Button>
@@ -420,35 +451,4 @@ export default function CommandCenterPage() {
                   href={`/admin/incidents/${incident.id}`}
                   className="flex items-start gap-3 px-4 py-3 border-b border-slate-800/50 last:border-0 hover:bg-slate-800/30 transition-colors"
                 >
-                  <div
-                    className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 mt-0.5"
-                    style={{ background: (incident.emergency_type?.color || '#6b7280') + '25' }}
-                  >
-                    <EmergencyTypeIcon
-                      iconName={incident.emergency_type?.icon || 'AlertTriangle'}
-                      className="w-3.5 h-3.5"
-                      style={{ color: incident.emergency_type?.color || '#6b7280' }}
-                    />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center justify-between gap-1">
-                      <p className="text-xs font-medium text-white truncate">{incident.emergency_type?.name ?? 'Alert'}</p>
-                      <Badge variant="outline" className="text-xs border-slate-700 text-slate-400 shrink-0">
-                        {incident.reference_number?.split('-').slice(-1)[0]}
-                      </Badge>
-                    </div>
-                    <p className="text-xs text-slate-500 mt-0.5 truncate">{incident.reporter_name ?? 'Anonymous'}</p>
-                    <div className="flex items-center gap-2 mt-0.5">
-                      <IncidentStatusBadge status={incident.status} />
-                      <span className="text-xs text-slate-600">{formatRelativeTime(incident.created_at)}</span>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </CardContent>
-          </Card>
-        </div>
-      </div>
-    </div>
-  )
-}
+    

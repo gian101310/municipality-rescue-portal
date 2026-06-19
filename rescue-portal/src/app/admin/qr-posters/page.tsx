@@ -252,7 +252,4 @@ export default function QRPostersPage() {
             border-radius: 0 !important;
           }
         }
-      `}</style>
-    </div>
-  )
-}
+      `}</st

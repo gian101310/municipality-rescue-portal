@@ -42,9 +42,3 @@ export default function RootLayout({
               <ServiceWorkerRegister />
               <Toaster richColors position="top-right" />
             </TooltipProvider>
-          </I18nProvider>
-        </SettingsProvider>
-      </body>
-    </html>
-  )
-}

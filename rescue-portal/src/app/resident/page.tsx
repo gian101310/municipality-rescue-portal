@@ -152,40 +152,4 @@ export default function ResidentDashboard() {
         </div>
         <div className="space-y-2">
           {loadingIncidents && (
-            <div className="text-center py-8 text-slate-400 text-sm">
-              <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              Loading reports...
-            </div>
-          )}
-          {!loadingIncidents && myIncidents.slice(0, 3).map((inc) => (
-            <Card key={inc.id} className="border-slate-200">
-              <CardContent className="p-3 flex items-center gap-3">
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
-                  style={{ background: inc.emergency_type.color + '20' }}
-                >
-                  <EmergencyTypeIcon
-                    iconName={inc.emergency_type.icon}
-                    className="w-4 h-4"
-                    style={{ color: inc.emergency_type.color }}
-                  />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-slate-900">{inc.emergency_type.name}</p>
-                  <p className="text-xs text-slate-500">{formatRelativeTime(inc.created_at)}</p>
-                </div>
-                <IncidentStatusBadge status={inc.status} />
-              </CardContent>
-            </Card>
-          ))}
-          {!loadingIncidents && myIncidents.length === 0 && (
-            <div className="text-center py-8 text-slate-400 text-sm">
-              <Clock className="w-8 h-8 mx-auto mb-2 opacity-50" />
-              No past reports
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
+            <div className="text-center py-8 text-slate-40

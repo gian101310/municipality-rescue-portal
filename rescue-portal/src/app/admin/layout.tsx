@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, AlertTriangle, Map, Users, UserCheck,
   ShieldCheck, BarChart3, ScrollText, Settings, Activity,
-  Shield, Menu, ChevronLeft, LogOut, User, Clock, QrCode,
+  Shield, Menu, ChevronLeft, LogOut, User, Clock, QrCode, TrendingUp,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -57,6 +57,7 @@ function buildNavItems(stats: DashboardStats | null) {
     { href: '/admin/residents', label: 'Residents', icon: UserCheck, badge: stats?.pending_registrations },
     { href: '/admin/verification', label: 'Verification', icon: ShieldCheck },
     { href: '/admin/reports', label: 'Reports', icon: BarChart3 },
+    { href: '/admin/analytics', label: 'Analytics', icon: TrendingUp },
     { href: '/admin/audit', label: 'Audit Logs', icon: ScrollText },
     { href: '/admin/qr-posters', label: 'QR Posters', icon: QrCode },
     { href: '/admin/settings', label: 'Settings', icon: Settings },
@@ -300,43 +301,4 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <DropdownMenu>
                 <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="rounded-full" />}>
                   <Avatar className="w-8 h-8">
-                    <AvatarFallback className="bg-blue-600 text-white text-xs font-bold">{initials}</AvatarFallback>
-                  </Avatar>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-48 bg-slate-800 border-slate-700">
-                  <DropdownMenuLabel className="text-slate-300 text-xs">
-                    <div>{adminProfile?.full_name ?? 'Admin'}</div>
-                    <div className="text-slate-500 font-normal">{adminProfile?.email ?? '...'}</div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator className="bg-slate-700" />
-                  <DropdownMenuItem className="text-slate-300 hover:text-white cursor-pointer">
-                    <User className="w-4 h-4 mr-2" />
-                    Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem className="text-slate-300 hover:text-white cursor-pointer" render={<Link href="/admin/settings" />}>
-                    <Settings className="w-4 h-4 mr-2" />
-                    Settings
-                  </DropdownMenuItem>
-                  <DropdownMenuSeparator className="bg-slate-700" />
-                  <DropdownMenuItem
-                    onClick={handleLogout}
-                    className="text-red-400 hover:text-red-300 cursor-pointer"
-                  >
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Logout
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </header>
-
-          {/* Content */}
-          <main className="flex-1 overflow-auto bg-slate-950">
-            {children}
-          </main>
-        </div>
-      </div>
-    </div>
-    </MasterKeyProvider>
-  )
-}
+                    <AvatarFallback className="bg-blue-600 text-white t

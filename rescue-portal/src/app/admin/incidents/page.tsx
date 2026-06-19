@@ -207,35 +207,4 @@ export default function IncidentsPage() {
                       <span className="text-xs text-slate-500 whitespace-nowrap">{formatRelativeTime(inc.created_at)}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-400 hover:text-white" render={<Link href={`/admin/incidents/${inc.id}`} />}>
-                        <Eye className="w-3.5 h-3.5" />
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-slate-800">
-              <span className="text-xs text-slate-500">
-                Showing {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}
-              </span>
-              <div className="flex items-center gap-1">
-                <Button variant="ghost" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1} className="h-7 w-7 p-0 text-slate-400 hover:text-white">
-                  <ChevronLeft className="w-4 h-4" />
-                </Button>
-                <span className="text-xs text-slate-400 px-2">{page} / {totalPages}</span>
-                <Button variant="ghost" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page === totalPages} className="h-7 w-7 p-0 text-slate-400 hover:text-white">
-                  <ChevronRight className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
+                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-400 hover:tex

@@ -450,6 +450,73 @@ export async function POST(request: Request) {
   }
 }
 
+export async function DELETE(request: Request) {
+  const auth = await requireSuperAdmin()
+  if ('error' in auth) return auth.error
+
+  try {
+    const body = await request.json()
+    const tenantId = String(body?.tenantId ?? '').trim()
+
+    if (!tenantId) {
+      return NextResponse.json({ message: 'Client municipality is required.' }, { status: 400 })
+    }
+
+    const adminClient = await createAdminClient()
+    const dataAdmin = adminClient as unknown as SupabaseDataClient
+
+    const { data: organization, error: orgError } = await dataAdmin
+      .from('organizations')
+      .select('id, name, slug, province, region, email, emergency_hotline, branding, is_active, subscription_tier, master_key_hash, created_at')
+      .eq('id', tenantId)
+      .neq('slug', 'rescue-portal-owner')
+      .single<OrganizationRow>()
+
+    if (orgError || !organization) throw new Error(orgError?.message ?? 'Client municipality not found.')
+
+    const profiles = await getTenantUsers(dataAdmin, tenantId)
+
+    const { error: profileDeleteError } = await dataAdmin
+      .from('user_profiles')
+      .delete()
+      .eq('organization_id', tenantId) as QueryResult<unknown>
+
+    if (profileDeleteError) throw new Error(profileDeleteError.message)
+
+    for (const profile of profiles) {
+      await adminClient.auth.admin.deleteUser(profile.user_id).catch(() => null)
+    }
+
+    const { error: scopeDeleteError } = await dataAdmin
+      .from('organization_geo_scopes')
+      .delete()
+      .eq('organization_id', tenantId) as QueryResult<unknown>
+
+    if (scopeDeleteError) throw new Error(scopeDeleteError.message)
+
+    const { error: municipalityDeleteError } = await dataAdmin
+      .from('municipalities')
+      .delete()
+      .eq('organization_id', tenantId) as QueryResult<unknown>
+
+    if (municipalityDeleteError) throw new Error(municipalityDeleteError.message)
+
+    const { error: orgDeleteError } = await dataAdmin
+      .from('organizations')
+      .delete()
+      .eq('id', tenantId) as QueryResult<unknown>
+
+    if (orgDeleteError) throw new Error(orgDeleteError.message)
+
+    return NextResponse.json({ success: true, deletedTenantId: tenantId })
+  } catch (error) {
+    return NextResponse.json(
+      { message: getErrorMessage(error, 'Unable to delete client municipality.') },
+      { status: 400 }
+    )
+  }
+}
+
 export async function PATCH(request: Request) {
   const auth = await requireSuperAdmin()
   if ('error' in auth) return auth.error

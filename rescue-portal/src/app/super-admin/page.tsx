@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Shield, Building2, Plus, Search,
-  Lock, Eye, EyeOff, CheckCircle2, XCircle, Clock, LogOut, Loader2, X, KeyRound, UserX
+  Lock, Eye, EyeOff, CheckCircle2, XCircle, Clock, LogOut, Loader2, X, KeyRound, UserX, ExternalLink, Trash2, LogIn
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -211,7 +211,30 @@ export default function SuperAdminPage() {
     }
   }
 
-  async function handleTenantAction(tenant: Tenant, action: 'enable' | 'disable' | 'kick' | 'change_password' | 'rotate_secret') {
+  async function handleTenantAction(tenant: Tenant, action: 'enable' | 'disable' | 'kick' | 'change_password' | 'rotate_secret' | 'delete') {
+    if (action === 'delete') {
+      if (!window.confirm(`PERMANENTLY DELETE ${tenant.name}? This will remove all users, data, and configuration. This cannot be undone.`)) {
+        return
+      }
+      setActionLoading(`${tenant.id}:delete`)
+      try {
+        const response = await fetch('/api/super-admin/tenants', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ tenantId: tenant.id }),
+        })
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(payload?.message ?? 'Unable to delete tenant.')
+        setTenants((current) => current.filter((t) => t.id !== tenant.id))
+        toast.success(`${tenant.name} permanently deleted`)
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Unable to delete tenant.')
+      } finally {
+        setActionLoading(null)
+      }
+      return
+    }
+
     if (action === 'change_password') {
       const password = window.prompt(`New temporary password for ${tenant.admin_email || tenant.name}`)
       if (!password) return
@@ -243,6 +266,39 @@ export default function SuperAdminPage() {
         ? 'Client municipality disabled'
         : 'Client users kicked for 15 minutes'
     )
+  }
+
+  async function handleLoginAsAdmin(tenant: Tenant) {
+    if (!tenant.admin_user_id) {
+      toast.error('No admin account configured for this tenant.')
+      return
+    }
+
+    setActionLoading(`${tenant.id}:login`)
+    try {
+      const response = await fetch('/api/super-admin/login-as-admin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId: tenant.id }),
+      })
+      const payload = await response.json().catch(() => ({}))
+
+      if (!response.ok) {
+        throw new Error(payload?.message ?? 'Unable to generate admin login.')
+      }
+
+      if (payload.loginUrl) {
+        // Open in new tab so the super admin session is preserved
+        window.open(payload.loginUrl, '_blank')
+        toast.success(`Opening admin dashboard for ${tenant.name}`)
+      } else {
+        toast.error('No login URL received.')
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to login as admin.')
+    } finally {
+      setActionLoading(null)
+    }
   }
 
   async function handleCreateTenant(event: FormEvent<HTMLFormElement>) {
@@ -304,433 +360,4 @@ export default function SuperAdminPage() {
   if (!authorized) return null
 
   const filtered = tenants.filter((t) =>
-    t.name.toLowerCase().includes(search.toLowerCase()) ||
-    t.province.toLowerCase().includes(search.toLowerCase()) ||
-    t.slug.toLowerCase().includes(search.toLowerCase())
-  )
-
-  const stats = {
-    total: tenants.length,
-    active: tenants.filter((t) => t.status === 'active').length,
-    trial: tenants.filter((t) => t.status === 'trial').length,
-    suspended: tenants.filter((t) => t.status === 'suspended').length,
-  }
-
-  return (
-    <div className="min-h-screen bg-slate-950">
-      {/* Header */}
-      <header className="bg-slate-900 border-b border-slate-800 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-600/20 border border-amber-500/30 flex items-center justify-center">
-              <Shield className="w-5 h-5 text-amber-400" />
-            </div>
-            <div>
-              <h1 className="text-lg font-bold text-white">Platform Admin</h1>
-              <p className="text-xs text-slate-500">Welcome, {userName}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800" render={<Link href="/" />}>
-              View Landing Page
-            </Button>
-            <Button className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => setAddOpen(true)}>
-              <Plus className="w-4 h-4 mr-1" /> Add Client
-            </Button>
-            <Button variant="ghost" className="text-slate-400 hover:text-white" onClick={handleSignOut}>
-              <LogOut className="w-4 h-4 mr-1" /> Sign Out
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-6 py-6 space-y-6">
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {[
-            { label: 'Client Municipalities', value: stats.total, color: 'text-white' },
-            { label: 'Active', value: stats.active, color: 'text-green-400' },
-            { label: 'On Trial', value: stats.trial, color: 'text-blue-400' },
-            { label: 'Suspended', value: stats.suspended, color: 'text-red-400' },
-          ].map(({ label, value, color }) => (
-            <Card key={label} className="bg-slate-900 border-slate-800">
-              <CardContent className="p-4 text-center">
-                <p className={`text-2xl font-black ${color}`}>{value}</p>
-                <p className="text-xs text-slate-500 mt-1">{label}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-
-        {/* Search */}
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search clients by name, province, or slug..."
-              className="pl-10 bg-slate-900 border-slate-700 text-white"
-            />
-          </div>
-        </div>
-
-        {/* Tenants Table */}
-        <Card className="bg-slate-900 border-slate-800 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-800 text-left">
-                  <th className="px-4 py-3 text-slate-400 font-medium">Municipality</th>
-                  <th className="px-4 py-3 text-slate-400 font-medium">Province Lock</th>
-                  <th className="px-4 py-3 text-slate-400 font-medium">Admin Login</th>
-                  <th className="px-4 py-3 text-slate-400 font-medium">Plan</th>
-                  <th className="px-4 py-3 text-slate-400 font-medium">Status</th>
-                  <th className="px-4 py-3 text-slate-400 font-medium">Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map((tenant) => {
-                  const st = statusConfig[tenant.status]
-                  const StIcon = st.icon
-                  return (
-                    <tr key={tenant.id} className="border-b border-slate-800/50 hover:bg-slate-800/30">
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-lg bg-slate-800 border border-slate-700 flex items-center justify-center">
-                            <Building2 className="w-4 h-4 text-slate-400" />
-                          </div>
-                          <div>
-                            <p className="text-white font-medium">{tenant.name}</p>
-                            <p className="text-xs text-slate-500">{tenant.slug}.emergencyrescueportal.ph · {tenant.contact_email}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1.5">
-                          <Lock className="w-3.5 h-3.5 text-amber-500" />
-                          <div>
-                            <p className="text-white text-xs font-medium">{tenant.municipality}, {tenant.province}</p>
-                            <p className="text-slate-500 text-xs">{tenant.region}</p>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div>
-                          <p className="text-white text-xs font-medium">{tenant.admin_email || 'No admin account'}</p>
-                          <p className="text-slate-500 text-xs">{tenant.master_key_configured ? 'Secret key configured' : 'No secret key'}</p>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex px-2.5 py-1 rounded-full text-xs font-medium ${planColors[tenant.plan]}`}>
-                          {tenant.plan === 'one_time' ? 'One-Time' : tenant.plan.charAt(0).toUpperCase() + tenant.plan.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${st.color}`}>
-                          <StIcon className="w-3 h-3" />
-                          {st.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-1">
-                          <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white h-8 w-8 p-0" title="View client" onClick={() => toast.info(`Viewing ${tenant.name}`)}>
-                            <Eye className="w-4 h-4" />
-                          </Button>
-                          {tenant.status === 'active' ? (
-                            <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300 h-8 w-8 p-0" title="Disable client" disabled={Boolean(actionLoading)} onClick={() => handleTenantAction(tenant, 'disable')}>
-                              <XCircle className="w-4 h-4" />
-                            </Button>
-                          ) : (
-                            <Button variant="ghost" size="sm" className="text-green-400 hover:text-green-300 h-8 w-8 p-0" title="Enable client" disabled={Boolean(actionLoading)} onClick={() => handleTenantAction(tenant, 'enable')}>
-                              <CheckCircle2 className="w-4 h-4" />
-                            </Button>
-                          )}
-                          <Button variant="ghost" size="sm" className="text-orange-300 hover:text-orange-200 h-8 w-8 p-0" title="Kick all users" disabled={Boolean(actionLoading)} onClick={() => handleTenantAction(tenant, 'kick')}>
-                            <UserX className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-blue-300 hover:text-blue-200 h-8 w-8 p-0" title="Change admin password" disabled={Boolean(actionLoading) || !tenant.admin_user_id} onClick={() => handleTenantAction(tenant, 'change_password')}>
-                            <Lock className="w-4 h-4" />
-                          </Button>
-                          <Button variant="ghost" size="sm" className="text-amber-300 hover:text-amber-200 h-8 w-8 p-0" title="Set settings secret key" disabled={Boolean(actionLoading)} onClick={() => handleTenantAction(tenant, 'rotate_secret')}>
-                            <KeyRound className="w-4 h-4" />
-                          </Button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-                {filtered.length === 0 && (
-                  <tr>
-                    <td colSpan={6} className="text-center py-10 text-slate-500">
-                      {tenants.length === 0 ? 'No clients yet. Add your first municipality!' : 'No clients found'}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </Card>
-
-        {/* Security Info */}
-        <Card className="bg-amber-950/20 border-amber-800/30">
-          <CardContent className="p-4 flex items-start gap-3">
-            <Lock className="w-5 h-5 text-amber-400 mt-0.5 shrink-0" />
-            <div>
-              <p className="text-amber-300 font-semibold text-sm">Coverage Lock Security</p>
-              <p className="text-amber-400/70 text-xs mt-1 leading-relaxed">
-                Province and municipality assignments are protected by a database-level trigger.
-                Only the platform owner can modify these fields. Municipality admins cannot see
-                or change their location lock.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {addOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="w-full max-w-2xl rounded-lg border border-slate-700 bg-slate-900 shadow-2xl">
-            <div className="flex items-start justify-between border-b border-slate-800 p-5">
-              <div>
-                <h2 className="text-lg font-bold text-white">Add Client Municipality</h2>
-                <p className="mt-1 text-sm text-slate-400">Create a locked municipality account for an authorized client.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setAddOpen(false)}
-                className="rounded-md p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
-                aria-label="Close tenant form"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            <form onSubmit={handleCreateTenant} className="space-y-4 p-5">
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="tenant-province" className="text-slate-300">Province</Label>
-                  <select
-                    id="tenant-province"
-                    value={tenantForm.provinceCode}
-                    onChange={(event) => updateTenantForm('provinceCode', event.target.value)}
-                    className="h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 text-sm text-white outline-none focus:border-amber-500"
-                  >
-                    <option value="">Choose province...</option>
-                    {PH_PROVINCES.map((province) => (
-                      <option key={province.code} value={province.code}>{province.name}</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="tenant-municipality" className="text-slate-300">City / Municipality</Label>
-                  <select
-                    id="tenant-municipality"
-                    value={tenantForm.municipalityCode}
-                    onChange={(event) => updateTenantForm('municipalityCode', event.target.value)}
-                    disabled={!tenantForm.provinceCode}
-                    className="h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 text-sm text-white outline-none focus:border-amber-500 disabled:opacity-50"
-                  >
-                    <option value="">Choose city or municipality...</option>
-                    {PH_LOCALITIES
-                      .filter((locality) => locality.provinceCode === tenantForm.provinceCode)
-                      .map((locality) => (
-                        <option key={locality.code} value={locality.code}>{getLocalityLabel(locality)}</option>
-                      ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="tenant-name" className="text-slate-300">Client Name</Label>
-                  <Input
-                    id="tenant-name"
-                    value={tenantForm.name}
-                    onChange={(event) => updateTenantForm('name', event.target.value)}
-                    placeholder="Municipality of Ramon Emergency Rescue Portal"
-                    className="bg-slate-800 border-slate-600 text-white"
-                  />
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="tenant-slug" className="text-slate-300">Slug</Label>
-                  <Input
-                    id="tenant-slug"
-                    value={tenantForm.slug}
-                    onChange={(event) => updateTenantForm('slug', event.target.value)}
-                    placeholder="ramon-isabela"
-                    className="bg-slate-800 border-slate-600 text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="tenant-email" className="text-slate-300">Contact Email</Label>
-                  <Input
-                    id="tenant-email"
-                    type="email"
-                    value={tenantForm.contactEmail}
-                    onChange={(event) => updateTenantForm('contactEmail', event.target.value)}
-                    placeholder="mdrrmo@municipality.gov.ph"
-                    className="bg-slate-800 border-slate-600 text-white"
-                  />
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-amber-700/30 bg-amber-950/10 p-4">
-                <div className="mb-3">
-                  <h3 className="text-sm font-semibold text-amber-200">Municipality Admin Login</h3>
-                  <p className="mt-1 text-xs text-amber-200/70">
-                    This creates the first admin account for the client municipality.
-                  </p>
-                </div>
-
-                <div className="grid gap-4 md:grid-cols-2">
-                  <div className="space-y-1.5">
-                    <Label htmlFor="tenant-admin-name" className="text-slate-300">Admin Full Name</Label>
-                    <Input
-                      id="tenant-admin-name"
-                      value={tenantForm.adminFullName}
-                      onChange={(event) => updateTenantForm('adminFullName', event.target.value)}
-                      placeholder="Municipality Admin"
-                      className="bg-slate-800 border-slate-600 text-white"
-                    />
-                  </div>
-
-                  <div className="space-y-1.5">
-                    <Label htmlFor="tenant-admin-email" className="text-slate-300">Admin Email *</Label>
-                    <Input
-                      id="tenant-admin-email"
-                      type="email"
-                      value={tenantForm.adminEmail}
-                      onChange={(event) => updateTenantForm('adminEmail', event.target.value)}
-                      placeholder="admin@municipality.gov.ph"
-                      className="bg-slate-800 border-slate-600 text-white"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="tenant-admin-password" className="text-slate-300">Temporary Password *</Label>
-                  <div className="relative">
-                    <Input
-                      id="tenant-admin-password"
-                      type={showAdminPassword ? 'text' : 'password'}
-                      value={tenantForm.adminPassword}
-                      onChange={(event) => updateTenantForm('adminPassword', event.target.value)}
-                      placeholder="At least 8 chars, upper/lower/number/symbol"
-                      className="bg-slate-800 border-slate-600 text-white pr-10"
-                      required
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowAdminPassword((current) => !current)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                      aria-label={showAdminPassword ? 'Hide password' : 'Show password'}
-                    >
-                      {showAdminPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    Give this temporary password only to the authorized municipality admin.
-                  </p>
-                </div>
-
-                <div className="space-y-1.5 mt-4">
-                  <Label htmlFor="tenant-master-key" className="text-slate-300">Settings Secret Key</Label>
-                  <div className="relative">
-                    <Input
-                      id="tenant-master-key"
-                      type={showMasterKey ? 'text' : 'password'}
-                      value={tenantForm.masterKey}
-                      onChange={(event) => updateTenantForm('masterKey', event.target.value)}
-                      placeholder="Optional custom key, otherwise auto-generated"
-                      className="bg-slate-800 border-slate-600 text-white pr-10"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => setShowMasterKey((current) => !current)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                      aria-label={showMasterKey ? 'Hide secret key' : 'Show secret key'}
-                    >
-                      {showMasterKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
-                  </div>
-                  <p className="text-xs text-slate-500">
-                    This unlocks admin settings editing. Coverage remains hidden from municipality admins.
-                  </p>
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="tenant-hotline" className="text-slate-300">Emergency Hotline</Label>
-                <Input
-                  id="tenant-hotline"
-                  value={tenantForm.emergencyHotline}
-                  onChange={(event) => updateTenantForm('emergencyHotline', event.target.value)}
-                  placeholder="911"
-                  className="bg-slate-800 border-slate-600 text-white"
-                />
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label htmlFor="tenant-plan" className="text-slate-300">Plan</Label>
-                  <select
-                    id="tenant-plan"
-                    value={tenantForm.plan}
-                    onChange={(event) => updateTenantForm('plan', event.target.value as TenantPlan)}
-                    className="h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 text-sm text-white outline-none focus:border-amber-500"
-                  >
-                    <option value="starter">Starter</option>
-                    <option value="professional">Professional</option>
-                    <option value="enterprise">Enterprise</option>
-                    <option value="one_time">One-Time</option>
-                  </select>
-                </div>
-
-                <div className="space-y-1.5">
-                  <Label htmlFor="tenant-status" className="text-slate-300">Status</Label>
-                  <select
-                    id="tenant-status"
-                    value={tenantForm.status}
-                    onChange={(event) => updateTenantForm('status', event.target.value as TenantStatus)}
-                    className="h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 text-sm text-white outline-none focus:border-amber-500"
-                  >
-                    <option value="trial">Trial</option>
-                    <option value="active">Active</option>
-                    <option value="suspended">Suspended</option>
-                    <option value="cancelled">Cancelled</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="flex justify-end gap-3 border-t border-slate-800 pt-4">
-                <Button type="button" variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800" onClick={() => setAddOpen(false)}>
-                  Cancel
-                </Button>
-                <Button type="submit" disabled={tenantSaving} className="bg-amber-600 hover:bg-amber-700 text-white">
-                  {tenantSaving ? (
-                    <span className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Creating...
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-2">
-                      <Plus className="h-4 w-4" />
-                      Create Client
-                    </span>
-                  )}
-                </Button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-    </div>
-  )
-}
+    t.name.toLowerCase().

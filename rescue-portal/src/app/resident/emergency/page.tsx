@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   ArrowLeft, MapPin, Camera, ChevronRight, CheckCircle2,
-  AlertTriangle, Users, Shield, Phone
+  AlertTriangle, Users, Shield, Phone, X, Upload
 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -75,6 +75,49 @@ export default function EmergencyPage() {
   const [submitting, setSubmitting] = useState(false)
   const [refNumber, setRefNumber] = useState('')
   const [emergencyTypes, setEmergencyTypes] = useState<EmergencyType[]>([])
+  const [photos, setPhotos] = useState<File[]>([])
+  const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
+  const fileInputRef = useRef<HTMLInputElement>(null)
+
+  function handleFileSelect(e: React.ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? [])
+    const remaining = 5 - photos.length
+    if (remaining <= 0) {
+      toast.error('Maximum 5 files allowed')
+      e.target.value = ''
+      return
+    }
+    const toAdd: File[] = []
+    for (const file of files.slice(0, remaining)) {
+      if (file.size > 10 * 1024 * 1024) {
+        toast.error(`${file.name} exceeds 10MB limit`)
+        continue
+      }
+      toAdd.push(file)
+    }
+    if (toAdd.length > 0) {
+      setPhotos((prev) => [...prev, ...toAdd])
+      const newPreviews = toAdd.map((f) => URL.createObjectURL(f))
+      setPhotoPreviews((prev) => [...prev, ...newPreviews])
+    }
+    e.target.value = ''
+  }
+
+  function removePhoto(index: number) {
+    URL.revokeObjectURL(photoPreviews[index])
+    setPhotos((prev) => prev.filter((_, i) => i !== index))
+    setPhotoPreviews((prev) => prev.filter((_, i) => i !== index))
+  }
+
+  function triggerFileInput(capture: boolean) {
+    if (!fileInputRef.current) return
+    if (capture) {
+      fileInputRef.current.setAttribute('capture', 'environment')
+    } else {
+      fileInputRef.current.removeAttribute('capture')
+    }
+    fileInputRef.current.click()
+  }
 
   // Fetch emergency types from API
   useEffect(() => {
@@ -169,8 +212,24 @@ export default function EmergencyPage() {
       }
 
       recordSubmission()
-      setRefNumber(payload?.referenceNumber ?? payload?.incident?.reference_number ?? 'Submitted')
+      const incidentRef = payload?.referenceNumber ?? payload?.incident?.reference_number ?? 'Submitted'
+      const incidentId = payload?.incident?.id ?? payload?.incidentId
+      setRefNumber(incidentRef)
       setStep('submitted')
+
+      // Upload photos in the background (non-blocking)
+      if (photos.length > 0 && incidentId) {
+        for (const file of photos) {
+          try {
+            const fd = new FormData()
+            fd.append('file', file)
+            fd.append('incident_id', incidentId)
+            await fetch('/api/resident/incidents/attachments', { method: 'POST', body: fd })
+          } catch {
+            toast.error(`Failed to upload ${file.name}`)
+          }
+        }
+      }
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to submit emergency report.')
     } finally {
@@ -382,13 +441,64 @@ export default function EmergencyPage() {
               </div>
             )}
 
-            {/* Photo */}
+            {/* Photo / Video Capture */}
             <div>
-              <Label className="text-slate-700 font-semibold mb-2 block">Photos (optional)</Label>
-              <div className="border-2 border-dashed border-slate-300 rounded-lg p-6 text-center">
-                <Camera className="w-6 h-6 text-slate-400 mx-auto mb-2" />
-                <p className="text-xs text-slate-400">Tap to take or upload photos</p>
-              </div>
+              <Label className="text-slate-700 font-semibold mb-2 block">Photos / Videos (optional, max 5)</Label>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                className="hidden"
+                onChange={handleFileSelect}
+              />
+              {photoPreviews.length > 0 && (
+                <div className="grid grid-cols-3 gap-2 mb-3">
+                  {photoPreviews.map((src, idx) => (
+                    <div key={src} className="relative rounded-lg overflow-hidden border border-slate-200 aspect-square bg-slate-100">
+                      {photos[idx]?.type.startsWith('video/') ? (
+                        <video src={src} className="w-full h-full object-cover" />
+                      ) : (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={src} alt={`Attachment ${idx + 1}`} className="w-full h-full object-cover" />
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => removePhoto(idx)}
+                        className="absolute top-1 right-1 w-6 h-6 bg-black/60 rounded-full flex items-center justify-center text-white hover:bg-black/80 transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {photos.length < 5 && (
+                <div className="flex gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 border-slate-300 text-slate-700 h-11"
+                    onClick={() => triggerFileInput(true)}
+                  >
+                    <Camera className="w-4 h-4 mr-2" />
+                    Take Photo
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="flex-1 border-slate-300 text-slate-700 h-11"
+                    onClick={() => triggerFileInput(false)}
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload File
+                  </Button>
+                </div>
+              )}
+              {photos.length >= 5 && (
+                <p className="text-xs text-amber-600 mt-1">Maximum 5 files reached. Remove one to add more.</p>
+              )}
+              <p className="text-xs text-slate-400 mt-1">Max 10MB per file. Photos help responders assess the situation.</p>
             </div>
 
             <Button
@@ -397,126 +507,4 @@ export default function EmergencyPage() {
               disabled={!description.trim() || !locationGranted}
             >
               Continue to Confirm
-              <ChevronRight className="w-4 h-4 ml-1" />
-            </Button>
-          </div>
-        )}
-
-        {/* Step 3: Confirm */}
-        {step === 'confirm' && selectedType && (
-          <div className="space-y-5">
-            <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4">
-              <div className="flex items-center gap-2 mb-3">
-                <AlertTriangle className="w-5 h-5 text-red-600" />
-                <p className="font-bold text-red-700">Confirm Emergency Report</p>
-              </div>
-              <p className="text-sm text-red-600">
-                By submitting, you confirm this is a real emergency. False alerts may result in legal consequences.
-              </p>
-            </div>
-
-            {/* Summary */}
-            <Card className="border-slate-200">
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: selectedType.color + '20' }}>
-                    <EmergencyTypeIcon iconName={selectedType.icon} className="w-4 h-4" style={{ color: selectedType.color }} />
-                  </div>
-                  <span className="font-semibold text-slate-900">{selectedType.name}</span>
-                </div>
-                <div>
-                  <p className="text-xs text-slate-500">Description</p>
-                  <p className="text-sm text-slate-800">{description}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <div>
-                    <p className="text-slate-500">Affected</p>
-                    <div className="flex items-center gap-1">
-                      <Users className="w-3.5 h-3.5" />
-                      <p className="font-medium">{affectedCount} person{affectedCount !== 1 ? 's' : ''}</p>
-                    </div>
-                  </div>
-                  <div>
-                    <p className="text-slate-500">Location</p>
-                    <div className="flex items-center gap-1 text-green-600">
-                      <MapPin className="w-3.5 h-3.5" />
-                      <p className="font-medium">Captured</p>
-                    </div>
-                  </div>
-                </div>
-                {activeHazards.length > 0 && (
-                  <div className="flex flex-wrap gap-1">
-                    {activeHazards.includes('unconscious') && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Unconscious</span>}
-                    {activeHazards.includes('fire') && <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full">Fire</span>}
-                    {activeHazards.includes('flooding') && <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">Flooding</span>}
-                    {activeHazards.includes('violence') && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Violence</span>}
-                    {activeHazards.includes('trapped') && <span className="text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">Trapped</span>}
-                    {activeHazards.includes('chemical') && <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Hazmat</span>}
-                  </div>
-                )}
-
-                {/* Auto Severity Score */}
-                {(() => {
-                  const severity = calculateSeverity({
-                    emergencyType: selectedType.id,
-                    hazards: activeHazards,
-                    affectedCount: parseInt(String(affectedCount)) || 1,
-                    description,
-                  })
-                  const ring = getSeverityRingProps(severity.score)
-                  return (
-                    <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
-                      <svg width="48" height="48" viewBox="0 0 100 100" className="shrink-0">
-                        <circle cx="50" cy="50" r="40" fill="none" stroke="#e2e8f0" strokeWidth="8" />
-                        <circle
-                          cx="50" cy="50" r="40" fill="none"
-                          stroke={severity.color}
-                          strokeWidth="8"
-                          strokeDasharray={ring.circumference}
-                          strokeDashoffset={ring.offset}
-                          strokeLinecap="round"
-                          transform="rotate(-90 50 50)"
-                        />
-                        <text x="50" y="55" textAnchor="middle" fontSize="24" fontWeight="900" fill={severity.color}>
-                          {severity.score}
-                        </text>
-                      </svg>
-                      <div>
-                        <p className="text-xs text-slate-500">Auto Severity Score</p>
-                        <p className="font-bold text-sm" style={{ color: severity.color }}>{severity.label}</p>
-                        <p className="text-xs text-slate-400">Priority triage for dispatchers</p>
-                      </div>
-                    </div>
-                  )
-                })()}
-              </CardContent>
-            </Card>
-
-            <div className="flex flex-col gap-3">
-              <Button
-                onClick={handleSubmit}
-                disabled={submitting}
-                className="w-full bg-red-600 hover:bg-red-700 text-white h-14 text-base font-bold shadow-lg shadow-red-500/30"
-              >
-                {submitting ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Submitting...
-                  </span>
-                ) : (
-                  <span className="flex items-center gap-2">
-                    <Shield className="w-5 h-5" />
-                    Submit Emergency Report
-                  </span>
-                )}
-              </Button>
-              <Button variant="outline" onClick={() => setStep('details')} className="border-slate-300 text-slate-700 h-11">
-                Back to Edit
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
+      
