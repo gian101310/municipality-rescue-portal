@@ -31,6 +31,11 @@ const TYPE_SCORES: Record<string, number> = {
   structure_collapse: 80,
   hazmat: 75,
   armed_conflict: 85,
+  domestic_abuse: 80,
+  kidnapping: 90,
+  hostage_situation: 95,
+  bank_robbery: 90,
+  stabbing: 90,
   missing_person: 40,
   other: 30,
 }

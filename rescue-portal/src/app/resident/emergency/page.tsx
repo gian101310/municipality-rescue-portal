@@ -18,7 +18,7 @@ import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
 // Emergency types fetched from API
 import { useSettings } from '@/lib/settings-context'
 import { toast } from 'sonner'
-import type { EmergencyType } from '@/lib/types'
+import type { EmergencyType, ReporterRole } from '@/lib/types'
 import { calculateSeverity, getSeverityRingProps } from '@/lib/severity-scoring'
 import { VoiceSOS } from '@/components/voice-sos'
 import { checkRateLimit, recordSubmission } from '@/lib/rate-limiter'
@@ -75,6 +75,9 @@ function EmergencyPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const ownerTestMode = isOwnerTestMode(searchParams)
+  const incomingIncidentId = searchParams.get('incident')
+  const incomingReference = searchParams.get('reference')
+  const isIncomingSos = Boolean(incomingIncidentId)
   const { settings } = useSettings()
   const [step, setStep] = useState<Step>('select')
   const [selectedType, setSelectedType] = useState<EmergencyType | null>(null)
@@ -84,7 +87,8 @@ function EmergencyPageContent() {
   const [locationGranted, setLocationGranted] = useState(false)
   const [location, setLocation] = useState<{ lat: number; lng: number; accuracy: number | null } | null>(null)
   const [submitting, setSubmitting] = useState(false)
-  const [refNumber, setRefNumber] = useState('')
+  const [refNumber, setRefNumber] = useState(incomingReference ?? '')
+  const [reporterRole, setReporterRole] = useState<ReporterRole | null>(null)
   const [emergencyTypes, setEmergencyTypes] = useState<EmergencyType[]>([])
   const [photos, setPhotos] = useState<File[]>([])
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
@@ -186,9 +190,10 @@ function EmergencyPageContent() {
   }
 
   async function handleSubmit() {
-    if (!description.trim()) { toast.error('Please describe the emergency'); return }
-    if (!locationGranted || !location) { toast.error('Please share your location first'); return }
     if (!selectedType) { toast.error('Please choose an emergency type'); return }
+    if (isIncomingSos && !reporterRole) { toast.error('Please choose whether you are the victim or a passerby'); return }
+    if (!isIncomingSos && !description.trim()) { toast.error('Please describe the emergency'); return }
+    if (!isIncomingSos && (!locationGranted || !location)) { toast.error('Please share your location first'); return }
 
     // Rate limiting
     const limit = checkRateLimit()
@@ -199,8 +204,11 @@ function EmergencyPageContent() {
 
     setSubmitting(true)
     try {
-      const response = await fetch(withOwnerTestMode('/api/resident/incidents', ownerTestMode), {
-        method: 'POST',
+      const response = await fetch(withOwnerTestMode(
+        isIncomingSos ? `/api/resident/incidents/${incomingIncidentId}` : '/api/resident/incidents',
+        ownerTestMode
+      ), {
+        method: isIncomingSos ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           emergency_type_id: selectedType.id,
@@ -211,9 +219,12 @@ function EmergencyPageContent() {
           description,
           affected_count: affectedCount,
           hazards: activeHazards,
-          latitude: location.lat,
-          longitude: location.lng,
-          gps_accuracy: location.accuracy,
+          reporter_role: reporterRole,
+          ...(isIncomingSos ? {} : {
+            latitude: location?.lat,
+            longitude: location?.lng,
+            gps_accuracy: location?.accuracy,
+          }),
         }),
       })
       const payload = await response.json().catch(() => ({}))
@@ -222,9 +233,9 @@ function EmergencyPageContent() {
         throw new Error(payload?.message ?? 'Unable to submit emergency report.')
       }
 
-      recordSubmission()
+      if (!isIncomingSos) recordSubmission()
       const incidentRef = payload?.referenceNumber ?? payload?.incident?.reference_number ?? 'Submitted'
-      const incidentId = payload?.incident?.id ?? payload?.incidentId
+      const incidentId = payload?.incident?.id ?? payload?.incidentId ?? incomingIncidentId
       setRefNumber(incidentRef)
       setStep('submitted')
 
@@ -350,9 +361,20 @@ function EmergencyPageContent() {
         {/* Step 1: Type Selection */}
         {step === 'select' && (
           <div>
+            {isIncomingSos && (
+              <Card className="mb-4 bg-red-50 border-red-200">
+                <CardContent className="p-4 flex items-start gap-3">
+                  <CheckCircle2 className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="font-semibold text-red-800">Location sent to dispatch</p>
+                    <p className="text-sm text-red-700">{refNumber ? `SOS ${refNumber} is incoming. ` : ''}You can safely add details now, but responders can already call and locate you.</p>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
             <p className="text-slate-500 text-sm mb-4">Select the type of emergency</p>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {emergencyTypes.map((et) => (
+              {emergencyTypes.filter((et) => et.name !== 'Emergency SOS').map((et) => (
                 <button
                   key={et.id}
                   onClick={() => selectType(et)}
@@ -391,10 +413,39 @@ function EmergencyPageContent() {
               </div>
             </div>
 
+            {isIncomingSos && (
+              <div>
+                <Label className="text-slate-700 font-semibold mb-2 block">Are you the victim or reporting for someone else?</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <Button
+                    type="button"
+                    variant={reporterRole === 'victim' ? 'default' : 'outline'}
+                    className={reporterRole === 'victim' ? 'bg-red-600 hover:bg-red-700 text-white' : 'border-slate-300 text-slate-700'}
+                    onClick={() => setReporterRole('victim')}
+                  >
+                    I am the victim
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={reporterRole === 'passerby' ? 'default' : 'outline'}
+                    className={reporterRole === 'passerby' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-slate-300 text-slate-700'}
+                    onClick={() => setReporterRole('passerby')}
+                  >
+                    I am a passerby
+                  </Button>
+                </div>
+              </div>
+            )}
+
             {/* Location */}
             <div>
               <Label className="text-slate-700 font-semibold mb-2 block">Location *</Label>
-              {!locationGranted ? (
+              {isIncomingSos ? (
+                <div className="flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                  <MapPin className="w-4 h-4 text-red-600" />
+                  <p className="text-sm text-red-700 font-medium">Location already sent to dispatch</p>
+                </div>
+              ) : !locationGranted ? (
                 <Button
                   onClick={requestLocation}
                   className="w-full bg-blue-600 hover:bg-blue-700 text-white h-12"
@@ -411,10 +462,12 @@ function EmergencyPageContent() {
 
             {/* Description */}
             <div>
-              <Label htmlFor="desc" className="text-slate-700 font-semibold mb-2 block">Describe the emergency *</Label>
+              <Label htmlFor="desc" className="text-slate-700 font-semibold mb-2 block">Describe the emergency{isIncomingSos ? ' (optional)' : ' *'}</Label>
               <Textarea
                 id="desc"
-                placeholder="What is happening? Include any important details about the situation, number of people involved, hazards, etc."
+                placeholder={isIncomingSos && reporterRole === 'victim'
+                  ? 'Description is optional—leave this blank if it is unsafe to type.'
+                  : 'What is happening? Include any important details about the situation, number of people involved, hazards, etc.'}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 className="min-h-[100px] border-slate-300"
@@ -515,7 +568,7 @@ function EmergencyPageContent() {
             <Button
               onClick={() => setStep('confirm')}
               className="w-full bg-red-600 hover:bg-red-700 text-white h-12 font-semibold"
-              disabled={!description.trim() || !locationGranted}
+              disabled={isIncomingSos ? !reporterRole : !description.trim() || !locationGranted}
             >
               Continue to Confirm
               <ChevronRight className="w-4 h-4 ml-1" />
@@ -547,8 +600,14 @@ function EmergencyPageContent() {
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Description</p>
-                  <p className="text-sm text-slate-800">{description}</p>
+                  <p className="text-sm text-slate-800">{description || 'No description provided'}</p>
                 </div>
+                {isIncomingSos && reporterRole && (
+                  <div>
+                    <p className="text-xs text-slate-500">Reporting as</p>
+                    <p className="text-sm text-slate-800 font-medium">{reporterRole === 'victim' ? 'Victim' : 'Passerby'}</p>
+                  </div>
+                )}
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   <div>
                     <p className="text-slate-500">Affected</p>

@@ -4,6 +4,7 @@ import { calculateSeverity } from '@/lib/severity-scoring'
 import {
   buildIncidentReference,
   mapEmergencyTypeToSeverityKey,
+  type ReporterRole,
   validateIncidentSubmission,
 } from '@/lib/incident-submission'
 import { attachEmergencyTypes } from '@/lib/incident-presentation'
@@ -193,6 +194,7 @@ export async function POST(request: Request) {
     const typeId = clean(body?.emergency_type_id)
     const typeName = clean(body?.emergency_type_name)
     const description = clean(body?.description)
+    const reporterRole = clean(body?.reporter_role) as ReporterRole | ''
     const affectedCount = Math.max(0, Number(body?.affected_count ?? 1) || 0)
     const latitude = Number(body?.latitude)
     const longitude = Number(body?.longitude)
@@ -208,6 +210,10 @@ export async function POST(request: Request) {
 
     if (!validation.ok) {
       return NextResponse.json({ message: validation.message }, { status: 400 })
+    }
+
+    if (reporterRole && reporterRole !== 'victim' && reporterRole !== 'passerby') {
+      return NextResponse.json({ message: 'Choose whether you are the victim or a passerby.' }, { status: 400 })
     }
 
     const admin = await createAdminClient() as unknown as SupabaseDataClient
@@ -228,9 +234,11 @@ export async function POST(request: Request) {
       reporter_id: auth.profile.user_id,
       reporter_name: auth.profile.full_name,
       reporter_phone: auth.profile.phone,
+      reporter_role: reporterRole || null,
       emergency_type_id: emergencyType.id,
       severity: severity.level,
       status: 'submitted',
+      intake_state: 'details_received',
       description,
       affected_count: affectedCount,
       has_unconscious: hazards.has_unconscious,

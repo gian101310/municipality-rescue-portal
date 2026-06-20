@@ -14,6 +14,22 @@ type ValidationResult =
 export type ReporterRole = 'victim' | 'passerby'
 export type IntakeState = 'incoming' | 'details_received'
 
+type IncomingSosLocation = {
+  latitude: number
+  longitude: number
+  gpsAccuracy: number | null
+}
+
+type IncomingSosContext = {
+  organizationId: string
+  reporterId: string
+  reporterName: string
+  reporterPhone: string | null
+  emergencyTypeId: string
+  referenceNumber: string
+  createdAt: string
+}
+
 const emergencyTypeAliases: Record<string, string> = {
   'et-fire': 'fire',
   'et-flood': 'flood',
@@ -56,6 +72,33 @@ export function validateIncomingSosLocation(input: {
   return { ok: true }
 }
 
+export function buildIncomingSosPayload(location: IncomingSosLocation, context: IncomingSosContext) {
+  return {
+    reference_number: context.referenceNumber,
+    organization_id: context.organizationId,
+    reporter_id: context.reporterId,
+    reporter_name: context.reporterName,
+    reporter_phone: context.reporterPhone,
+    emergency_type_id: context.emergencyTypeId,
+    severity: 'critical',
+    status: 'submitted',
+    intake_state: 'incoming',
+    description: '',
+    affected_count: 1,
+    has_unconscious: false,
+    has_fire: false,
+    has_flooding: false,
+    has_violence: false,
+    latitude: location.latitude,
+    longitude: location.longitude,
+    gps_accuracy: location.gpsAccuracy,
+    is_anonymous: false,
+    is_drill: false,
+    created_at: context.createdAt,
+    updated_at: context.createdAt,
+  }
+}
+
 export function mapEmergencyTypeToSeverityKey(typeId: string, typeName: string) {
   if (emergencyTypeAliases[typeId]) return emergencyTypeAliases[typeId]
 
@@ -69,6 +112,11 @@ export function mapEmergencyTypeToSeverityKey(typeId: string, typeName: string) 
   if (normalizedName.includes('landslide')) return 'landslide'
   if (normalizedName.includes('collapse')) return 'structure_collapse'
   if (normalizedName.includes('hazmat') || normalizedName.includes('chemical')) return 'hazmat'
+  if (normalizedName.includes('domestic abuse')) return 'domestic_abuse'
+  if (normalizedName.includes('kidnap')) return 'kidnapping'
+  if (normalizedName.includes('hostage')) return 'hostage_situation'
+  if (normalizedName.includes('bank robbery')) return 'bank_robbery'
+  if (normalizedName.includes('stabbing') || normalizedName.includes('stabbed')) return 'stabbing'
   if (normalizedName.includes('crime') || normalizedName.includes('violence')) return 'armed_conflict'
 
   return 'other'

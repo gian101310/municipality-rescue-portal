@@ -149,9 +149,10 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
               </div>
               <SeverityBadge severity={incident.severity} />
               <IncidentStatusBadge status={incident.status} />
+              {incident.intake_state === 'incoming' && <Badge className="border-red-500/40 bg-red-500/15 text-xs text-red-300 animate-pulse">Incoming SOS · details pending</Badge>}
             </div>
           </div>
-          <p className="text-slate-400 text-sm">{incident.description.slice(0, 100)}{incident.description.length > 100 ? '…' : ''}</p>
+          <p className="text-slate-400 text-sm">{incident.description ? `${incident.description.slice(0, 100)}${incident.description.length > 100 ? '…' : ''}` : 'No description provided'}</p>
         </div>
       </div>
 
@@ -176,6 +177,11 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
                     <Badge className="text-xs border-0 bg-green-600/20 text-green-400">
                       Verified Resident
                     </Badge>
+                    {incident.reporter_role && (
+                      <Badge className="text-xs border-0 bg-blue-600/20 text-blue-300">
+                        {incident.reporter_role === 'victim' ? 'Victim' : 'Passerby'}
+                      </Badge>
+                    )}
                   </div>
                 </div>
                 <div className="flex gap-2">
@@ -251,7 +257,7 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
             <CardContent className="space-y-4">
               <div>
                 <p className="text-xs text-slate-500 mb-1">Description</p>
-                <p className="text-sm text-slate-300 leading-relaxed">{incident.description}</p>
+                <p className="text-sm text-slate-300 leading-relaxed">{incident.description || 'No description provided'}</p>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="bg-slate-800 rounded-lg p-3 text-center">

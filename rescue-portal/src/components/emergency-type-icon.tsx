@@ -10,6 +10,11 @@ import {
   PawPrint,
   CloudLightning,
   AlertTriangle,
+  Siren,
+  House,
+  Search,
+  Landmark,
+  Cross,
   type LucideProps,
 } from 'lucide-react'
 
@@ -25,6 +30,11 @@ const ICON_MAP: Record<string, React.FC<LucideProps>> = {
   PawPrint,
   CloudLightning,
   AlertTriangle,
+  Siren,
+  House,
+  Search,
+  Landmark,
+  Cross,
 }
 
 interface EmergencyTypeIconProps extends LucideProps {

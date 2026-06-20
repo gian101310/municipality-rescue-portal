@@ -186,6 +186,11 @@ export default function IncidentsPage() {
                             TEST DRILL
                           </Badge>
                         )}
+                        {inc.intake_state === 'incoming' && (
+                          <Badge className="border-red-500/40 bg-red-500/15 text-[10px] text-red-300 animate-pulse">
+                            INCOMING SOS
+                          </Badge>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3">
@@ -207,7 +212,10 @@ export default function IncidentsPage() {
                         {inc.address && <p className="text-slate-500 truncate max-w-[120px]">{inc.address}</p>}
                       </div>
                     </td>
-                    <td className="px-4 py-3"><IncidentStatusBadge status={inc.status} /></td>
+                    <td className="px-4 py-3">
+                      <IncidentStatusBadge status={inc.status} />
+                      {inc.intake_state === 'incoming' && <p className="mt-1 text-[10px] text-red-300">Details pending</p>}
+                    </td>
                     <td className="px-4 py-3">
                       <span className="text-xs text-slate-400">{inc.assigned_unit_name || '—'}</span>
                     </td>

@@ -374,6 +374,9 @@ export default function CommandCenterPage() {
                         <tr key={incident.id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
                           <td className="px-4 py-3">
                             <span className="font-mono text-xs text-slate-300">{incident.reference_number?.split('-').slice(-1)[0]}</span>
+                            {incident.intake_state === 'incoming' && (
+                              <span className="mt-1 block text-[10px] font-bold uppercase tracking-wide text-red-300 animate-pulse">Incoming SOS</span>
+                            )}
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1.5">
@@ -397,7 +400,10 @@ export default function CommandCenterPage() {
                             <span className="text-xs text-slate-400">{incident.barangay}</span>
                           </td>
                           <td className="px-4 py-3">
-                            <IncidentStatusBadge status={incident.status} />
+                            <div className="space-y-1">
+                              <IncidentStatusBadge status={incident.status} />
+                              {incident.intake_state === 'incoming' && <p className="text-[10px] text-red-300">Location received · details pending</p>}
+                            </div>
                           </td>
                           <td className="px-4 py-3 hidden lg:table-cell">
                             <span className="text-xs text-slate-500">{formatRelativeTime(incident.created_at)}</span>

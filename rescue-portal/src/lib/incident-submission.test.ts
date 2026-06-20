@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { describe, it } from 'node:test'
 import {
+  buildIncomingSosPayload,
   buildIncidentReference,
   mapEmergencyTypeToSeverityKey,
   validateIncomingSosLocation,
@@ -28,6 +29,24 @@ describe('incident submission helpers', () => {
     )
   })
 
+  it('builds a critical incoming SOS without trusting resident data from the browser', () => {
+    const payload = buildIncomingSosPayload({ latitude: 14.1, longitude: 121.2, gpsAccuracy: 8 }, {
+      organizationId: 'org-1',
+      reporterId: 'resident-1',
+      reporterName: 'Alex Resident',
+      reporterPhone: '+639171234567',
+      emergencyTypeId: 'sos-type',
+      referenceNumber: 'INC-20260621-000001',
+      createdAt: '2026-06-21T10:00:00.000Z',
+    })
+
+    assert.equal(payload.status, 'submitted')
+    assert.equal(payload.severity, 'critical')
+    assert.equal(payload.intake_state, 'incoming')
+    assert.equal(payload.reporter_name, 'Alex Resident')
+    assert.equal(payload.description, '')
+  })
+
   it('rejects an SOS handoff without both GPS coordinates', () => {
     const result = validateIncomingSosLocation({ latitude: null, longitude: 121.243 })
 
@@ -53,6 +72,9 @@ describe('incident submission helpers', () => {
     assert.equal(mapEmergencyTypeToSeverityKey('et-fire', 'Fire'), 'fire')
     assert.equal(mapEmergencyTypeToSeverityKey('et-collapse', 'Structure Collapse'), 'structure_collapse')
     assert.equal(mapEmergencyTypeToSeverityKey('unknown', 'Medical Emergency'), 'medical')
+    assert.equal(mapEmergencyTypeToSeverityKey('unknown', 'Domestic Abuse'), 'domestic_abuse')
+    assert.equal(mapEmergencyTypeToSeverityKey('unknown', 'Hostage Situation'), 'hostage_situation')
+    assert.equal(mapEmergencyTypeToSeverityKey('unknown', 'Stabbing'), 'stabbing')
   })
 
   it('builds production incident reference numbers with date and six digit sequence', () => {

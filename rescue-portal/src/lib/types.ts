@@ -35,6 +35,10 @@ export type IncidentStatus =
 
 export type SeverityLevel = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
+export type ReporterRole = 'victim' | 'passerby';
+
+export type IncidentIntakeState = 'incoming' | 'details_received';
+
 export type RegistrationStatus =
   | 'draft'
   | 'submitted'
@@ -266,10 +270,12 @@ export interface Incident {
   reporter_id: string | null; // null = anonymous
   reporter_name: string | null; // denormalized for quick display
   reporter_phone: string | null;
+  reporter_role?: ReporterRole | null;
   emergency_type_id: string;
   emergency_type: EmergencyType | null; // joined
   severity: SeverityLevel;
   status: IncidentStatus;
+  intake_state?: IncidentIntakeState;
   description: string;
   affected_count: number;
   has_unconscious: boolean;

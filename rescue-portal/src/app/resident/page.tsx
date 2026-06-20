@@ -2,7 +2,7 @@
 
 import { Suspense, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Shield, Phone, AlertTriangle, Clock, ChevronRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
@@ -25,11 +25,13 @@ export default function ResidentDashboard() {
 function ResidentDashboardContent() {
   const { settings } = useSettings()
   const searchParams = useSearchParams()
+  const router = useRouter()
   const ownerTestMode = isOwnerTestMode(searchParams)
   const [residentName, setResidentName] = useState('Resident')
   const [residentLocation, setResidentLocation] = useState('')
   const [myIncidents, setMyIncidents] = useState<DemoIncident[]>([])
   const [loadingIncidents, setLoadingIncidents] = useState(true)
+  const [sendingSos, setSendingSos] = useState(false)
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const activeIncident = useMemo(
@@ -77,6 +79,47 @@ function ResidentDashboardContent() {
     return () => window.clearTimeout(timer)
   }, [ownerTestMode])
 
+  function sendSos() {
+    if (!navigator.geolocation) {
+      toast.error('This browser cannot share location. Call the emergency hotline now.')
+      return
+    }
+
+    setSendingSos(true)
+    navigator.geolocation.getCurrentPosition(
+      async (position) => {
+        try {
+          const response = await fetch(withOwnerTestMode('/api/resident/incidents/sos', ownerTestMode), {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              latitude: position.coords.latitude,
+              longitude: position.coords.longitude,
+              gps_accuracy: position.coords.accuracy,
+            }),
+          })
+          const payload = await response.json().catch(() => ({}))
+
+          if (!response.ok) throw new Error(payload?.message ?? 'Unable to send SOS.')
+
+          const incidentId = payload?.incident?.id
+          if (!incidentId) throw new Error('SOS was sent but no incident reference was returned.')
+
+          const reference = encodeURIComponent(payload?.referenceNumber ?? payload?.incident?.reference_number ?? '')
+          router.push(withOwnerTestMode(`/resident/emergency?incident=${encodeURIComponent(incidentId)}&reference=${reference}`, ownerTestMode))
+        } catch (error) {
+          toast.error(error instanceof Error ? error.message : 'Unable to send SOS.')
+          setSendingSos(false)
+        }
+      },
+      () => {
+        setSendingSos(false)
+        toast.error('Location is required to send SOS. Please allow location access and try again.')
+      },
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+    )
+  }
+
   return (
     <div className="px-4 py-6 space-y-6">
       <div>
@@ -86,17 +129,17 @@ function ResidentDashboardContent() {
       </div>
 
       <div className="flex flex-col items-center py-6">
-        <Link href={withOwnerTestMode('/resident/emergency', ownerTestMode)} className="group">
+        <button type="button" onClick={sendSos} disabled={sendingSos} className="group disabled:cursor-wait disabled:opacity-70">
           <div className="relative">
             <div className="absolute inset-0 rounded-full bg-red-500/20 scale-125 group-hover:scale-150 transition-transform duration-700 animate-ping" />
             <div className="absolute inset-0 rounded-full bg-red-500/10 scale-150 group-hover:scale-175 transition-transform duration-1000 animate-ping" style={{ animationDelay: '200ms' }} />
-            <button className="relative w-36 h-36 rounded-full bg-red-600 hover:bg-red-700 active:scale-95 transition-all shadow-2xl shadow-red-500/40 flex flex-col items-center justify-center text-white">
+            <span className="relative w-36 h-36 rounded-full bg-red-600 group-hover:bg-red-700 group-active:scale-95 transition-all shadow-2xl shadow-red-500/40 flex flex-col items-center justify-center text-white">
               <Shield className="w-10 h-10 mb-1" />
-              <span className="text-xl font-black tracking-wide">SOS</span>
-            </button>
+              <span className="text-xl font-black tracking-wide">{sendingSos ? 'SENDING' : 'SOS'}</span>
+            </span>
           </div>
-        </Link>
-        <p className="text-slate-500 text-sm mt-4">Tap to report an emergency</p>
+        </button>
+        <p className="text-slate-500 text-sm mt-4">{sendingSos ? 'Sending your location to dispatch…' : 'Tap to send your location to dispatch'}</p>
       </div>
 
       {activeIncident && (

@@ -81,7 +81,7 @@ export async function GET() {
     // Fetch all incidents for this organization
     const { data: allIncidents } = await admin
       .from('incidents')
-      .select('id, status, severity, created_at, reference_number, reporter_name, reporter_phone, description, latitude, longitude, gps_accuracy, address, barangay, municipality, emergency_type_id, affected_count, has_unconscious, has_fire, has_flooding, has_violence, assigned_unit_id, reporter_id, updated_at, verified_at, dispatched_at, arrived_at, resolved_at, resolution_notes')
+      .select('id, status, severity, created_at, reference_number, reporter_name, reporter_phone, reporter_role, intake_state, description, latitude, longitude, gps_accuracy, address, barangay, municipality, emergency_type_id, affected_count, has_unconscious, has_fire, has_flooding, has_violence, assigned_unit_id, reporter_id, updated_at, verified_at, dispatched_at, arrived_at, resolved_at, resolution_notes')
       .eq('organization_id', orgId)
       .order('created_at', { ascending: false }) as QueryResult<Record<string, unknown>[]>
 
