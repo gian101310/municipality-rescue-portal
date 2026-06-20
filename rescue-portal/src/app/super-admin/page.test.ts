@@ -13,3 +13,8 @@ test('super admin tenant editor exposes the editable settings without credential
   assert.match(page, /Pencil/)
   assert.match(page, /!editingTenant && \(/)
 })
+
+test('super admin tenant editor keeps province-independent cities selectable', () => {
+  assert.match(page, /locality\.provinceCode === null/)
+  assert.doesNotMatch(page, /disabled=\{!tenantForm\.provinceCode\}/)
+})

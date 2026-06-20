@@ -28,3 +28,20 @@
 
 - A full-repository `pnpm lint` still reports pre-existing errors in unrelated admin map/dashboard/responder/realtime files. The targeted lint for the edited page and its test is clean.
 - A browser interaction check is not practical without an authenticated Super Admin session and tenant API data. The implemented page compiles through the production Next build; the automated source-level regression test verifies the editor controls, returned-field type support, edit action, and credential gating.
+
+## P1 follow-up — province-independent cities
+
+### Root cause and correction
+
+- The Philippines geography catalogue represents province-independent cities such as City of Manila, City of Makati, and Quezon City with `provinceCode: null`.
+- The editor previously disabled the locality selector whenever `provinceCode` was an empty string and filtered with `locality.provinceCode === tenantForm.provinceCode`; that excluded `null` catalogue entries even though editor prefill had preserved their locality code.
+- The selector is now always available. With no province selected, it lists localities whose `provinceCode === null`; with a province selected, it continues listing only that province's localities. The empty province option is labelled `Province-independent city...`, allowing a Super Admin to return to this city set.
+- This preserves an independent city's returned `municipalityCode` in the prefilled edit dialog and gives it a matching rendered option.
+
+### P1 regression and verification
+
+1. Added a regression case to `rescue-portal/src/app/super-admin/page.test.ts` first; it failed before the selector logic changed because the `null` branch was absent.
+2. `node --test src/app/super-admin/page.test.ts` — passed (2/2) after the fix.
+3. `pnpm exec eslint src/app/super-admin/page.tsx src/app/super-admin/page.test.ts` — passed.
+4. `pnpm build` — passed (Next.js compilation, TypeScript validation, and static route generation).
+5. `git diff --check` — passed.

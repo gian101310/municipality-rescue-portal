@@ -437,6 +437,12 @@ export default function SuperAdminPage() {
     suspended: tenants.filter((t) => t.status === 'suspended').length,
   }
 
+  const localitiesForSelectedProvince = PH_LOCALITIES.filter((locality) => (
+    tenantForm.provinceCode
+      ? locality.provinceCode === tenantForm.provinceCode
+      : locality.provinceCode === null
+  ))
+
   return (
     <div className="min-h-screen bg-slate-950">
       {/* Header */}
@@ -757,7 +763,7 @@ export default function SuperAdminPage() {
                     onChange={(event) => updateTenantForm('provinceCode', event.target.value)}
                     className="h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 text-sm text-white outline-none focus:border-amber-500"
                   >
-                    <option value="">Choose province...</option>
+                    <option value="">Province-independent city...</option>
                     {PH_PROVINCES.map((province) => (
                       <option key={province.code} value={province.code}>{province.name}</option>
                     ))}
@@ -770,15 +776,12 @@ export default function SuperAdminPage() {
                     id="tenant-municipality"
                     value={tenantForm.municipalityCode}
                     onChange={(event) => updateTenantForm('municipalityCode', event.target.value)}
-                    disabled={!tenantForm.provinceCode}
-                    className="h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 text-sm text-white outline-none focus:border-amber-500 disabled:opacity-50"
+                    className="h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 text-sm text-white outline-none focus:border-amber-500"
                   >
                     <option value="">Choose city or municipality...</option>
-                    {PH_LOCALITIES
-                      .filter((locality) => locality.provinceCode === tenantForm.provinceCode)
-                      .map((locality) => (
+                    {localitiesForSelectedProvince.map((locality) => (
                         <option key={locality.code} value={locality.code}>{getLocalityLabel(locality)}</option>
-                      ))}
+                    ))}
                   </select>
                 </div>
               </div>
