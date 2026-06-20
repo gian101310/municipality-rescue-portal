@@ -422,9 +422,11 @@ export async function POST(request: Request) {
       verified_at: new Date().toISOString(),
     }
 
+    // Use upsert because the handle_new_auth_user trigger may have already
+    // inserted a row for this user_id with default values.
     const { error: profileError } = await dataAdmin
       .from('user_profiles')
-      .insert(adminProfilePayload) as QueryResult<unknown>
+      .upsert(adminProfilePayload, { onConflict: 'user_id' }) as QueryResult<unknown>
 
     if (profileError) throw new Error(profileError.message ?? 'Unable to create municipality admin profile.')
 

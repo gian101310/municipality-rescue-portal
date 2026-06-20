@@ -1,0 +1,363 @@
+Exit code: 0
+Wall time: 0.2 seconds
+Output:
+diff --git a/.superpowers/sdd/task-4-report.md b/.superpowers/sdd/task-4-report.md
+new file mode 100644
+index 0000000..2ac6e7b
+--- /dev/null
++++ b/.superpowers/sdd/task-4-report.md
+@@ -0,0 +1,30 @@
++# Task 4 Report
++## Task 4 — Super Admin tenant settings editor
++
++### Scope completed
++
++- Added `emergency_hotline` and `admin_full_name` to the client-side `Tenant` type, matching the completed tenant API response.
++- Added an Edit (`Pencil`) icon control to every desktop tenant row and every mobile tenant card.
++- Added `openTenantEditor`, which pre-fills the existing municipality form from the selected returned row and derives PSGC province/locality codes by matching the returned province and municipality names against `PH_PROVINCES` and `PH_LOCALITIES`.
++- Reused the add-client dialog as an edit dialog. Its edit title is **Edit Client Municipality** and it exposes name, slug, contact email, hotline, province, municipality, admin full name/email, plan, and status.
++- The edit state never renders the temporary-password or settings-secret-key fields. Those remain create-only inputs; the existing separate password and secret-key actions remain unchanged.
++- Added `handleEditTenant`, which PATCHes `/api/super-admin/tenants` with `tenantId`, `action: 'edit'`, and an explicit allow-list of editable values. It does not include password or master-key fields.
++- `patchTenant` now reports success to the edit handler while preserving existing action behavior. It replaces the updated tenant row from the API response, shows a success/error toast, and closes the editor only after a successful save.
++
++### TDD evidence
++
++1. Added `rescue-portal/src/app/super-admin/page.test.ts` before UI implementation.
++2. Ran `node --test src/app/super-admin/page.test.ts` before production code. It failed as expected because `Edit Client Municipality` was absent.
++3. Implemented the editor UI and re-ran the same test. Latest result: 1 pass, 0 failures. Node emits its existing module-type warning for `.ts` tests but the assertion run is successful.
++
++### Verification evidence
++
++- `node --test src/app/super-admin/page.test.ts` — passed (1/1).
++- `pnpm exec eslint src/app/super-admin/page.tsx src/app/super-admin/page.test.ts` — passed with no output/errors.
++- `pnpm build` — passed. Next.js 16.2.9 completed compilation, TypeScript validation, route generation, and production optimization.
++- `git diff --check` — passed with no whitespace errors.
++
++### Known workspace context
++
++- A full-repository `pnpm lint` still reports pre-existing errors in unrelated admin map/dashboard/responder/realtime files. The targeted lint for the edited page and its test is clean.
++- A browser interaction check is not practical without an authenticated Super Admin session and tenant API data. The implemented page compiles through the production Next build; the automated source-level regression test verifies the editor controls, returned-field type support, edit action, and credential gating.
+diff --git a/rescue-portal/src/app/super-admin/page.test.ts b/rescue-portal/src/app/super-admin/page.test.ts
+new file mode 100644
+index 0000000..38ea8a3
+--- /dev/null
++++ b/rescue-portal/src/app/super-admin/page.test.ts
+@@ -0,0 +1,15 @@
++import test from 'node:test'
++import assert from 'node:assert/strict'
++import { readFileSync } from 'node:fs'
++
++const page = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
++
++test('super admin tenant editor exposes the editable settings without credentials', () => {
++  assert.match(page, /Edit Client Municipality/)
++  assert.match(page, /action: 'edit'/)
++  assert.match(page, /emergency_hotline/)
++  assert.match(page, /admin_full_name/)
++  assert.match(page, /openTenantEditor/)
++  assert.match(page, /Pencil/)
++  assert.match(page, /!editingTenant && \(/)
++})
+diff --git a/rescue-portal/src/app/super-admin/page.tsx b/rescue-portal/src/app/super-admin/page.tsx
+index a9168b9..109c66d 100644
+--- a/rescue-portal/src/app/super-admin/page.tsx
++++ b/rescue-portal/src/app/super-admin/page.tsx
+@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, type FormEvent } from 'react'
+ import { useRouter } from 'next/navigation'
+ import {
+   Shield, Building2, Plus, Search,
+-  Lock, Eye, EyeOff, CheckCircle2, XCircle, Clock, LogOut, Loader2, X, KeyRound, UserX, ExternalLink, Trash2, LogIn
++  Lock, Eye, EyeOff, CheckCircle2, XCircle, Clock, LogOut, Loader2, X, KeyRound, UserX, ExternalLink, Trash2, LogIn, Pencil
+ } from 'lucide-react'
+ import { Button } from '@/components/ui/button'
+ import { Card, CardContent } from '@/components/ui/card'
+@@ -26,9 +26,11 @@ interface Tenant {
+   region: string
+   municipality: string
+   plan: TenantPlan
+-  status: TenantStatus
+-  contact_email: string
+-  admin_email: string
++  status: TenantStatus
++  contact_email: string
++  emergency_hotline: string
++  admin_email: string
++  admin_full_name: string
+   admin_user_id: string | null
+   master_key_configured: boolean
+   created_at: string
+@@ -84,8 +86,9 @@ export default function SuperAdminPage() {
+   const [authorized, setAuthorized] = useState(false)
+   const [userName, setUserName] = useState('')
+   const [search, setSearch] = useState('')
+-  const [tenants, setTenants] = useState<Tenant[]>([])
+-  const [addOpen, setAddOpen] = useState(false)
++  const [tenants, setTenants] = useState<Tenant[]>([])
++  const [addOpen, setAddOpen] = useState(false)
++  const [editingTenant, setEditingTenant] = useState<Tenant | null>(null)
+   const [tenantForm, setTenantForm] = useState<TenantForm>(initialTenantForm)
+   const [tenantSaving, setTenantSaving] = useState(false)
+   const [showAdminPassword, setShowAdminPassword] = useState(false)
+@@ -182,13 +185,42 @@ export default function SuperAdminPage() {
+     })
+   }
+ 
+-  function replaceTenant(updatedTenant: Tenant) {
++  function replaceTenant(updatedTenant: Tenant) {
+     setTenants((current) => current.map((tenant) => (
+       tenant.id === updatedTenant.id ? updatedTenant : tenant
+     )))
+-  }
++  }
++
++  function openTenantEditor(tenant: Tenant) {
++    const province = PH_PROVINCES.find((item) => item.name === tenant.province)
++    const locality = PH_LOCALITIES.find((item) => (
++      item.name === tenant.municipality && (!province || item.provinceCode === province.code)
++    )) ?? PH_LOCALITIES.find((item) => item.name === tenant.municipality)
++
++    setTenantForm({
++      name: tenant.name,
++      slug: tenant.slug,
++      contactEmail: tenant.contact_email,
++      emergencyHotline: tenant.emergency_hotline,
++      adminFullName: tenant.admin_full_name,
++      adminEmail: tenant.admin_email,
++      adminPassword: '',
++      masterKey: '',
++      provinceCode: province?.code ?? locality?.provinceCode ?? '',
++      municipalityCode: locality?.code ?? '',
++      plan: tenant.plan,
++      status: tenant.status,
++    })
++    setEditingTenant(tenant)
++  }
++
++  function closeTenantDialog() {
++    setAddOpen(false)
++    setEditingTenant(null)
++    setTenantForm(initialTenantForm)
++  }
+ 
+-  async function patchTenant(tenant: Tenant, body: Record<string, unknown>, successMessage: string) {
++  async function patchTenant(tenant: Tenant, body: Record<string, unknown>, successMessage: string) {
+     setActionLoading(`${tenant.id}:${String(body.action)}`)
+     try {
+       const response = await fetch('/api/super-admin/tenants', {
+@@ -202,10 +234,12 @@ export default function SuperAdminPage() {
+         throw new Error(payload?.message ?? 'Unable to update client municipality.')
+       }
+ 
+-      if (payload.tenant) replaceTenant(payload.tenant as Tenant)
+-      toast.success(successMessage)
+-    } catch (error) {
+-      toast.error(error instanceof Error ? error.message : 'Unable to update client municipality.')
++      if (payload.tenant) replaceTenant(payload.tenant as Tenant)
++      toast.success(successMessage)
++      return true
++    } catch (error) {
++      toast.error(error instanceof Error ? error.message : 'Unable to update client municipality.')
++      return false
+     } finally {
+       setActionLoading(null)
+     }
+@@ -301,7 +335,7 @@ export default function SuperAdminPage() {
+     }
+   }
+ 
+-  async function handleCreateTenant(event: FormEvent<HTMLFormElement>) {
++  async function handleCreateTenant(event: FormEvent<HTMLFormElement>) {
+     event.preventDefault()
+ 
+     if (!tenantForm.municipalityCode) {
+@@ -344,7 +378,38 @@ export default function SuperAdminPage() {
+     } finally {
+       setTenantSaving(false)
+     }
+-  }
++  }
++
++  async function handleEditTenant(event: FormEvent<HTMLFormElement>) {
++    event.preventDefault()
++
++    if (!editingTenant) return
++    if (!tenantForm.municipalityCode) {
++      toast.error('Choose the tenant municipality first.')
++      return
++    }
++
++    setTenantSaving(true)
++    try {
++      const saved = await patchTenant(editingTenant, {
++        action: 'edit',
++        name: tenantForm.name,
++        slug: tenantForm.slug,
++        contactEmail: tenantForm.contactEmail,
++        emergencyHotline: tenantForm.emergencyHotline,
++        adminFullName: tenantForm.adminFullName,
++        adminEmail: tenantForm.adminEmail,
++        provinceCode: tenantForm.provinceCode,
++        municipalityCode: tenantForm.municipalityCode,
++        plan: tenantForm.plan,
++        status: tenantForm.status,
++      }, 'Client municipality updated')
++
++      if (saved) closeTenantDialog()
++    } finally {
++      setTenantSaving(false)
++    }
++  }
+ 
+   if (loading) {
+     return (
+@@ -391,7 +456,11 @@ export default function SuperAdminPage() {
+               <ExternalLink className="w-4 h-4 sm:mr-1" />
+               <span className="hidden sm:inline">View Landing Page</span>
+             </Button>
+-            <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white px-2.5 sm:px-3" onClick={() => setAddOpen(true)}>
++            <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white px-2.5 sm:px-3" onClick={() => {
++              setTenantForm(initialTenantForm)
++              setEditingTenant(null)
++              setAddOpen(true)
++            }}>
+               <Plus className="w-4 h-4 sm:mr-1" /> <span className="hidden sm:inline">Add Client</span>
+             </Button>
+             <Button size="sm" variant="ghost" className="text-slate-400 hover:text-white px-2.5 sm:px-3" onClick={handleSignOut}>
+@@ -507,8 +576,11 @@ export default function SuperAdminPage() {
+                         </span>
+                       </td>
+                       <td className="px-4 py-3">
+-                        <div className="flex items-center gap-1">
+-                          <Button variant="ghost" size="sm" className="text-emerald-400 hover:text-emerald-300 h-8 w-8 p-0" title="Login as this tenant's admin" disabled={Boolean(actionLoading) || !tenant.admin_user_id} onClick={() => handleLoginAsAdmin(tenant)}>
++                        <div className="flex items-center gap-1">
++                          <Button variant="ghost" size="sm" className="text-amber-300 hover:text-amber-200 h-8 w-8 p-0" title="Edit client municipality" disabled={Boolean(actionLoading)} onClick={() => openTenantEditor(tenant)}>
++                            <Pencil className="w-4 h-4" />
++                          </Button>
++                          <Button variant="ghost" size="sm" className="text-emerald-400 hover:text-emerald-300 h-8 w-8 p-0" title="Login as this tenant's admin" disabled={Boolean(actionLoading) || !tenant.admin_user_id} onClick={() => handleLoginAsAdmin(tenant)}>
+                             <LogIn className="w-4 h-4" />
+                           </Button>
+                           <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white h-8 w-8 p-0" title="View client" onClick={() => toast.info(`Viewing ${tenant.name}`)}>
+@@ -594,8 +666,11 @@ export default function SuperAdminPage() {
+                     </span>
+                   </div>
+ 
+-                  <div className="flex items-center gap-1 border-t border-slate-800 pt-3">
+-                    <Button variant="ghost" size="sm" className="text-emerald-400 hover:text-emerald-300 h-8 w-8 p-0" title="Login as this tenant's admin" disabled={Boolean(actionLoading) || !tenant.admin_user_id} onClick={() => handleLoginAsAdmin(tenant)}>
++                  <div className="flex items-center gap-1 border-t border-slate-800 pt-3">
++                    <Button variant="ghost" size="sm" className="text-amber-300 hover:text-amber-200 h-8 w-8 p-0" title="Edit client municipality" disabled={Boolean(actionLoading)} onClick={() => openTenantEditor(tenant)}>
++                      <Pencil className="w-4 h-4" />
++                    </Button>
++                    <Button variant="ghost" size="sm" className="text-emerald-400 hover:text-emerald-300 h-8 w-8 p-0" title="Login as this tenant's admin" disabled={Boolean(actionLoading) || !tenant.admin_user_id} onClick={() => handleLoginAsAdmin(tenant)}>
+                       <LogIn className="w-4 h-4" />
+                     </Button>
+                     <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white h-8 w-8 p-0" title="View client" onClick={() => toast.info(`Viewing ${tenant.name}`)}>
+@@ -652,17 +727,19 @@ export default function SuperAdminPage() {
+         </Card>
+       </div>
+ 
+-      {addOpen && (
++      {(addOpen || editingTenant) && (
+         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+           <div className="w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 shadow-2xl">
+             <div className="flex items-start justify-between border-b border-slate-800 p-5">
+               <div>
+-                <h2 className="text-lg font-bold text-white">Add Client Municipality</h2>
+-                <p className="mt-1 text-sm text-slate-400">Create a locked municipality account for an authorized client.</p>
++                <h2 className="text-lg font-bold text-white">{editingTenant ? 'Edit Client Municipality' : 'Add Client Municipality'}</h2>
++                <p className="mt-1 text-sm text-slate-400">
++                  {editingTenant ? 'Update the client settings and municipality admin details.' : 'Create a locked municipality account for an authorized client.'}
++                </p>
+               </div>
+               <button
+                 type="button"
+-                onClick={() => setAddOpen(false)}
++                onClick={closeTenantDialog}
+                 className="rounded-md p-1 text-slate-400 hover:bg-slate-800 hover:text-white"
+                 aria-label="Close tenant form"
+               >
+@@ -670,7 +747,7 @@ export default function SuperAdminPage() {
+               </button>
+             </div>
+ 
+-            <form onSubmit={handleCreateTenant} className="space-y-4 p-5">
++            <form onSubmit={editingTenant ? handleEditTenant : handleCreateTenant} className="space-y-4 p-5">
+               <div className="grid gap-4 md:grid-cols-2">
+                 <div className="space-y-1.5">
+                   <Label htmlFor="tenant-province" className="text-slate-300">Province</Label>
+@@ -746,9 +823,9 @@ export default function SuperAdminPage() {
+ 
+               <div className="rounded-lg border border-amber-700/30 bg-amber-950/10 p-4">
+                 <div className="mb-3">
+-                  <h3 className="text-sm font-semibold text-amber-200">Municipality Admin Login</h3>
+-                  <p className="mt-1 text-xs text-amber-200/70">
+-                    This creates the first admin account for the client municipality.
++                  <h3 className="text-sm font-semibold text-amber-200">Municipality Admin Login</h3>
++                  <p className="mt-1 text-xs text-amber-200/70">
++                    {editingTenant ? 'Update the primary municipality admin contact.' : 'This creates the first admin account for the client municipality.'}
+                   </p>
+                 </div>
+ 
+@@ -778,7 +855,9 @@ export default function SuperAdminPage() {
+                   </div>
+                 </div>
+ 
+-                <div className="space-y-1.5">
++                {!editingTenant && (
++                  <>
++                <div className="space-y-1.5">
+                   <Label htmlFor="tenant-admin-password" className="text-slate-300">Temporary Password *</Label>
+                   <div className="relative">
+                     <Input
+@@ -804,7 +883,7 @@ export default function SuperAdminPage() {
+                   </p>
+                 </div>
+ 
+-                <div className="space-y-1.5 mt-4">
++                <div className="space-y-1.5 mt-4">
+                   <Label htmlFor="tenant-master-key" className="text-slate-300">Settings Secret Key</Label>
+                   <div className="relative">
+                     <Input
+@@ -824,10 +903,12 @@ export default function SuperAdminPage() {
+                       {showMasterKey ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                     </button>
+                   </div>
+-                  <p className="text-xs text-slate-500">
+-                    This unlocks admin settings editing. Coverage remains hidden from municipality admins.
+-                  </p>
+-                </div>
++                  <p className="text-xs text-slate-500">
++                    This unlocks admin settings editing. Coverage remains hidden from municipality admins.
++                  </p>
++                </div>
++                  </>
++                )}
+               </div>
+ 
+               <div className="space-y-1.5">
+@@ -874,19 +955,19 @@ export default function SuperAdminPage() {
+               </div>
+ 
+               <div className="flex justify-end gap-3 border-t border-slate-800 pt-4">
+-                <Button type="button" variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800" onClick={() => setAddOpen(false)}>
+-                  Cancel
+-                </Button>
++                <Button type="button" variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800" onClick={closeTenantDialog}>
++                  Cancel
++                </Button>
+                 <Button type="submit" disabled={tenantSaving} className="bg-amber-600 hover:bg-amber-700 text-white">
+                   {tenantSaving ? (
+                     <span className="flex items-center gap-2">
+                       <Loader2 className="h-4 w-4 animate-spin" />
+-                      Creating...
++                      {editingTenant ? 'Saving...' : 'Creating...'}
+                     </span>
+                   ) : (
+                     <span className="flex items-center gap-2">
+-                      <Plus className="h-4 w-4" />
+-                      Create Client
++                      {editingTenant ? <Pencil className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
++                      {editingTenant ? 'Save Changes' : 'Create Client'}
+                     </span>
+                   )}
+                 </Button>
+

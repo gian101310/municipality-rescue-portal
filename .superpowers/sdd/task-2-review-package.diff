@@ -1,0 +1,164 @@
+Exit code: 0
+Wall time: 0.2 seconds
+Output:
+diff --git a/rescue-portal/src/lib/tenant-admin.test.ts b/rescue-portal/src/lib/tenant-admin.test.ts
+index 43cc3b3..6e91deb 100644
+--- a/rescue-portal/src/lib/tenant-admin.test.ts
++++ b/rescue-portal/src/lib/tenant-admin.test.ts
+@@ -1,12 +1,77 @@
+ import test from 'node:test'
+ import assert from 'node:assert/strict'
+ import {
++  buildEditedTenantBranding,
+   buildTenantBranding,
+   getSettingsTabsForRole,
++  isTenantAction,
+   normalizeSecretKey,
++  validateTenantEditorInput,
+   validateTenantPassword,
+ } from './tenant-admin.ts'
+ 
++test('validates a complete editable tenant payload', () => {
++  assert.equal(validateTenantEditorInput({
++    name: 'City of San Fernando Emergency Rescue Portal',
++    slug: 'san-fernando-pampanga',
++    contactEmail: 'contact@sanfernando.gov.ph',
++    emergencyHotline: '911',
++    adminFullName: 'Maria Cruz',
++    adminEmail: 'admin@sanfernando.gov.ph',
++    municipalityCode: '035416000',
++    plan: 'professional',
++    status: 'active',
++  }), null)
++})
++
++test('rejects an edit with no locality', () => {
++  assert.equal(
++    validateTenantEditorInput({ municipalityCode: '' }),
++    'Choose a valid city or municipality.'
++  )
++})
++
++test('rejects an edit with a malformed municipality admin email', () => {
++  assert.equal(
++    validateTenantEditorInput({
++      municipalityCode: '035416000',
++      name: 'San Fernando Emergency Rescue Portal',
++      slug: 'san-fernando-pampanga',
++      contactEmail: 'contact@sanfernando.gov.ph',
++      emergencyHotline: '911',
++      adminFullName: 'Maria Cruz',
++      adminEmail: 'bad-email',
++      plan: 'professional',
++      status: 'active',
++    }),
++    'Enter a valid municipality admin email address.'
++  )
++})
++
++test('preserves unrelated branding while replacing tenant editor values', () => {
++  const branding = buildEditedTenantBranding({ logo_url: 'seal.svg', custom: true }, {
++    plan: 'enterprise',
++    status: 'active',
++    localityCode: '035416000',
++    provinceCode: '0354',
++    regionCode: '03',
++    municipalityName: 'San Fernando',
++  })
++
++  assert.equal(branding.logo_url, 'seal.svg')
++  assert.equal(branding.custom, true)
++  assert.equal(branding.tenant_plan, 'enterprise')
++  assert.equal(branding.tenant_status, 'active')
++  assert.equal(branding.locality_code, '035416000')
++  assert.equal(branding.province_code, '0354')
++  assert.equal(branding.region_code, '03')
++  assert.equal(branding.municipality_name, 'San Fernando')
++})
++
++test('recognizes edit as a tenant action', () => {
++  assert.equal(isTenantAction('edit'), true)
++})
++
+ test('buildTenantBranding updates tenant status while preserving existing branding', () => {
+   const branding = buildTenantBranding({ logo: 'seal.png', tenant_plan: 'starter' }, 'suspended')
+ 
+diff --git a/rescue-portal/src/lib/tenant-admin.ts b/rescue-portal/src/lib/tenant-admin.ts
+index ea9d0bc..d2ef028 100644
+--- a/rescue-portal/src/lib/tenant-admin.ts
++++ b/rescue-portal/src/lib/tenant-admin.ts
+@@ -1,5 +1,31 @@
+ export type TenantStatus = 'trial' | 'active' | 'suspended' | 'cancelled'
+-export type TenantAction = 'enable' | 'disable' | 'kick' | 'change_password' | 'rotate_secret'
++export type TenantPlan = 'starter' | 'professional' | 'enterprise' | 'one_time'
++export type TenantAction = 'enable' | 'disable' | 'kick' | 'change_password' | 'rotate_secret' | 'edit'
++
++export type TenantEditInput = {
++  name?: unknown
++  slug?: unknown
++  contactEmail?: unknown
++  emergencyHotline?: unknown
++  adminFullName?: unknown
++  adminEmail?: unknown
++  municipalityCode?: unknown
++  plan?: unknown
++  status?: unknown
++}
++
++type EditedTenantBrandingFields = {
++  plan: TenantPlan
++  status: TenantStatus
++  localityCode: string
++  provinceCode: string | null | undefined
++  regionCode: string
++  municipalityName: string
++}
++
++const TENANT_PLANS: TenantPlan[] = ['starter', 'professional', 'enterprise', 'one_time']
++const TENANT_STATUSES: TenantStatus[] = ['trial', 'active', 'suspended', 'cancelled']
++const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+ 
+ export type SettingsTabValue = 'general' | 'coverage_lock' | 'emergency_types' | 'barangays' | 'telegram' | 'notifications'
+ 
+@@ -30,6 +56,34 @@ export function buildTenantBranding(
+   }
+ }
+ 
++export function validateTenantEditorInput(value: TenantEditInput): string | null {
++  if (!String(value.municipalityCode ?? '').trim()) return 'Choose a valid city or municipality.'
++  if (!String(value.name ?? '').trim()) return 'Tenant name is required.'
++  if (!String(value.slug ?? '').trim()) return 'Tenant slug is required.'
++  if (!EMAIL_PATTERN.test(String(value.contactEmail ?? '').trim())) return 'Enter a valid contact email address.'
++  if (!String(value.adminFullName ?? '').trim()) return 'Municipality admin name is required.'
++  if (!EMAIL_PATTERN.test(String(value.adminEmail ?? '').trim())) return 'Enter a valid municipality admin email address.'
++  if (!String(value.emergencyHotline ?? '').trim()) return 'Emergency hotline is required.'
++  if (!TENANT_PLANS.includes(value.plan as TenantPlan)) return 'Choose a valid tenant plan.'
++  if (!TENANT_STATUSES.includes(value.status as TenantStatus)) return 'Choose a valid tenant status.'
++  return null
++}
++
++export function buildEditedTenantBranding(
++  existing: Record<string, unknown> | null | undefined,
++  fields: EditedTenantBrandingFields
++) {
++  return {
++    ...(existing ?? {}),
++    tenant_plan: fields.plan,
++    tenant_status: fields.status,
++    locality_code: fields.localityCode,
++    province_code: fields.provinceCode,
++    region_code: fields.regionCode,
++    municipality_name: fields.municipalityName,
++  }
++}
++
+ export function getSettingsTabsForRole(role: string | null | undefined) {
+   return SETTINGS_TABS.filter((tab) => !tab.platformOnly || role === 'super_admin')
+ }
+@@ -59,4 +113,5 @@ export function isTenantAction(value: unknown): value is TenantAction {
+     || value === 'kick'
+     || value === 'change_password'
+     || value === 'rotate_secret'
++    || value === 'edit'
+ }
+

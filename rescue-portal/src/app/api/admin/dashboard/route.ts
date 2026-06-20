@@ -116,7 +116,7 @@ export async function GET() {
       .select('id')
       .eq('organization_id', orgId)
       .eq('role', 'resident')
-      .eq('registration_status', 'pending') as QueryResult<{ id: string }[]>
+      .in('registration_status', ['pending', 'submitted', 'under_review']) as QueryResult<{ id: string }[]>
 
     // Emergency types
     const { data: emergencyTypes } = await admin

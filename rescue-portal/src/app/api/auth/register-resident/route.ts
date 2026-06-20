@@ -16,6 +16,7 @@ type SupabaseQueryBuilder = PromiseLike<QueryResult<unknown>> & {
   order(column: string, options?: { ascending?: boolean }): SupabaseQueryBuilder
   limit(count: number): SupabaseQueryBuilder
   insert(values: Record<string, unknown> | Record<string, unknown>[]): SupabaseQueryBuilder
+  upsert(values: Record<string, unknown>, options: { onConflict: string }): SupabaseQueryBuilder
   maybeSingle<T = Record<string, unknown>>(): Promise<QueryResult<T>>
   single<T = Record<string, unknown>>(): Promise<QueryResult<T>>
 }
@@ -228,9 +229,11 @@ export async function POST(request: Request) {
       updated_at: now,
     }
 
+    // Use upsert because the handle_new_auth_user trigger may have already
+    // inserted a row for this user_id with default values.
     const { data: profile, error: profileError } = await admin
       .from('user_profiles')
-      .insert(profilePayload)
+      .upsert(profilePayload, { onConflict: 'user_id' })
       .select('id')
       .single<{ id: string }>()
 
