@@ -53,7 +53,6 @@ type EmergencyTypeRow = {
   name: string
   icon: string
   color: string
-  description: string | null
   organization_id: string | null
 }
 
@@ -114,7 +113,7 @@ async function findOrCreateEmergencyType(
   if (typeId) {
     const { data: typeById, error: typeByIdError } = await admin
       .from('emergency_types')
-      .select('id, name, icon, color, description, organization_id')
+      .select('id, name, icon, color, organization_id')
       .eq('id', typeId)
       .maybeSingle<EmergencyTypeRow>()
 
@@ -126,7 +125,7 @@ async function findOrCreateEmergencyType(
   if (typeName) {
     const { data: typeByName, error: typeByNameError } = await admin
       .from('emergency_types')
-      .select('id, name, icon, color, description, organization_id')
+      .select('id, name, icon, color, organization_id')
       .eq('name', typeName)
       .maybeSingle<EmergencyTypeRow>()
 
@@ -146,7 +145,7 @@ async function findOrCreateEmergencyType(
       sort_order: 100,
       organization_id: organizationId,
     })
-    .select('id, name, icon, color, description, organization_id')
+    .select('id, name, icon, color, organization_id')
     .single<EmergencyTypeRow>()
 
   if (createTypeError || !createdType) {
@@ -172,7 +171,7 @@ export async function GET(request: Request) {
 
     const { data: emergencyTypes } = await admin
       .from('emergency_types')
-      .select('id, name, icon, color, description') as QueryResult<EmergencyTypeRow[]>
+      .select('id, name, icon, color') as QueryResult<EmergencyTypeRow[]>
 
     return NextResponse.json({
       incidents: attachEmergencyTypes(data ?? [], emergencyTypes ?? []),
