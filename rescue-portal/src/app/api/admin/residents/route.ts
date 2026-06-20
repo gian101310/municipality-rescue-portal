@@ -89,32 +89,34 @@ export async function GET() {
   try {
     const adminClient = await createAdminClient()
 
-    // Use the real Supabase client directly (not the custom type wrapper)
-    let queryBuilder = adminClient
+    // Build query - for non-super_admin, filter by their org
+    const orgFilter = auth.profile.role !== 'super_admin' ? auth.profile.organization_id : null
+
+    let query = adminClient
       .from('user_profiles')
       .select('*')
       .eq('role', 'resident')
-      .order('created_at', { ascending: false })
 
-    if (auth.profile.role !== 'super_admin') {
-      queryBuilder = queryBuilder.eq('organization_id', auth.profile.organization_id)
+    if (orgFilter) {
+      query = query.eq('organization_id', orgFilter)
     }
 
-    const result = await queryBuilder
+    const { data, error } = await query.order('created_at', { ascending: false })
 
-    if (result.error) throw new Error(result.error.message ?? 'Unable to load residents.')
+    if (error) {
+      return NextResponse.json(
+        { message: error.message ?? 'Unable to load residents.', residents: [] },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json({
-      residents: result.data ?? [],
-      _debug: {
-        count: result.data?.length ?? 0,
-        authRole: auth.profile.role,
-        authOrg: auth.profile.organization_id,
-      },
+      residents: data ?? [],
+      _v: 3,
     })
   } catch (error) {
     return NextResponse.json(
-      { message: error instanceof Error ? error.message : 'Unable to load residents.' },
+      { message: error instanceof Error ? error.message : 'Unable to load residents.', residents: [] },
       { status: 500 }
     )
   }
