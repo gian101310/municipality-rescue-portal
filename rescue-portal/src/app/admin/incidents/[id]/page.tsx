@@ -22,6 +22,7 @@ import { formatDateTime, formatRelativeTime, getStatusLabel } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { DemoIncident, IncidentStatus, RescueUnit } from '@/lib/types'
 import { cn } from '@/lib/utils'
+import { buildStatusUpdateRequest } from '@/lib/incident-status-actions'
 
 const ALL_STATUSES: IncidentStatus[] = [
   'received', 'verification_pending', 'verified', 'assigned', 'dispatched',
@@ -94,15 +95,14 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
     pulse: ['submitted', 'on_the_way', 'arrived'].includes(incident.status),
   }]
 
-  async function handleStatusUpdate() {
-    if (!newStatus) return
+  async function applyStatus(status: IncidentStatus, reason = '') {
     if (!incident) return
 
     try {
       const response = await fetch(`/api/admin/incidents/${incident.id}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus, reason: statusReason }),
+        body: JSON.stringify(reason ? { status, reason } : buildStatusUpdateRequest(status)),
       })
       const payload = await response.json().catch(() => ({}))
 
@@ -111,11 +111,20 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
       }
 
       setIncident(payload?.incident as DemoIncident)
-      toast.success(`Status updated to ${getStatusLabel(newStatus)}`)
-      setNewStatus('')
-      setStatusReason('')
+      toast.success(`Status updated to ${getStatusLabel(status)}`)
+      return true
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to update incident.')
+      return false
+    }
+  }
+
+  async function handleStatusUpdate() {
+    if (!newStatus) return
+
+    if (await applyStatus(newStatus, statusReason)) {
+      setNewStatus('')
+      setStatusReason('')
     }
   }
 
@@ -396,11 +405,11 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
               <Button size="sm" variant="outline" className="w-full border-slate-600 text-slate-300 hover:bg-slate-800" onClick={() => toast.success('Demo: Team assigned')}>
                 <Users className="w-3.5 h-3.5 mr-2" /> Assign Team
               </Button>
-              <Button size="sm" className="w-full bg-amber-700 hover:bg-amber-600 text-white" onClick={() => toast.success('Demo: Team dispatched')}>
+              <Button size="sm" className="w-full bg-amber-700 hover:bg-amber-600 text-white" onClick={() => void applyStatus('dispatched')}>
                 <CheckCircle2 className="w-3.5 h-3.5 mr-2" /> Dispatch
               </Button>
               <Separator className="bg-slate-800" />
-              <Button size="sm" className="w-full bg-green-700 hover:bg-green-600 text-white" onClick={() => toast.success('Demo: Incident resolved')}>
+              <Button size="sm" className="w-full bg-green-700 hover:bg-green-600 text-white" onClick={() => void applyStatus('resolved')}>
                 <CheckCircle2 className="w-3.5 h-3.5 mr-2" /> Resolve Incident
               </Button>
               <Button size="sm" variant="outline" className="w-full border-red-700/50 text-red-400 hover:bg-red-900/20" onClick={() => toast.success('Demo: Marked as escalated')}>

@@ -2,12 +2,17 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
   SOUND_PREF_KEY,
+  getIncidentAlarmPattern,
   getStoredSoundPreference,
   setStoredSoundPreference,
 } from './notification-sound.ts'
 
 test('sound preference defaults to false when storage is unavailable', () => {
   assert.equal(getStoredSoundPreference(null), false)
+})
+
+test('incident alarm uses a repeated urgent pattern', () => {
+  assert.deepEqual(getIncidentAlarmPattern(), [740, 980, 740, 980, 740, 980])
 })
 
 test('sound preference reads true only from the enabled value', () => {

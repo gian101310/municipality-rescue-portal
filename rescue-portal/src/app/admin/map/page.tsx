@@ -24,6 +24,8 @@ import type { TenantGeographyScope } from '@/lib/philippines-geography'
 import Link from 'next/link'
 import type { DemoIncident } from '@/lib/types'
 import { toast } from 'sonner'
+import { useRealtimeIncidents } from '@/lib/use-realtime-incidents'
+import { mergeLiveIncident } from '@/lib/live-incidents'
 
 function deterministicOffset(seed: string, axis: 'lat' | 'lng') {
   const input = `${seed}:${axis}`
@@ -115,6 +117,22 @@ export default function LiveMapPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  const { isConnected: realtimeConnected } = useRealtimeIncidents({
+    onNewIncident: (payload) => {
+      const incoming = payload.new as unknown as DemoIncident
+      setIncidents((current) => mergeLiveIncident(current, incoming))
+      void fetchIncidents(true)
+    },
+    onIncidentUpdate: (payload) => {
+      const updated = payload.new as unknown as DemoIncident
+      setIncidents((current) => mergeLiveIncident(current, updated))
+      setSelectedIncident((current) => (
+        current?.id === updated.id ? { ...current, ...updated } : current
+      ))
+      void fetchIncidents(true)
+    },
+  })
+
   const markers = useMemo(() => [
     {
       id: 'coverage-focus',
@@ -153,8 +171,10 @@ export default function LiveMapPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <Badge className="bg-green-500/20 text-green-400 border-green-500/30 animate-pulse">
-            <Radio className="w-3 h-3 mr-1" /> LIVE
+          <Badge className={realtimeConnected
+            ? 'bg-green-500/20 text-green-400 border-green-500/30 animate-pulse'
+            : 'bg-amber-500/20 text-amber-300 border-amber-500/30'}>
+            <Radio className="w-3 h-3 mr-1" /> {realtimeConnected ? 'LIVE' : 'RECONNECTING'}
           </Badge>
           <Button
             size="sm"
@@ -246,7 +266,7 @@ export default function LiveMapPage() {
                     className="w-4 h-4 shrink-0"
                     style={{ color: selectedIncident.emergency_type?.color ?? '#6b7280' }}
                   />
-                  <span className="text-sm font-semibold text-white">{selectedIncident.emergency_type?.name}</span>
+                  <span className="text-sm font-semibold text-white">{selectedIncident.emergency_type?.name ?? 'Emergency SOS'}</span>
                 </div>
                 <p className="text-xs font-mono text-slate-300">{selectedIncident.reference_number}</p>
                 <div className="flex gap-2">
@@ -287,7 +307,7 @@ export default function LiveMapPage() {
                       style={{ backgroundColor: getSeverityHexColor(inc.severity) }}
                     />
                     <div className="flex-1 min-w-0">
-                      <p className="text-xs font-semibold text-slate-200 truncate">{inc.emergency_type.name}</p>
+                      <p className="text-xs font-semibold text-slate-200 truncate">{inc.emergency_type?.name ?? 'Emergency SOS'}</p>
                       <p className="text-xs text-slate-500 font-mono">{inc.reference_number}</p>
                       <p className="text-xs text-slate-500 truncate">{inc.barangay}</p>
                     </div>

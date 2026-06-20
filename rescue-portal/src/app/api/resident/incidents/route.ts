@@ -4,6 +4,7 @@ import { calculateSeverity } from '@/lib/severity-scoring'
 import {
   buildIncidentReference,
   mapEmergencyTypeToSeverityKey,
+  selectHistoryActorId,
   type ReporterRole,
   validateIncidentSubmission,
 } from '@/lib/incident-submission'
@@ -273,7 +274,7 @@ export async function POST(request: Request) {
         incident_id: incident.id,
         previous_status: null,
         new_status: 'submitted',
-        changed_by: auth.profile.user_id,
+        changed_by: selectHistoryActorId(auth.profile),
         changed_by_name: auth.profile.full_name,
         changed_by_role: reportMetadata.changed_by_role,
         reason: auth.access.ownerTestMode

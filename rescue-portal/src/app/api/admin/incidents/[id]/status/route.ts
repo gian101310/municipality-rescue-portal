@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { attachEmergencyTypes } from '@/lib/incident-presentation'
+import { selectHistoryActorId } from '@/lib/incident-submission'
 import type { IncidentStatus, RegistrationStatus, UserRole } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -158,7 +159,7 @@ export async function PATCH(
         incident_id: id,
         previous_status: existingIncident.status,
         new_status: status,
-        changed_by: auth.profile.user_id,
+        changed_by: selectHistoryActorId(auth.profile),
         changed_by_name: auth.profile.full_name,
         changed_by_role: auth.profile.role,
         reason: reason || null,
@@ -180,4 +181,3 @@ export async function PATCH(
     )
   }
 }
-

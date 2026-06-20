@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { calculateSeverity } from '@/lib/severity-scoring'
-import { mapEmergencyTypeToSeverityKey, type ReporterRole } from '@/lib/incident-submission'
+import { mapEmergencyTypeToSeverityKey, selectHistoryActorId, type ReporterRole } from '@/lib/incident-submission'
 import { attachEmergencyTypes } from '@/lib/incident-presentation'
 import { isEmergencyTypeAvailableToOrganization } from '@/lib/emergency-type-catalog'
 import { getResidentAccess, getTestReportMetadata } from '@/lib/owner-test-mode'
@@ -28,6 +28,7 @@ type SupabaseDataClient = {
 }
 
 type ResidentProfileRow = {
+  id: string
   user_id: string
   role: UserRole
   full_name: string
@@ -172,7 +173,7 @@ export async function PATCH(request: Request, context: RouteContext<'/api/reside
         incident_id: id,
         previous_status: incident.status,
         new_status: incident.status,
-        changed_by: auth.profile.user_id,
+        changed_by: selectHistoryActorId(auth.profile),
         changed_by_name: auth.profile.full_name,
         changed_by_role: reportMetadata.changed_by_role,
         reason: 'Resident added SOS details.',

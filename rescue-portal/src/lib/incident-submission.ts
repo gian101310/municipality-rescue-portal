@@ -14,6 +14,10 @@ type ValidationResult =
 export type ReporterRole = 'victim' | 'passerby'
 export type IntakeState = 'incoming' | 'details_received'
 
+export function selectHistoryActorId(profile: { id: string }) {
+  return profile.id
+}
+
 type IncomingSosLocation = {
   latitude: number
   longitude: number

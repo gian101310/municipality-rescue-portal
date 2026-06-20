@@ -60,7 +60,12 @@ export function playSosDemoSound() {
   playTone(660, 0.24, 0.18, 0.06)
 }
 
+export function getIncidentAlarmPattern() {
+  return [740, 980, 740, 980, 740, 980]
+}
+
 export function playAdminNotificationSound() {
-  playTone(740, 0, 0.12, 0.045)
-  playTone(980, 0.15, 0.1, 0.035)
+  getIncidentAlarmPattern().forEach((frequency, index) => {
+    playTone(frequency, index * 0.22, 0.16, 0.075)
+  })
 }

@@ -4,6 +4,7 @@ import {
   buildIncomingSosPayload,
   buildIncidentReference,
   mapEmergencyTypeToSeverityKey,
+  selectHistoryActorId,
   validateIncomingSosLocation,
   validateIncidentSubmission,
 } from './incident-submission.ts'
@@ -45,6 +46,10 @@ describe('incident submission helpers', () => {
     assert.equal(payload.intake_state, 'incoming')
     assert.equal(payload.reporter_name, 'Alex Resident')
     assert.equal(payload.description, '')
+  })
+
+  it('uses the profile primary key for status-history actors', () => {
+    assert.equal(selectHistoryActorId({ id: 'profile-1', user_id: 'auth-user-1' }), 'profile-1')
   })
 
   it('rejects an SOS handoff without both GPS coordinates', () => {

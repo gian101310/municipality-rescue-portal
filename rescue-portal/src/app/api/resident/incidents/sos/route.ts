@@ -3,6 +3,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import {
   buildIncidentReference,
   buildIncomingSosPayload,
+  selectHistoryActorId,
   validateIncomingSosLocation,
 } from '@/lib/incident-submission'
 import { attachEmergencyTypes } from '@/lib/incident-presentation'
@@ -151,7 +152,7 @@ export async function POST(request: Request) {
         incident_id: incident.id,
         previous_status: null,
         new_status: 'submitted',
-        changed_by: auth.profile.user_id,
+        changed_by: selectHistoryActorId(auth.profile),
         changed_by_name: auth.profile.full_name,
         changed_by_role: reportMetadata.changed_by_role,
         reason: 'Resident sent GPS SOS; details pending.',
