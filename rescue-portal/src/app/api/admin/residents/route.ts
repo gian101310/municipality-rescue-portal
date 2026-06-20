@@ -87,22 +87,31 @@ export async function GET() {
   if ('error' in auth) return auth.error
 
   try {
-    const admin = await createAdminClient() as unknown as SupabaseDataClient
-    let query = admin
+    const adminClient = await createAdminClient()
+
+    // Use the real Supabase client directly (not the custom type wrapper)
+    let queryBuilder = adminClient
       .from('user_profiles')
       .select('*')
       .eq('role', 'resident')
       .order('created_at', { ascending: false })
 
     if (auth.profile.role !== 'super_admin') {
-      query = query.eq('organization_id', auth.profile.organization_id)
+      queryBuilder = queryBuilder.eq('organization_id', auth.profile.organization_id)
     }
 
-    const { data, error } = await query as QueryResult<Record<string, unknown>[]>
+    const result = await queryBuilder
 
-    if (error) throw new Error(error.message ?? 'Unable to load residents.')
+    if (result.error) throw new Error(result.error.message ?? 'Unable to load residents.')
 
-    return NextResponse.json({ residents: data ?? [] })
+    return NextResponse.json({
+      residents: result.data ?? [],
+      _debug: {
+        count: result.data?.length ?? 0,
+        authRole: auth.profile.role,
+        authOrg: auth.profile.organization_id,
+      },
+    })
   } catch (error) {
     return NextResponse.json(
       { message: error instanceof Error ? error.message : 'Unable to load residents.' },
