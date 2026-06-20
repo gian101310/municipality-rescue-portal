@@ -112,7 +112,6 @@ export async function GET() {
 
     return NextResponse.json({
       residents: data ?? [],
-      _v: 3,
     })
   } catch (error) {
     return NextResponse.json(

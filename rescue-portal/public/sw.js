@@ -1,4 +1,4 @@
-const CACHE_NAME = 'rescue-portal-v1'
+const CACHE_NAME = 'rescue-portal-v2'
 const OFFLINE_URL = '/offline'
 
 const PRECACHE_URLS = [
@@ -24,6 +24,13 @@ self.addEventListener('activate', (event) => {
 })
 
 self.addEventListener('fetch', (event) => {
+  const url = new URL(event.request.url)
+
+  // NEVER cache API routes — they must always hit the server
+  if (url.pathname.startsWith('/api/')) {
+    return
+  }
+
   if (event.request.mode === 'navigate') {
     event.respondWith(
       fetch(event.request).catch(() =>
@@ -33,16 +40,15 @@ self.addEventListener('fetch', (event) => {
     return
   }
 
+  // Cache static assets only (network-first with cache fallback)
   event.respondWith(
-    caches.match(event.request).then((cached) =>
-      cached || fetch(event.request).then((response) => {
-        if (response.status === 200 && event.request.url.startsWith(self.location.origin)) {
-          const clone = response.clone()
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
-        }
-        return response
-      }).catch(() => cached)
-    )
+    fetch(event.request).then((response) => {
+      if (response.status === 200 && url.origin === self.location.origin) {
+        const clone = response.clone()
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone))
+      }
+      return response
+    }).catch(() => caches.match(event.request))
   )
 })
 
