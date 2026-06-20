@@ -3,8 +3,12 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
+type QueryResult<T> = {
+  data: T | null
+  error: { message?: string } | null
+}
+
 export async function POST(request: Request) {
-  // Auth check - must be admin/super_admin
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ message: 'Not authenticated' }, { status: 401 })
@@ -13,7 +17,7 @@ export async function POST(request: Request) {
     .from('user_profiles')
     .select('role')
     .eq('user_id', user.id)
-    .single() as { data: { role: string } | null; error: unknown }
+    .single() as QueryResult<{ role: string }>
 
   if (!profile || !['super_admin', 'admin'].includes(profile.role)) {
     return NextResponse.json({ message: 'Admin access required' }, { status: 403 })
@@ -26,15 +30,25 @@ export async function POST(request: Request) {
 
   const adminClient = await createAdminClient()
 
-  // Find user by email
-  const { data: { users }, error: listError } = await adminClient.auth.admin.listUsers()
-  if (listError) return NextResponse.json({ message: listError.message }, { status: 500 })
+  // Look up user_id from user_profiles by email
+  const { data: targetProfile } = await (adminClient as unknown as { from(t: string): { select(c: string): { eq(c: string, v: string): { maybeSingle(): Promise<QueryResult<{ user_id: string }>> } } } })
+    .from('user_profiles')
+    .select('user_id')
+    .eq('email', email)
+    .maybeSingle()
 
-  const target = users.find((u: { email?: string }) => u.email === email)
-  if (!target) return NextResponse.json({ message: `User ${email} not found` }, { status: 404 })
+  if (!targetProfile?.user_id) {
+    return NextResponse.json({ message: 'User not found' }, { status: 404 })
+  }
 
-  const { error: updateError } = await adminClient.auth.admin.updateUserById(target.id, { password })
-  if (updateError) return NextResponse.json({ message: updateError.message }, { status: 500 })
+  const { error: updateError } = await adminClient.auth.admin.updateUserById(
+    targetProfile.user_id,
+    { password }
+  )
 
-  return NextResponse.json({ success: true, email })
+  if (updateError) {
+    return NextResponse.json({ message: updateError.message }, { status: 500 })
+  }
+
+  return NextResponse.json({ ok: true, email })
 }
