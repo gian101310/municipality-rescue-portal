@@ -4,6 +4,7 @@ import {
   COVERAGE_LOCK_GEOCODE_STORAGE_KEY,
   COVERAGE_LOCK_STORAGE_KEY,
   DEMO_TENANT_GEO_SCOPE,
+  getCountryForScope,
   getFallbackMapCenter,
   getScopeGeocodeQuery,
   getScopeLocationDetails,
@@ -78,6 +79,8 @@ export async function saveCoverageLock(scope: TenantGeographyScope) {
 export function getBuyerDetails(scope: TenantGeographyScope) {
   const details = getScopeLocationDetails(scope)
   const map = getFallbackMapCenter(scope)
+  const country = getCountryForScope(scope)
+  const countryLabel = country === 'AE' ? 'United Arab Emirates' : 'Philippines'
 
   return {
     ...details,
@@ -87,7 +90,7 @@ export function getBuyerDetails(scope: TenantGeographyScope) {
       ? `${details.locality.name}, ${details.provinceName}`
       : details.province
       ? details.province.name
-      : details.regionName || 'Philippines',
+      : details.regionName || countryLabel,
   }
 }
 

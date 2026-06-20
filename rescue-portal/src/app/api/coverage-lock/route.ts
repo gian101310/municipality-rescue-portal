@@ -8,7 +8,7 @@ import {
   PSGC_VERSION_LABEL,
 } from '@/lib/philippines-geography'
 import type { GeoScopeLevel, TenantGeographyScope } from '@/lib/philippines-geography'
-import { createAdminClient } from '@/lib/supabase/server'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -98,7 +98,29 @@ function normalizeScope(input: unknown): TenantGeographyScope {
   }
 }
 
-async function getDefaultOrganizationId() {
+async function getOrganizationIdForCurrentUser() {
+  // Try to get the logged-in user's organization first
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+
+    if (user?.id) {
+      const admin = await createDataClient()
+      const { data: profile } = await admin
+        .from('user_profiles')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .maybeSingle() as QueryResult<{ organization_id?: string }>
+
+      if (profile?.organization_id) {
+        return String(profile.organization_id)
+      }
+    }
+  } catch {
+    // Fall through to default lookup
+  }
+
+  // Fallback: find by demo slug or first active org
   const supabase = await createDataClient()
 
   const bySlug = await supabase
@@ -150,7 +172,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 export async function GET() {
   try {
     const supabase = await createDataClient()
-    const organizationId = await getDefaultOrganizationId()
+    const organizationId = await getOrganizationIdForCurrentUser()
 
     const { data, error } = await supabase
       .from('organization_geo_scopes')
@@ -175,7 +197,7 @@ export async function PUT(request: Request) {
     const body = await request.json()
     const scope = normalizeScope(body?.scope)
     const supabase = await createDataClient()
-    const organizationId = await getDefaultOrganizationId()
+    const organizationId = await getOrganizationIdForCurrentUser()
 
     const { data, error } = await supabase
       .from('organization_geo_scopes')

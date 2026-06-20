@@ -17,6 +17,7 @@ import {
   PH_LOCALITIES,
   PH_PROVINCES,
   PH_REGIONS,
+  getCountryForScope,
   getLocalitiesForProvince,
   getLocalityLabel,
   getProvinceName,
@@ -90,8 +91,9 @@ export default function SettingsPage() {
   const selectedScopeLocality = PH_LOCALITIES.find((item) => item.code === scopeMunicipalityCode)
   const settingsTabs = getSettingsTabsForRole(profileRole)
   const canEditSettings = isUnlocked
+  const currentCountry = getCountryForScope(currentScope)
   const scopeLabel = scopeLevel === 'country'
-    ? 'Entire Philippines'
+    ? (currentCountry === 'AE' ? 'Entire UAE' : 'Entire Philippines')
     : scopeLevel === 'region'
     ? getRegionName(scopeRegionCode)
     : scopeLevel === 'province'
