@@ -25,6 +25,7 @@ type ResidentFormState = {
   full_name: string
   phone: string
   email: string
+  password: string
   barangay: string
   address: string
   registration_status: RegistrationStatus
@@ -49,6 +50,7 @@ const emptyResidentForm: ResidentFormState = {
   full_name: '',
   phone: '',
   email: '',
+  password: '',
   barangay: '',
   address: '',
   registration_status: 'approved',
@@ -88,6 +90,14 @@ export default function ResidentsPage() {
       toast.error('Name and phone are required.')
       return
     }
+    if (!manualForm.email.trim()) {
+      toast.error('Email is required — the resident uses it to log in.')
+      return
+    }
+    if (!manualForm.password.trim() || manualForm.password.trim().length < 6) {
+      toast.error('Set a password (at least 6 characters) for the resident.')
+      return
+    }
 
     setSubmitting(true)
     try {
@@ -98,7 +108,8 @@ export default function ResidentsPage() {
           residents: [{
             full_name: manualForm.full_name.trim(),
             phone: manualForm.phone.trim(),
-            email: manualForm.email.trim() || undefined,
+            email: manualForm.email.trim(),
+            password: manualForm.password.trim(),
             barangay: manualForm.barangay || undefined,
             address: manualForm.address.trim() || undefined,
             registration_status: manualForm.registration_status,
@@ -285,8 +296,12 @@ export default function ResidentsPage() {
                 <Input value={manualForm.phone} onChange={(e) => setManualForm((prev) => ({ ...prev, phone: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" placeholder="0917-123-4567" />
               </div>
               <div className="space-y-1.5">
-                <Label className="text-slate-300">Email</Label>
-                <Input value={manualForm.email} onChange={(e) => setManualForm((prev) => ({ ...prev, email: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" placeholder="Optional" />
+                <Label className="text-slate-300">Email * <span className="text-slate-500 font-normal">(login username)</span></Label>
+                <Input type="email" value={manualForm.email} onChange={(e) => setManualForm((prev) => ({ ...prev, email: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" placeholder="resident@email.com" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-slate-300">Password * <span className="text-slate-500 font-normal">(give to resident)</span></Label>
+                <Input type="text" value={manualForm.password} onChange={(e) => setManualForm((prev) => ({ ...prev, password: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" placeholder="Set login password" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-slate-300">Barangay</Label>

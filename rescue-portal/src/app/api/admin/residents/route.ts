@@ -37,6 +37,7 @@ type ResidentInput = {
   full_name: string
   phone: string
   email?: string
+  password?: string
   barangay?: string
   address?: string
   registration_status?: RegistrationStatus
@@ -163,7 +164,8 @@ export async function POST(request: Request) {
 
       // Generate email if not provided
       const email = rawEmail || `${fullName.toLowerCase().replace(/[^a-z0-9]+/g, '.')}.${Date.now().toString(36)}@manual.local`
-      const password = generatePassword()
+      // Use admin-provided password or generate one
+      const password = clean(input.password) || generatePassword()
 
       try {
         // Check if email already exists
