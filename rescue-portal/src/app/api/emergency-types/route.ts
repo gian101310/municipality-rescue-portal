@@ -14,7 +14,6 @@ type EmergencyTypeRow = {
   name: string
   icon: string
   color: string
-  description: string | null
 }
 
 type RequesterProfileRow = {
@@ -40,10 +39,10 @@ export async function GET() {
 
     const { data, error } = await (admin
       .from('emergency_types')
-      .select('id, name, icon, color, description')
+      .select('id, name, icon, color')
       .eq('is_active', true)
       .or(getEmergencyTypeScopeFilter(organizationId))
-      .order('sort_order', { ascending: true }) as unknown as Promise<QueryResult<EmergencyTypeRow[]>>)
+      .order('name', { ascending: true }) as unknown as Promise<QueryResult<EmergencyTypeRow[]>>)
 
     if (error) {
       return NextResponse.json({ message: error.message ?? 'Failed to load emergency types.' }, { status: 500 })
