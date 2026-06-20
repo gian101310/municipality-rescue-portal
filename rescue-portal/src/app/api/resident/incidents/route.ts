@@ -7,6 +7,7 @@ import {
   validateIncidentSubmission,
 } from '@/lib/incident-submission'
 import { attachEmergencyTypes } from '@/lib/incident-presentation'
+import { isEmergencyTypeAvailableToOrganization } from '@/lib/emergency-type-catalog'
 import { getResidentAccess, getTestReportMetadata } from '@/lib/owner-test-mode'
 import type { RegistrationStatus, UserRole } from '@/lib/types'
 
@@ -118,7 +119,8 @@ async function findOrCreateEmergencyType(
       .maybeSingle<EmergencyTypeRow>()
 
     if (typeByIdError) throw new Error(typeByIdError.message ?? 'Unable to check emergency type.')
-    if (typeById) return typeById
+    if (typeById && isEmergencyTypeAvailableToOrganization(typeById.organization_id, organizationId)) return typeById
+    if (typeById) throw new Error('That emergency type is not available to your municipality.')
   }
 
   if (typeName) {
@@ -129,7 +131,7 @@ async function findOrCreateEmergencyType(
       .maybeSingle<EmergencyTypeRow>()
 
     if (typeByNameError) throw new Error(typeByNameError.message ?? 'Unable to check emergency type.')
-    if (typeByName) return typeByName
+    if (typeByName && isEmergencyTypeAvailableToOrganization(typeByName.organization_id, organizationId)) return typeByName
   }
 
   const { data: createdType, error: createTypeError } = await admin

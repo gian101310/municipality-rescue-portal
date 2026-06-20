@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createAdminClient } from '@/lib/supabase/server'
+import { getEmergencyTypeScopeFilter } from '@/lib/emergency-type-catalog'
+import { createAdminClient, createClient } from '@/lib/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,14 +17,32 @@ type EmergencyTypeRow = {
   description: string | null
 }
 
+type RequesterProfileRow = {
+  organization_id: string
+}
+
 export async function GET() {
   try {
+    const requester = await createClient()
+    const { data: { user } } = await requester.auth.getUser()
+    let organizationId: string | undefined
+
+    if (user) {
+      const { data: profile } = await requester
+        .from('user_profiles')
+        .select('organization_id')
+        .eq('user_id', user.id)
+        .maybeSingle<RequesterProfileRow>()
+      organizationId = profile?.organization_id
+    }
+
     const admin = await createAdminClient()
 
     const { data, error } = await (admin
       .from('emergency_types')
       .select('id, name, icon, color, description')
       .eq('is_active', true)
+      .or(getEmergencyTypeScopeFilter(organizationId))
       .order('sort_order', { ascending: true }) as unknown as Promise<QueryResult<EmergencyTypeRow[]>>)
 
     if (error) {
