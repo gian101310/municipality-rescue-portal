@@ -3,11 +3,12 @@ import { describe, it } from 'node:test'
 import {
   buildIncidentReference,
   mapEmergencyTypeToSeverityKey,
+  validateIncomingSosLocation,
   validateIncidentSubmission,
 } from './incident-submission.ts'
 
 describe('incident submission helpers', () => {
-  it('rejects an incident without a description', () => {
+  it('accepts an incident without a description', () => {
     const result = validateIncidentSubmission({
       emergency_type_id: 'et-fire',
       emergency_type_name: 'Fire',
@@ -17,8 +18,21 @@ describe('incident submission helpers', () => {
       longitude: 121.2,
     })
 
+    assert.deepEqual(result, { ok: true })
+  })
+
+  it('accepts a location-only SOS handoff', () => {
+    assert.deepEqual(
+      validateIncomingSosLocation({ latitude: 14.1634, longitude: 121.243 }),
+      { ok: true }
+    )
+  })
+
+  it('rejects an SOS handoff without both GPS coordinates', () => {
+    const result = validateIncomingSosLocation({ latitude: null, longitude: 121.243 })
+
     assert.equal(result.ok, false)
-    assert.equal(result.message, 'Describe the emergency.')
+    assert.equal(result.message, 'Share your current location before sending SOS.')
   })
 
   it('requires GPS coordinates', () => {
@@ -47,4 +61,3 @@ describe('incident submission helpers', () => {
     assert.equal(reference, 'INC-20260619-000042')
   })
 })
-

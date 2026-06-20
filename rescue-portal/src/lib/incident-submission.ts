@@ -11,6 +11,9 @@ type ValidationResult =
   | { ok: true }
   | { ok: false; message: string }
 
+export type ReporterRole = 'victim' | 'passerby'
+export type IntakeState = 'incoming' | 'details_received'
+
 const emergencyTypeAliases: Record<string, string> = {
   'et-fire': 'fire',
   'et-flood': 'flood',
@@ -31,16 +34,23 @@ export function validateIncidentSubmission(input: IncidentSubmissionInput): Vali
     return { ok: false, message: 'Choose an emergency type.' }
   }
 
-  if (!input.description.trim()) {
-    return { ok: false, message: 'Describe the emergency.' }
-  }
-
   if (!Number.isFinite(input.latitude) || !Number.isFinite(input.longitude)) {
     return { ok: false, message: 'Share your current location before submitting.' }
   }
 
   if (input.affected_count < 0) {
     return { ok: false, message: 'Affected count cannot be negative.' }
+  }
+
+  return { ok: true }
+}
+
+export function validateIncomingSosLocation(input: {
+  latitude: number | null
+  longitude: number | null
+}): ValidationResult {
+  if (!Number.isFinite(input.latitude) || !Number.isFinite(input.longitude)) {
+    return { ok: false, message: 'Share your current location before sending SOS.' }
   }
 
   return { ok: true }
@@ -72,4 +82,3 @@ export function buildIncidentReference(date: Date, sequence: number) {
 
   return `INC-${year}${month}${day}-${paddedSequence}`
 }
-
