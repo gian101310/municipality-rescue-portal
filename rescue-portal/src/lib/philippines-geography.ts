@@ -29,6 +29,24 @@ export interface TenantGeographyScope {
   municipalityCode?: string
 }
 
+// Country detection helpers
+export function isUAECode(code?: string): boolean {
+  return !!code && code.startsWith('AE-')
+}
+
+export function getCountryForCode(code?: string): 'PH' | 'AE' {
+  return isUAECode(code) ? 'AE' : 'PH'
+}
+
+export function getCountryName(code?: string): string {
+  return isUAECode(code) ? 'United Arab Emirates' : 'Philippines'
+}
+
+export function getCountryForScope(scope: TenantGeographyScope = { level: 'country' }): 'PH' | 'AE' {
+  const anyCode = scope.municipalityCode ?? scope.provinceCode ?? scope.regionCode
+  return getCountryForCode(anyCode)
+}
+
 export const PSGC_VERSION_LABEL = geographyData.versionLabel
 export const COVERAGE_LOCK_STORAGE_KEY = 'rescue-portal.coverage-lock'
 export const COVERAGE_LOCK_GEOCODE_STORAGE_KEY = 'rescue-portal.coverage-lock.geocodes'
@@ -36,9 +54,29 @@ export const PH_REGIONS = geographyData.regions as RegionOption[]
 export const PH_PROVINCES = geographyData.provinces as ProvinceOption[]
 export const PH_LOCALITIES = geographyData.localities as LocalityOption[]
 
+// Country-filtered helpers
+export const UAE_REGIONS = PH_REGIONS.filter(r => isUAECode(r.code))
+export const UAE_PROVINCES = PH_PROVINCES.filter(p => isUAECode(p.code))
+export const UAE_LOCALITIES = PH_LOCALITIES.filter(l => isUAECode(l.code))
+export const PH_ONLY_REGIONS = PH_REGIONS.filter(r => !isUAECode(r.code))
+export const PH_ONLY_PROVINCES = PH_PROVINCES.filter(p => !isUAECode(p.code))
+export const PH_ONLY_LOCALITIES = PH_LOCALITIES.filter(l => !isUAECode(l.code))
+
+export function getRegionsForCountry(country: 'PH' | 'AE') {
+  return country === 'AE' ? UAE_REGIONS : PH_ONLY_REGIONS
+}
+export function getProvincesForCountry(country: 'PH' | 'AE') {
+  return country === 'AE' ? UAE_PROVINCES : PH_ONLY_PROVINCES
+}
+export function getLocalitiesForCountry(country: 'PH' | 'AE') {
+  return country === 'AE' ? UAE_LOCALITIES : PH_ONLY_LOCALITIES
+}
+
 export const PHILIPPINES_MAP_CENTER = { lat: 12.8797, lng: 121.7740 }
+export const UAE_MAP_CENTER = { lat: 24.4539, lng: 54.3773 }
 
 export const REGION_MAP_CENTERS: Record<string, { lat: number; lng: number }> = {
+  // Philippines regions
   '1300000000': { lat: 14.5995, lng: 120.9842 },
   '1400000000': { lat: 17.3513, lng: 121.1719 },
   '0100000000': { lat: 16.0832, lng: 120.6199 },
@@ -57,6 +95,14 @@ export const REGION_MAP_CENTERS: Record<string, { lat: number; lng: number }> = 
   '1200000000': { lat: 6.2707, lng: 124.6857 },
   '1600000000': { lat: 8.8015, lng: 125.7407 },
   '1900000000': { lat: 6.9568, lng: 124.2422 },
+  // UAE emirates
+  'AE-AZ-000000': { lat: 24.4539, lng: 54.3773 },
+  'AE-DU-000000': { lat: 25.2048, lng: 55.2708 },
+  'AE-SH-000000': { lat: 25.3463, lng: 55.4209 },
+  'AE-AJ-000000': { lat: 25.4052, lng: 55.5136 },
+  'AE-UQ-000000': { lat: 25.5647, lng: 55.5554 },
+  'AE-RK-000000': { lat: 25.7895, lng: 55.9432 },
+  'AE-FU-000000': { lat: 25.1288, lng: 56.3265 },
 }
 
 export const DEMO_TENANT_GEO_SCOPE: TenantGeographyScope = {
@@ -76,6 +122,10 @@ export function getLocalityName(code?: string) {
 }
 
 export function getLocalityLabel(locality: LocalityOption) {
+  // UAE localities don't use City/Municipality classification
+  if (isUAECode(locality.code)) {
+    return locality.name
+  }
   const suffix = locality.type === 'city'
     ? locality.cityClass
       ? `City, ${locality.cityClass}`
@@ -86,6 +136,8 @@ export function getLocalityLabel(locality: LocalityOption) {
 }
 
 export function getScopeLocationDetails(scope: TenantGeographyScope = { level: 'country' }) {
+  const country = getCountryForScope(scope)
+  const countryLabel = country === 'AE' ? 'United Arab Emirates' : 'Philippines'
   const locality = PH_LOCALITIES.find((item) => item.code === scope.municipalityCode)
   const province = PH_PROVINCES.find((item) => item.code === (scope.provinceCode ?? locality?.provinceCode))
   const region = PH_REGIONS.find((item) => item.code === (scope.regionCode ?? province?.regionCode ?? locality?.regionCode))
@@ -95,16 +147,18 @@ export function getScopeLocationDetails(scope: TenantGeographyScope = { level: '
     ? province.name
     : region
     ? region.name
-    : 'Philippines'
+    : countryLabel
   const organizationName = locality
-    ? locality.name.match(/^(City|Municipality) of /i)
+    ? country === 'AE'
       ? locality.name
-      : `${locality.type === 'city' ? 'City' : 'Municipality'} of ${locality.name}`
+      : locality.name.match(/^(City|Municipality) of /i)
+        ? locality.name
+        : `${locality.type === 'city' ? 'City' : 'Municipality'} of ${locality.name}`
     : province
-    ? `Province of ${province.name}`
+    ? country === 'AE' ? province.name : `Province of ${province.name}`
     : region
     ? region.name
-    : 'Philippines Emergency Rescue Portal'
+    : `${countryLabel} Emergency Rescue Portal`
 
   return {
     region,
@@ -115,17 +169,20 @@ export function getScopeLocationDetails(scope: TenantGeographyScope = { level: '
     regionName: region?.name ?? '',
     provinceName: province?.name ?? '',
     municipalityName: locality?.name ?? '',
+    country,
   }
 }
 
 export function getFallbackMapCenter(scope: TenantGeographyScope = { level: 'country' }) {
   const details = getScopeLocationDetails(scope)
+  const country = details.country
+  const defaultCenter = country === 'AE' ? UAE_MAP_CENTER : PHILIPPINES_MAP_CENTER
   const regionCenter = details.region ? REGION_MAP_CENTERS[details.region.code] : null
 
   return {
-    center: regionCenter ?? PHILIPPINES_MAP_CENTER,
+    center: regionCenter ?? defaultCenter,
     zoom: scope.level === 'country'
-      ? 6
+      ? (country === 'AE' ? 7 : 6)
       : scope.level === 'region'
       ? 8
       : scope.level === 'province'
@@ -136,19 +193,20 @@ export function getFallbackMapCenter(scope: TenantGeographyScope = { level: 'cou
 
 export function getScopeGeocodeQuery(scope: TenantGeographyScope = { level: 'country' }) {
   const details = getScopeLocationDetails(scope)
+  const countryLabel = details.country === 'AE' ? 'United Arab Emirates' : 'Philippines'
 
   if (details.locality) {
     return [
       details.locality.name,
       details.provinceName,
       details.regionName,
-      'Philippines',
+      countryLabel,
     ].filter(Boolean).join(', ')
   }
 
-  if (details.province) return `${details.province.name}, Philippines`
-  if (details.region) return `${details.region.name}, Philippines`
-  return 'Philippines'
+  if (details.province) return `${details.province.name}, ${countryLabel}`
+  if (details.region) return `${details.region.name}, ${countryLabel}`
+  return countryLabel
 }
 
 export function getScopedRegions(scope: TenantGeographyScope = { level: 'country' }) {

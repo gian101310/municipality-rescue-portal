@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { PH_LOCALITIES, PH_PROVINCES, getLocalityLabel } from '@/lib/philippines-geography'
+import { PH_LOCALITIES, PH_PROVINCES, getLocalityLabel, getRegionsForCountry, getProvincesForCountry, getLocalitiesForCountry, isUAECode } from '@/lib/philippines-geography'
 
 type TenantPlan = 'starter' | 'professional' | 'enterprise' | 'one_time'
 type TenantStatus = 'trial' | 'active' | 'suspended' | 'cancelled'
@@ -45,6 +45,7 @@ type TenantForm = {
   adminEmail: string
   adminPassword: string
   masterKey: string
+  country: 'PH' | 'AE'
   provinceCode: string
   municipalityCode: string
   plan: TenantPlan
@@ -60,6 +61,7 @@ const initialTenantForm: TenantForm = {
   adminEmail: '',
   adminPassword: '',
   masterKey: '',
+  country: 'PH',
   provinceCode: '',
   municipalityCode: '',
   plan: 'starter',
@@ -159,6 +161,11 @@ export default function SuperAdminPage() {
     setTenantForm((current) => {
       const next = { ...current, [key]: value }
 
+      if (key === 'country') {
+        next.provinceCode = ''
+        next.municipalityCode = ''
+      }
+
       if (key === 'provinceCode') {
         next.municipalityCode = ''
       }
@@ -166,9 +173,12 @@ export default function SuperAdminPage() {
       if (key === 'municipalityCode') {
         const locality = PH_LOCALITIES.find((item) => item.code === value)
         const province = PH_PROVINCES.find((item) => item.code === locality?.provinceCode)
+        const isUAE = isUAECode(String(value))
 
         if (!current.name && locality) {
-          next.name = `${locality.type === 'city' ? 'City' : 'Municipality'} of ${locality.name} Emergency Rescue Portal`
+          next.name = isUAE
+            ? `${locality.name} Emergency Rescue Portal`
+            : `${locality.type === 'city' ? 'City' : 'Municipality'} of ${locality.name} Emergency Rescue Portal`
         }
 
         if (!current.slug && locality) {
@@ -196,6 +206,7 @@ export default function SuperAdminPage() {
     const locality = PH_LOCALITIES.find((item) => (
       item.name === tenant.municipality && (!province || item.provinceCode === province.code)
     )) ?? PH_LOCALITIES.find((item) => item.name === tenant.municipality)
+    const detectedCountry: 'PH' | 'AE' = isUAECode(locality?.code) || isUAECode(province?.code) ? 'AE' : 'PH'
 
     setTenantForm({
       name: tenant.name,
@@ -206,6 +217,7 @@ export default function SuperAdminPage() {
       adminEmail: tenant.admin_email,
       adminPassword: '',
       masterKey: '',
+      country: detectedCountry,
       provinceCode: province?.code ?? locality?.provinceCode ?? '',
       municipalityCode: locality?.code ?? '',
       plan: tenant.plan,
@@ -437,7 +449,9 @@ export default function SuperAdminPage() {
     suspended: tenants.filter((t) => t.status === 'suspended').length,
   }
 
-  const localitiesForSelectedProvince = PH_LOCALITIES.filter((locality) => (
+  const countryProvinces = getProvincesForCountry(tenantForm.country)
+  const countryLocalities = getLocalitiesForCountry(tenantForm.country)
+  const localitiesForSelectedProvince = countryLocalities.filter((locality) => (
     tenantForm.provinceCode
       ? locality.provinceCode === tenantForm.provinceCode
       : locality.provinceCode === null
@@ -754,31 +768,44 @@ export default function SuperAdminPage() {
             </div>
 
             <form onSubmit={editingTenant ? handleEditTenant : handleCreateTenant} className="space-y-4 p-5">
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 <div className="space-y-1.5">
-                  <Label htmlFor="tenant-province" className="text-slate-300">Province</Label>
+                  <Label htmlFor="tenant-country" className="text-slate-300">Country</Label>
+                  <select
+                    id="tenant-country"
+                    value={tenantForm.country}
+                    onChange={(event) => updateTenantForm('country', event.target.value as 'PH' | 'AE')}
+                    className="h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 text-sm text-white outline-none focus:border-amber-500"
+                  >
+                    <option value="PH">Philippines</option>
+                    <option value="AE">United Arab Emirates</option>
+                  </select>
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="tenant-province" className="text-slate-300">{tenantForm.country === 'AE' ? 'District' : 'Province'}</Label>
                   <select
                     id="tenant-province"
                     value={tenantForm.provinceCode}
                     onChange={(event) => updateTenantForm('provinceCode', event.target.value)}
                     className="h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 text-sm text-white outline-none focus:border-amber-500"
                   >
-                    <option value="">Province-independent city...</option>
-                    {PH_PROVINCES.map((province) => (
+                    <option value="">{tenantForm.country === 'AE' ? 'Choose district...' : 'Province-independent city...'}</option>
+                    {countryProvinces.map((province) => (
                       <option key={province.code} value={province.code}>{province.name}</option>
                     ))}
                   </select>
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="tenant-municipality" className="text-slate-300">City / Municipality</Label>
+                  <Label htmlFor="tenant-municipality" className="text-slate-300">{tenantForm.country === 'AE' ? 'Area' : 'City / Municipality'}</Label>
                   <select
                     id="tenant-municipality"
                     value={tenantForm.municipalityCode}
                     onChange={(event) => updateTenantForm('municipalityCode', event.target.value)}
                     className="h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 text-sm text-white outline-none focus:border-amber-500"
                   >
-                    <option value="">Choose city or municipality...</option>
+                    <option value="">{tenantForm.country === 'AE' ? 'Choose area...' : 'Choose city or municipality...'}</option>
                     {localitiesForSelectedProvince.map((locality) => (
                         <option key={locality.code} value={locality.code}>{getLocalityLabel(locality)}</option>
                     ))}

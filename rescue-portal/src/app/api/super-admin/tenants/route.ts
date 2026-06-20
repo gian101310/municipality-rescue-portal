@@ -18,6 +18,7 @@ import {
   PSGC_VERSION_LABEL,
   getFallbackMapCenter,
   getLocalityLabel,
+  getCountryName,
   getScopeLocationDetails,
   makeTenantScope,
 } from '@/lib/philippines-geography'
@@ -326,7 +327,7 @@ export async function POST(request: Request) {
       region: region.name,
       emergency_hotline: emergencyHotline,
       email: contactEmail,
-      address: [getLocalityLabel(locality), province?.name, region.name, 'Philippines'].filter(Boolean).join(', '),
+      address: [getLocalityLabel(locality), province?.name, region.name, getCountryName(locality.code)].filter(Boolean).join(', '),
       map_center_lat: fallbackMap.center.lat,
       map_center_lng: fallbackMap.center.lng,
       map_zoom: fallbackMap.zoom,
@@ -615,7 +616,7 @@ export async function PATCH(request: Request) {
       const scope = makeTenantScope('municipality', locality.code)
       const fallbackMap = getFallbackMapCenter(scope)
       const provinceName = province?.name ?? ''
-      const address = [getLocalityLabel(locality), provinceName, region.name, 'Philippines']
+      const address = [getLocalityLabel(locality), provinceName, region.name, getCountryName(locality.code)]
         .filter(Boolean)
         .join(', ')
 

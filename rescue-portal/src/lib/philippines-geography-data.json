@@ -1,5 +1,5 @@
 {
-  "source": "PSA PSGC publication as mirrored by Rootscratch PSGC API",
+  "source": "PSA PSGC publication as mirrored by Rootscratch PSGC API + UAE Emirates data",
   "sourceUrl": "https://psa.gov.ph/classification/psgc/",
   "mirrorUrl": "https://psgc.rootscratch.com/",
   "versionLabel": "PSGC as of 31 March 2026",
@@ -76,6 +76,34 @@
     {
       "code": "1900000000",
       "name": "Bangsamoro Autonomous Region In Muslim Mindanao (BARMM)"
+    },
+    {
+      "code": "AE-AZ-000000",
+      "name": "Abu Dhabi"
+    },
+    {
+      "code": "AE-DU-000000",
+      "name": "Dubai"
+    },
+    {
+      "code": "AE-SH-000000",
+      "name": "Sharjah"
+    },
+    {
+      "code": "AE-AJ-000000",
+      "name": "Ajman"
+    },
+    {
+      "code": "AE-UQ-000000",
+      "name": "Umm Al Quwain"
+    },
+    {
+      "code": "AE-RK-000000",
+      "name": "Ras Al Khaimah"
+    },
+    {
+      "code": "AE-FU-000000",
+      "name": "Fujairah"
     }
   ],
   "provinces": [
@@ -488,6 +516,101 @@
       "code": "1908800000",
       "name": "Maguindanao del Sur",
       "regionCode": "1900000000"
+    },
+    {
+      "code": "AE-AZ-010000",
+      "name": "Abu Dhabi City",
+      "regionCode": "AE-AZ-000000"
+    },
+    {
+      "code": "AE-AZ-020000",
+      "name": "Al Ain",
+      "regionCode": "AE-AZ-000000"
+    },
+    {
+      "code": "AE-AZ-030000",
+      "name": "Al Dhafra",
+      "regionCode": "AE-AZ-000000"
+    },
+    {
+      "code": "AE-DU-010000",
+      "name": "Dubai City",
+      "regionCode": "AE-DU-000000"
+    },
+    {
+      "code": "AE-DU-020000",
+      "name": "Hatta",
+      "regionCode": "AE-DU-000000"
+    },
+    {
+      "code": "AE-SH-010000",
+      "name": "Sharjah City",
+      "regionCode": "AE-SH-000000"
+    },
+    {
+      "code": "AE-SH-020000",
+      "name": "Khor Fakkan",
+      "regionCode": "AE-SH-000000"
+    },
+    {
+      "code": "AE-SH-030000",
+      "name": "Kalba",
+      "regionCode": "AE-SH-000000"
+    },
+    {
+      "code": "AE-SH-040000",
+      "name": "Dibba Al Hisn",
+      "regionCode": "AE-SH-000000"
+    },
+    {
+      "code": "AE-AJ-010000",
+      "name": "Ajman City",
+      "regionCode": "AE-AJ-000000"
+    },
+    {
+      "code": "AE-AJ-020000",
+      "name": "Masfout",
+      "regionCode": "AE-AJ-000000"
+    },
+    {
+      "code": "AE-AJ-030000",
+      "name": "Manama",
+      "regionCode": "AE-AJ-000000"
+    },
+    {
+      "code": "AE-UQ-010000",
+      "name": "Umm Al Quwain City",
+      "regionCode": "AE-UQ-000000"
+    },
+    {
+      "code": "AE-UQ-020000",
+      "name": "Falaj Al Mualla",
+      "regionCode": "AE-UQ-000000"
+    },
+    {
+      "code": "AE-RK-010000",
+      "name": "Ras Al Khaimah City",
+      "regionCode": "AE-RK-000000"
+    },
+    {
+      "code": "AE-RK-020000",
+      "name": "Al Jazirah Al Hamra",
+      "regionCode": "AE-RK-000000"
+    },
+    {
+      "code": "AE-RK-030000",
+      "name": "Digdaga",
+      "regionCode": "AE-RK-000000"
+    },
+    {
+      "code": "AE-FU-010000",
+      "name": "Fujairah City",
+      "regionCode": "AE-FU-000000"
+    },
+    {
+      "code": "AE-FU-020000",
+      "name": "Dibba Al Fujairah",
+      "regionCode": "AE-FU-000000"
     }
   ],
   "localities": [
@@ -13626,6 +13749,518 @@
       "cityClass": null,
       "regionCode": "1900000000",
       "provinceCode": null
+    },
+    {
+      "code": "AE-AZ-010001",
+      "name": "Al Khalidiyah",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-010000"
+    },
+    {
+      "code": "AE-AZ-010002",
+      "name": "Al Mushrif",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-010000"
+    },
+    {
+      "code": "AE-AZ-010003",
+      "name": "Al Reem Island",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-010000"
+    },
+    {
+      "code": "AE-AZ-010004",
+      "name": "Corniche",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-010000"
+    },
+    {
+      "code": "AE-AZ-010005",
+      "name": "Tourist Club Area",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-010000"
+    },
+    {
+      "code": "AE-AZ-010006",
+      "name": "Mussafah",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-010000"
+    },
+    {
+      "code": "AE-AZ-010007",
+      "name": "Khalifa City",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-010000"
+    },
+    {
+      "code": "AE-AZ-010008",
+      "name": "Mohammed Bin Zayed City",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-010000"
+    },
+    {
+      "code": "AE-AZ-010009",
+      "name": "Yas Island",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-010000"
+    },
+    {
+      "code": "AE-AZ-010010",
+      "name": "Saadiyat Island",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-010000"
+    },
+    {
+      "code": "AE-AZ-020001",
+      "name": "Al Ain Central",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-020000"
+    },
+    {
+      "code": "AE-AZ-020002",
+      "name": "Al Jimi",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-020000"
+    },
+    {
+      "code": "AE-AZ-020003",
+      "name": "Al Towayya",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-020000"
+    },
+    {
+      "code": "AE-AZ-020004",
+      "name": "Al Mutawaa",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-020000"
+    },
+    {
+      "code": "AE-AZ-030001",
+      "name": "Madinat Zayed",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-030000"
+    },
+    {
+      "code": "AE-AZ-030002",
+      "name": "Liwa",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-030000"
+    },
+    {
+      "code": "AE-AZ-030003",
+      "name": "Ruwais",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AZ-000000",
+      "provinceCode": "AE-AZ-030000"
+    },
+    {
+      "code": "AE-DU-010001",
+      "name": "Deira",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-010002",
+      "name": "Bur Dubai",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-010003",
+      "name": "Jumeirah",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-010004",
+      "name": "Downtown Dubai",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-010005",
+      "name": "Dubai Marina",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-010006",
+      "name": "Business Bay",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-010007",
+      "name": "Al Barsha",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-010008",
+      "name": "Al Quoz",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-010009",
+      "name": "Al Karama",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-010010",
+      "name": "International City",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-010011",
+      "name": "Al Nahda",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-010012",
+      "name": "JBR",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-010013",
+      "name": "Palm Jumeirah",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-010014",
+      "name": "JLT",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-010015",
+      "name": "Silicon Oasis",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-010016",
+      "name": "Al Qusais",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-010017",
+      "name": "Satwa",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-010000"
+    },
+    {
+      "code": "AE-DU-020001",
+      "name": "Hatta Town",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-DU-000000",
+      "provinceCode": "AE-DU-020000"
+    },
+    {
+      "code": "AE-SH-010001",
+      "name": "Al Majaz",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-SH-000000",
+      "provinceCode": "AE-SH-010000"
+    },
+    {
+      "code": "AE-SH-010002",
+      "name": "Al Nahda (Sharjah)",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-SH-000000",
+      "provinceCode": "AE-SH-010000"
+    },
+    {
+      "code": "AE-SH-010003",
+      "name": "Al Qasimia",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-SH-000000",
+      "provinceCode": "AE-SH-010000"
+    },
+    {
+      "code": "AE-SH-010004",
+      "name": "Al Khan",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-SH-000000",
+      "provinceCode": "AE-SH-010000"
+    },
+    {
+      "code": "AE-SH-010005",
+      "name": "Muwaileh",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-SH-000000",
+      "provinceCode": "AE-SH-010000"
+    },
+    {
+      "code": "AE-SH-010006",
+      "name": "Al Taawun",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-SH-000000",
+      "provinceCode": "AE-SH-010000"
+    },
+    {
+      "code": "AE-SH-010007",
+      "name": "Industrial Area",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-SH-000000",
+      "provinceCode": "AE-SH-010000"
+    },
+    {
+      "code": "AE-SH-020001",
+      "name": "Khor Fakkan Center",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-SH-000000",
+      "provinceCode": "AE-SH-020000"
+    },
+    {
+      "code": "AE-SH-030001",
+      "name": "Kalba Center",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-SH-000000",
+      "provinceCode": "AE-SH-030000"
+    },
+    {
+      "code": "AE-SH-040001",
+      "name": "Dibba Al Hisn Center",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-SH-000000",
+      "provinceCode": "AE-SH-040000"
+    },
+    {
+      "code": "AE-AJ-010001",
+      "name": "Al Nuaimia",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AJ-000000",
+      "provinceCode": "AE-AJ-010000"
+    },
+    {
+      "code": "AE-AJ-010002",
+      "name": "Al Rashidiya",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AJ-000000",
+      "provinceCode": "AE-AJ-010000"
+    },
+    {
+      "code": "AE-AJ-010003",
+      "name": "Al Jurf",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AJ-000000",
+      "provinceCode": "AE-AJ-010000"
+    },
+    {
+      "code": "AE-AJ-010004",
+      "name": "Emirates City",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AJ-000000",
+      "provinceCode": "AE-AJ-010000"
+    },
+    {
+      "code": "AE-AJ-020001",
+      "name": "Masfout Center",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AJ-000000",
+      "provinceCode": "AE-AJ-020000"
+    },
+    {
+      "code": "AE-AJ-030001",
+      "name": "Manama Center",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-AJ-000000",
+      "provinceCode": "AE-AJ-030000"
+    },
+    {
+      "code": "AE-UQ-010001",
+      "name": "Old Town UAQ",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-UQ-000000",
+      "provinceCode": "AE-UQ-010000"
+    },
+    {
+      "code": "AE-UQ-010002",
+      "name": "Al Salama",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-UQ-000000",
+      "provinceCode": "AE-UQ-010000"
+    },
+    {
+      "code": "AE-UQ-020001",
+      "name": "Falaj Al Mualla Center",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-UQ-000000",
+      "provinceCode": "AE-UQ-020000"
+    },
+    {
+      "code": "AE-RK-010001",
+      "name": "Al Nakheel",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-RK-000000",
+      "provinceCode": "AE-RK-010000"
+    },
+    {
+      "code": "AE-RK-010002",
+      "name": "Al Hamra Village",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-RK-000000",
+      "provinceCode": "AE-RK-010000"
+    },
+    {
+      "code": "AE-RK-010003",
+      "name": "Marjan Island",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-RK-000000",
+      "provinceCode": "AE-RK-010000"
+    },
+    {
+      "code": "AE-RK-010004",
+      "name": "Khuzam",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-RK-000000",
+      "provinceCode": "AE-RK-010000"
+    },
+    {
+      "code": "AE-RK-020001",
+      "name": "Al Jazirah Al Hamra Center",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-RK-000000",
+      "provinceCode": "AE-RK-020000"
+    },
+    {
+      "code": "AE-RK-030001",
+      "name": "Digdaga Center",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-RK-000000",
+      "provinceCode": "AE-RK-030000"
+    },
+    {
+      "code": "AE-FU-010001",
+      "name": "Fujairah Downtown",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-FU-000000",
+      "provinceCode": "AE-FU-010000"
+    },
+    {
+      "code": "AE-FU-010002",
+      "name": "Al Faseel",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-FU-000000",
+      "provinceCode": "AE-FU-010000"
+    },
+    {
+      "code": "AE-FU-010003",
+      "name": "Merashid",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-FU-000000",
+      "provinceCode": "AE-FU-010000"
+    },
+    {
+      "code": "AE-FU-020001",
+      "name": "Dibba Al Fujairah Center",
+      "type": "municipality",
+      "cityClass": null,
+      "regionCode": "AE-FU-000000",
+      "provinceCode": "AE-FU-020000"
     }
   ]
 }
