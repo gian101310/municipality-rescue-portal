@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
 import { isStrongPassword, isValidEmail, requiresBarangay } from '@/lib/auth-validation'
+import { PH_LOCALITIES } from '@/lib/philippines-geography'
+import { getCoverageLookupCandidates } from '@/lib/registration-organization'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,15 +67,19 @@ async function findOrganization(
   municipalityCode: string
 ): Promise<OrganizationRow> {
   if (municipalityCode) {
-    const { data: scope, error: scopeError } = await admin
-      .from('organization_geo_scopes')
-      .select('organization_id')
-      .eq('municipality_code', municipalityCode)
-      .maybeSingle<GeoScopeRow>()
+    const locality = PH_LOCALITIES.find((item) => item.code === municipalityCode)
 
-    if (scopeError) throw new Error(scopeError.message ?? 'Unable to check coverage lock.')
+    for (const candidate of getCoverageLookupCandidates(municipalityCode, locality)) {
+      const { data: scope, error: scopeError } = await admin
+        .from('organization_geo_scopes')
+        .select('organization_id')
+        .eq(candidate.column, candidate.value)
+        .limit(1)
+        .maybeSingle<GeoScopeRow>()
 
-    if (scope?.organization_id) {
+      if (scopeError) throw new Error(scopeError.message ?? 'Unable to check coverage lock.')
+      if (!scope?.organization_id) continue
+
       const { data: scopedOrg, error: scopedOrgError } = await admin
         .from('organizations')
         .select('id, name, slug, is_active')
