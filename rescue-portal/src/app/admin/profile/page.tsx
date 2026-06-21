@@ -55,8 +55,8 @@ export default function AdminProfilePage() {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) throw new Error('Not authenticated')
 
-      const { error } = await supabase
-        .from('user_profiles')
+      const { error } = await (supabase
+        .from('user_profiles') as unknown as { update: (values: Record<string, string>) => { eq: (col: string, val: string) => Promise<{ error: { message: string } | null }> } })
         .update({ full_name: fullName.trim(), phone: phone.trim() })
         .eq('user_id', user.id)
 
