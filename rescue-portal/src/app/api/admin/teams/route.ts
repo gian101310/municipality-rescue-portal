@@ -7,7 +7,7 @@ async function staff() {
   const { data: { user } } = await client.auth.getUser()
   if (!user) return null
   const { data: profile } = await client.from('user_profiles').select('id, role, full_name, organization_id, is_active, registration_status').eq('user_id', user.id).single() as any
-  if (!profile || !profile.is_active || !['super_admin', 'admin', 'dispatcher'].includes(profile.role) || (profile.registration_status && profile.registration_status !== 'approved')) return null
+  if (!profile || !profile.is_active || !['super_admin', 'admin', 'dispatcher', 'staff'].includes(profile.role) || (profile.registration_status && profile.registration_status !== 'approved')) return null
   return profile
 }
 

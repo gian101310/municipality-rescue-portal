@@ -46,7 +46,7 @@ type ResidentInput = {
   registration_status?: RegistrationStatus
 }
 
-const residentReadRoles: UserRole[] = ['super_admin', 'admin', 'dispatcher', 'verifier']
+const residentReadRoles: UserRole[] = ['super_admin', 'admin', 'dispatcher', 'verifier', 'staff']
 const residentWriteRoles: UserRole[] = ['super_admin', 'admin']
 
 async function requireResidentReader() {

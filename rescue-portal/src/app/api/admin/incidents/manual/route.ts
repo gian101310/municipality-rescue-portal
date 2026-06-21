@@ -15,7 +15,7 @@ export async function POST(request: Request) {
     .eq('user_id', user.id)
     .single() as any
 
-  if (!profile?.is_active || !['admin', 'super_admin', 'dispatcher'].includes(profile.role)) {
+  if (!profile?.is_active || !['admin', 'super_admin', 'dispatcher', 'staff'].includes(profile.role)) {
     return NextResponse.json({ message: 'Admin or dispatcher access required.' }, { status: 403 })
   }
 

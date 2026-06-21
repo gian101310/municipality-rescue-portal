@@ -5,7 +5,7 @@ import { isValidTeamPosition } from '@/lib/team-members'
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const client = await createClient(); const { data: { user } } = await client.auth.getUser(); if (!user) return NextResponse.json({ message: 'Please sign in first.' }, { status: 401 })
   const { data: profile } = await client.from('user_profiles').select('role, organization_id, is_active, registration_status').eq('user_id', user.id).single() as any
-  if (!profile?.is_active || !['super_admin', 'admin', 'dispatcher'].includes(profile.role)) return NextResponse.json({ message: 'Team management access required.' }, { status: 403 })
+  if (!profile?.is_active || !['super_admin', 'admin', 'dispatcher', 'staff'].includes(profile.role)) return NextResponse.json({ message: 'Team management access required.' }, { status: 403 })
   const { id } = await context.params; const body = await request.json(); if (!body.userId || !isValidTeamPosition(String(body.position))) return NextResponse.json({ message: 'Choose a staff member and valid position.' }, { status: 400 })
   const admin = await createAdminClient() as any; const { data: team } = await admin.from('rescue_units').select('organization_id').eq('id', id).single(); if (!team || (profile.role !== 'super_admin' && team.organization_id !== profile.organization_id)) return NextResponse.json({ message: 'Team not found.' }, { status: 404 })
   const { data: member } = await admin.from('user_profiles').select('id, full_name, organization_id').eq('id', body.userId).single(); if (!member || member.organization_id !== team.organization_id) return NextResponse.json({ message: 'Staff member not found.' }, { status: 404 })

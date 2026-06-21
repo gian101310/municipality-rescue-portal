@@ -5,7 +5,7 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
   const client = await createClient(); const { data: { user } } = await client.auth.getUser()
   if (!user) return NextResponse.json({ message: 'Please sign in first.' }, { status: 401 })
   const { data: profile } = await client.from('user_profiles').select('role, organization_id, is_active, registration_status').eq('user_id', user.id).single() as any
-  if (!profile?.is_active || !['super_admin', 'admin', 'dispatcher'].includes(profile.role) || (profile.registration_status && profile.registration_status !== 'approved')) return NextResponse.json({ message: 'Team management access required.' }, { status: 403 })
+  if (!profile?.is_active || !['super_admin', 'admin', 'dispatcher', 'staff'].includes(profile.role) || (profile.registration_status && profile.registration_status !== 'approved')) return NextResponse.json({ message: 'Team management access required.' }, { status: 403 })
   const { id } = await context.params; const body = await request.json(); const admin = await createAdminClient() as any
   const { data: existing } = await admin.from('rescue_units').select('organization_id').eq('id', id).single()
   if (!existing || (profile.role !== 'super_admin' && existing.organization_id !== profile.organization_id)) return NextResponse.json({ message: 'Team not found.' }, { status: 404 })

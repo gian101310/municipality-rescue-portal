@@ -4,7 +4,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 export async function POST(request: Request, context: { params: Promise<{ id: string }> }) {
   const client = await createClient(); const { data: { user } } = await client.auth.getUser(); if (!user) return NextResponse.json({ message: 'Please sign in first.' }, { status: 401 })
   const { data: profile } = await client.from('user_profiles').select('id, role, full_name, organization_id, is_active, registration_status').eq('user_id', user.id).single() as any
-  if (!profile?.is_active || !['super_admin','admin','dispatcher'].includes(profile.role)) return NextResponse.json({ message: 'Assignment access required.' }, { status: 403 })
+  if (!profile?.is_active || !['super_admin','admin','dispatcher','staff'].includes(profile.role)) return NextResponse.json({ message: 'Assignment access required.' }, { status: 403 })
   const { id } = await context.params; const { rescueUnitId } = await request.json(); if (!String(rescueUnitId ?? '').trim()) return NextResponse.json({ message: 'Choose a rescue team.' }, { status: 400 })
   const admin = await createAdminClient() as any; const [{ data: incident }, { data: team }] = await Promise.all([admin.from('incidents').select('*').eq('id', id).single(), admin.from('rescue_units').select('*').eq('id', rescueUnitId).single()])
   if (!incident || !team || incident.organization_id !== team.organization_id || (profile.role !== 'super_admin' && incident.organization_id !== profile.organization_id)) return NextResponse.json({ message: 'Incident or rescue team not found.' }, { status: 404 })

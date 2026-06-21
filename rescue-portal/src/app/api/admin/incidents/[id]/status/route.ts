@@ -48,7 +48,7 @@ type EmergencyTypeRow = {
   description: string | null
 }
 
-const incidentUpdateRoles: UserRole[] = ['super_admin', 'admin', 'dispatcher', 'team_leader', 'responder', 'verifier']
+const incidentUpdateRoles: UserRole[] = ['super_admin', 'admin', 'dispatcher', 'team_leader', 'responder', 'verifier', 'staff']
 const allowedStatuses: IncidentStatus[] = [
   'received',
   'verification_pending',

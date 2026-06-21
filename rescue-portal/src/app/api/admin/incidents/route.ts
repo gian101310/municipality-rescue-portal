@@ -37,7 +37,7 @@ type EmergencyTypeRow = {
   description: string | null
 }
 
-const incidentReadRoles: UserRole[] = ['super_admin', 'admin', 'dispatcher', 'team_leader', 'responder', 'verifier']
+const incidentReadRoles: UserRole[] = ['super_admin', 'admin', 'dispatcher', 'team_leader', 'responder', 'verifier', 'staff']
 
 async function requireIncidentReader() {
   const supabase = await createClient()
