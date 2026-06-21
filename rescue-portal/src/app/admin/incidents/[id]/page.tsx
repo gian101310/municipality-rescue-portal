@@ -119,7 +119,7 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
         throw new Error(payload?.message ?? 'Unable to update incident.')
       }
 
-      setIncident(payload?.incident as DemoIncident)
+      setIncident((prev) => prev ? { ...prev, ...payload.incident, emergency_type: prev.emergency_type } as DemoIncident : prev)
       toast.success(`Status updated to ${getStatusLabel(status)}`)
       return true
     } catch (error) {
@@ -144,7 +144,7 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
     const response = await fetch(`/api/admin/incidents/${incident.id}/escalate`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildEscalationPayload(reason)) })
     const payload = await response.json().catch(() => ({}))
     if (!response.ok) return toast.error(payload.message ?? 'Unable to escalate incident.')
-    setIncident(payload.incident)
+    setIncident((prev) => prev ? { ...prev, ...payload.incident, emergency_type: prev.emergency_type } as DemoIncident : prev)
     toast.success('Incident escalated to critical')
   }
 
@@ -171,7 +171,7 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
       const response = await fetch(`/api/admin/incidents/${incident.id}/assignments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rescueUnitId: teamId }) })
       const payload = await response.json().catch(() => ({}))
       if (!response.ok) return toast.error(payload.message ?? 'Unable to assign rescue team.')
-      setIncident(payload.incident)
+      setIncident((prev) => prev ? { ...prev, ...payload.incident, emergency_type: prev.emergency_type } as DemoIncident : prev)
       toast.success(`Assigned ${payload.team?.name ?? 'team'}`)
       setShowTeamDialog(false)
     } catch {

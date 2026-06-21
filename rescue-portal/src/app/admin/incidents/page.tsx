@@ -77,8 +77,12 @@ export default function IncidentsPage() {
       })
       const payload = await res.json().catch(() => ({}))
       if (!res.ok) return toast.error(payload.message ?? 'Unable to dispatch team.')
-      // Update the incident in the list
-      setIncidents((prev) => prev.map((inc) => inc.id === dispatchIncident.id ? (payload.incident as DemoIncident) : inc))
+      // Merge updated fields into existing incident (API returns raw DB row without emergency_type object)
+      setIncidents((prev) => prev.map((inc) =>
+        inc.id === dispatchIncident.id
+          ? { ...inc, ...payload.incident, emergency_type: inc.emergency_type } as DemoIncident
+          : inc
+      ))
       const teamName = availableTeams.find((t) => t.id === teamId)?.name ?? 'team'
       toast.success(`Dispatched ${teamName} to ${dispatchIncident.reference_number}`)
       setDispatchOpen(false)
