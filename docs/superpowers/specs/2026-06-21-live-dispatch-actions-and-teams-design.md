@@ -10,7 +10,7 @@ Replace remaining operational demo controls with live, municipality-scoped actio
 
 - Replace the short notification pattern with a distinct repeating high-volume emergency siren/wail and a critical visual alert.
 - Continue to require one browser interaction to arm Web Audio; this is imposed by browser security.
-- Respect an explicit operator mute.
+- Alarm activation is mandatory: there is no mute or off control for municipal operators.
 - The alarm is a browser-open alert. Waking a sleeping or muted device requires a later server-side push/SMS/call escalation system and is outside this release.
 
 ### Incident actions
@@ -22,10 +22,12 @@ Replace remaining operational demo controls with live, municipality-scoped actio
 
 ### Rescue Teams
 
+- When an organization has no team records, create four editable starter teams for that organization: Alpha Rescue, Bravo Medical, Charlie Fire Support, and Delta Rapid Response. These are real municipality-owned sample records, not front-end demo data.
 - Replace `DEMO_RESCUE_UNITS` with rescue units loaded from `rescue_units` for the current admin's municipality/organization.
 - Add team creation and editing for name, code, contact number, status, vehicle data, equipment, and specializations.
+- Add and manage team members through `rescue_unit_members`, including their name and position: team leader, driver, medic, responder, fire specialist, or communications.
 - Dispatch from a team card requires choosing an active municipality incident. It uses the same assignment operation as the incident detail page, ensuring a single audit path.
-- No default teams are inserted. Each municipality starts with its own database records only.
+- The four starter teams are editable and remain isolated to the municipality that first loads them.
 
 ## API and data flow
 
