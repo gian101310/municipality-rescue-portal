@@ -9,6 +9,7 @@ export type UserRole =
   | 'team_leader'
   | 'responder'
   | 'verifier'
+  | 'staff'
   | 'resident';
 
 export type IncidentStatus =
