@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, Shield, Upload } from 'lucide-react'
+import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, Phone, Shield, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,6 +21,7 @@ import {
   getRegionName,
   getScopedProvinces,
   getScopedRegions,
+  makeTenantScope,
   PSGC_VERSION_LABEL,
 } from '@/lib/philippines-geography'
 import type { TenantGeographyScope } from '@/lib/philippines-geography'
@@ -68,7 +70,20 @@ interface FormData {
   false_alert_agree: boolean
 }
 
+interface MunicipalityInfo {
+  id: string
+  name: string
+  slug: string
+  hotline: string | null
+  secondaryHotline: string | null
+  description: string | null
+  dialect: string | null
+}
+
 export default function RegisterPage() {
+  const searchParams = useSearchParams()
+  const municipalityParam = searchParams.get('municipality')
+
   const [step, setStep] = useState(1)
   const [submitting, setSubmitting] = useState(false)
   const [refNumber, setRefNumber] = useState('')
@@ -76,6 +91,8 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
   const [geoScope, setGeoScope] = useState<TenantGeographyScope>(DEMO_TENANT_GEO_SCOPE)
   const [geoScopePersistence, setGeoScopePersistence] = useState<'checking' | 'supabase' | 'demo'>('checking')
+  const [municipalityInfo, setMunicipalityInfo] = useState<MunicipalityInfo | null>(null)
+  const [municipalityLoading, setMunicipalityLoading] = useState(!!municipalityParam)
   const [form, setForm] = useState<FormData>({
     full_name: '', phone: '', email: '', password: '', confirmPassword: '', date_of_birth: '',
     region: '', regionCode: '', province: '', provinceCode: '',
@@ -126,6 +143,66 @@ export default function RegisterPage() {
       cancelled = true
     }
   }, [])
+
+  // When ?municipality= param is present (from QR scan), fetch the org info
+  // and lock the registration to that municipality
+  useEffect(() => {
+    if (!municipalityParam) return
+    let cancelled = false
+
+    async function loadMunicipalityInfo() {
+      try {
+        const res = await fetch(`/api/municipality-info?id=${encodeURIComponent(municipalityParam!)}`)
+        const payload = await res.json().catch(() => ({}))
+        if (cancelled) return
+
+        if (res.ok && payload.organization) {
+          setMunicipalityInfo(payload.organization)
+
+          // If the API returns a geo scope, apply it to lock the address fields
+          if (payload.geoScope) {
+            const gs = payload.geoScope
+            const scopeLevel = gs.scope_level ?? 'country'
+            const scopeCode = gs.municipality_code ?? gs.province_code ?? gs.region_code ?? undefined
+            const scope = makeTenantScope(scopeLevel, scopeCode)
+            setGeoScope(scope)
+            setGeoScopePersistence('supabase')
+
+            // Auto-fill geo fields from the resolved scope
+            const regions = getScopedRegions(scope)
+            const provinces = getScopedProvinces(scope)
+            const localities = provinces.length > 0 && provinces[0]?.code
+              ? getLocalitiesForProvince(provinces[0].code, scope)
+              : regions.length === 1
+              ? getLocalitiesForRegionWithoutProvince(regions[0].code, scope)
+              : []
+            const matched = gs.municipality_code
+              ? localities.find((l) => l.code === gs.municipality_code)
+              : undefined
+
+            setForm((prev) => ({
+              ...prev,
+              regionCode: regions[0]?.code ?? prev.regionCode,
+              region: regions[0]?.name ?? prev.region,
+              provinceCode: provinces[0]?.code ?? prev.provinceCode,
+              province: provinces[0]?.name ?? prev.province,
+              municipalityCode: matched?.code ?? gs.municipality_code ?? prev.municipalityCode,
+              municipality: matched?.name ?? prev.municipality,
+            }))
+          }
+        } else {
+          toast.error(payload.message ?? 'Unable to load municipality info from QR code.')
+        }
+      } catch {
+        if (!cancelled) toast.error('Unable to load municipality info.')
+      } finally {
+        if (!cancelled) setMunicipalityLoading(false)
+      }
+    }
+
+    loadMunicipalityInfo()
+    return () => { cancelled = true }
+  }, [municipalityParam])
 
   function update(field: keyof FormData, value: string | boolean) {
     setForm((prev) => ({ ...prev, [field]: value }))
@@ -224,7 +301,7 @@ export default function RegisterPage() {
       const response = await fetch('/api/auth/register-resident', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, organizationId: municipalityInfo?.id ?? null }),
       })
       const payload = await response.json().catch(() => ({}))
 
@@ -253,6 +330,39 @@ export default function RegisterPage() {
             <ArrowLeft className="w-4 h-4" />
             Back to login
           </Link>
+
+          {/* Municipality banner from QR scan */}
+          {municipalityLoading && (
+            <div className="mb-4 rounded-lg border border-blue-500/30 bg-blue-600/10 p-4 text-center">
+              <span className="inline-block w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin mr-2 align-middle" />
+              <span className="text-sm text-blue-300">Loading municipality info...</span>
+            </div>
+          )}
+          {municipalityInfo && !municipalityLoading && (
+            <div className="mb-4 rounded-lg border border-green-500/30 bg-green-600/10 p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield className="w-5 h-5 text-green-400" />
+                <h3 className="text-sm font-semibold text-green-300">
+                  Registering under {municipalityInfo.name}
+                </h3>
+              </div>
+              {municipalityInfo.description && (
+                <p className="text-xs text-green-200/80 mb-2">{municipalityInfo.description}</p>
+              )}
+              {municipalityInfo.dialect && (
+                <p className="text-xs text-green-200/60 italic mb-2">Language: {municipalityInfo.dialect}</p>
+              )}
+              {municipalityInfo.hotline && (
+                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-green-500/20">
+                  <Phone className="w-4 h-4 text-green-400" />
+                  <span className="text-sm font-bold text-green-300">{municipalityInfo.hotline}</span>
+                  {municipalityInfo.secondaryHotline && (
+                    <span className="text-xs text-green-300/70 ml-1">/ {municipalityInfo.secondaryHotline}</span>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
@@ -348,20 +458,29 @@ export default function RegisterPage() {
                   <CardDescription className="text-slate-400">Your current residential address.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
-                    <p className="text-xs font-semibold text-blue-200">Buyer geography lock</p>
-                    <p className="mt-1 text-xs text-blue-100/80">
-                      This buyer account is currently scoped to {geoScope.level === 'country' ? 'all Philippines regions, provinces, and cities/municipalities' : 'the saved admin coverage lock'}.
-                      Source: {PSGC_VERSION_LABEL}.
-                    </p>
-                    <p className="mt-1 text-xs text-blue-100/60">
-                      Storage: {geoScopePersistence === 'checking'
-                        ? 'Checking...'
-                        : geoScopePersistence === 'supabase'
-                        ? 'Supabase persisted'
-                        : 'Demo fallback'}
-                    </p>
-                  </div>
+                  {municipalityInfo ? (
+                    <div className="rounded-lg border border-green-500/20 bg-green-500/10 p-3">
+                      <p className="text-xs font-semibold text-green-200">Municipality locked via QR code</p>
+                      <p className="mt-1 text-xs text-green-100/80">
+                        Your registration is linked to <strong>{municipalityInfo.name}</strong>. Address fields below are pre-filled from the municipality coverage area.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
+                      <p className="text-xs font-semibold text-blue-200">Geography scope</p>
+                      <p className="mt-1 text-xs text-blue-100/80">
+                        Registration is scoped to {geoScope.level === 'country' ? 'all Philippines regions, provinces, and cities/municipalities' : 'the configured coverage area'}.
+                        Source: {PSGC_VERSION_LABEL}.
+                      </p>
+                      <p className="mt-1 text-xs text-blue-100/60">
+                        Storage: {geoScopePersistence === 'checking'
+                          ? 'Checking...'
+                          : geoScopePersistence === 'supabase'
+                          ? 'Supabase persisted'
+                          : 'Demo fallback'}
+                      </p>
+                    </div>
+                  )}
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div className="space-y-1.5 sm:col-span-2">
                       <Label className="text-slate-300">Region *</Label>

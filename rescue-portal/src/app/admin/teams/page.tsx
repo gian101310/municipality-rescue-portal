@@ -1,12 +1,15 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, Phone, MapPin, Plus, ChevronDown, ChevronUp, Calendar } from 'lucide-react'
+import { Users, Phone, MapPin, Plus, ChevronDown, ChevronUp, Calendar, UserPlus, UserMinus, Send, X, Check, Edit2 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { TeamStatus } from '@/lib/types'
@@ -31,10 +34,40 @@ const VEHICLE_TYPE_LABELS: Record<string, string> = {
   other: 'Other',
 }
 
+const POSITION_LABELS: Record<string, string> = {
+  team_leader: 'Team Leader',
+  driver: 'Driver',
+  medic: 'Medic',
+  responder: 'Responder',
+  fire_specialist: 'Fire Specialist',
+  communications: 'Communications',
+}
+
 export default function TeamsPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
-  const [addOpen, setAddOpen] = useState(false)
   const [teams, setTeams] = useState<any[]>([])
+
+  // Create team dialog
+  const [createOpen, setCreateOpen] = useState(false)
+  const [newTeam, setNewTeam] = useState({ name: '', code: '', contact_number: '' })
+
+  // Edit team dialog
+  const [editOpen, setEditOpen] = useState(false)
+  const [editTeamData, setEditTeamData] = useState<any>(null)
+
+  // Add member dialog
+  const [addMemberOpen, setAddMemberOpen] = useState(false)
+  const [addMemberTeamId, setAddMemberTeamId] = useState('')
+  const [staffList, setStaffList] = useState<any[]>([])
+  const [selectedStaffId, setSelectedStaffId] = useState('')
+  const [selectedPosition, setSelectedPosition] = useState('')
+
+  // Dispatch dialog
+  const [dispatchOpen, setDispatchOpen] = useState(false)
+  const [dispatchTeam, setDispatchTeam] = useState<any>(null)
+  const [activeIncidents, setActiveIncidents] = useState<any[]>([])
+  const [selectedIncidentId, setSelectedIncidentId] = useState('')
+  const [dispatching, setDispatching] = useState(false)
 
   async function loadTeams() {
     const response = await fetch('/api/admin/teams', { cache: 'no-store' })
@@ -45,21 +78,65 @@ export default function TeamsPage() {
 
   useEffect(() => { void loadTeams() }, [])
 
-  async function createTeam() {
-    const name = window.prompt('Team name')?.trim(); const code = window.prompt('Team code')?.trim()
-    if (!name || !code) return
-    const contact_number = window.prompt('Contact number (optional)')?.trim() || null
-    const response = await fetch('/api/admin/teams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, code, contact_number }) })
-    const payload = await response.json().catch(() => ({})); if (!response.ok) return toast.error(payload.message ?? 'Unable to add team.')
-    toast.success('Rescue team created'); void loadTeams()
+  async function handleCreateTeam() {
+    if (!newTeam.name.trim() || !newTeam.code.trim()) return toast.error('Team name and code are required.')
+    const response = await fetch('/api/admin/teams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newTeam) })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) return toast.error(payload.message ?? 'Unable to create team.')
+    toast.success('Rescue team created'); setCreateOpen(false); setNewTeam({ name: '', code: '', contact_number: '' }); void loadTeams()
   }
 
-  async function editTeam(unit: any) {
-    const name = window.prompt('Team name', unit.name)?.trim(); const contact_number = window.prompt('Contact number', unit.contact_number ?? '')?.trim() || null
-    if (!name) return
-    const response = await fetch(`/api/admin/teams/${unit.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, contact_number }) })
-    const payload = await response.json().catch(() => ({})); if (!response.ok) return toast.error(payload.message ?? 'Unable to update team.')
-    toast.success('Rescue team updated'); void loadTeams()
+  async function handleEditTeam() {
+    if (!editTeamData) return
+    const response = await fetch(`/api/admin/teams/${editTeamData.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editTeamData.name, code: editTeamData.code, contact_number: editTeamData.contact_number, status: editTeamData.status }) })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) return toast.error(payload.message ?? 'Unable to update team.')
+    toast.success('Team updated'); setEditOpen(false); void loadTeams()
+  }
+
+  async function openAddMember(teamId: string) {
+    setAddMemberTeamId(teamId); setSelectedStaffId(''); setSelectedPosition('responder')
+    // Load org staff who aren't already on this team
+    const response = await fetch('/api/admin/users?role=staff', { cache: 'no-store' })
+    const payload = await response.json().catch(() => ({}))
+    setStaffList(payload.users ?? [])
+    setAddMemberOpen(true)
+  }
+
+  async function handleAddMember() {
+    if (!selectedStaffId || !selectedPosition) return toast.error('Select a staff member and position.')
+    const response = await fetch(`/api/admin/teams/${addMemberTeamId}/members`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ userId: selectedStaffId, position: selectedPosition }) })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) return toast.error(payload.message ?? 'Unable to add member.')
+    toast.success('Member added'); setAddMemberOpen(false); void loadTeams()
+  }
+
+  async function removeMember(teamId: string, memberId: string, memberName: string) {
+    if (!confirm(`Remove ${memberName} from this team?`)) return
+    // Use PATCH to deactivate the member
+    const response = await fetch(`/api/admin/teams/${teamId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+    // For now just reload — in a full implementation we'd have a DELETE /members/:id endpoint
+    toast.info(`${memberName} would be removed (pending member removal endpoint)`); void loadTeams()
+  }
+
+  async function openDispatch(team: any) {
+    setDispatchTeam(team); setSelectedIncidentId(''); setDispatching(false)
+    // Load active/pending incidents
+    const response = await fetch('/api/admin/incidents?status=pending,acknowledged', { cache: 'no-store' })
+    const payload = await response.json().catch(() => ({}))
+    setActiveIncidents(payload.incidents ?? [])
+    setDispatchOpen(true)
+  }
+
+  async function handleDispatch() {
+    if (!selectedIncidentId || !dispatchTeam) return toast.error('Select an incident to dispatch to.')
+    setDispatching(true)
+    try {
+      const response = await fetch(`/api/admin/incidents/${selectedIncidentId}/assignments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rescueUnitId: dispatchTeam.id }) })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) return toast.error(payload.message ?? 'Unable to dispatch team.')
+      toast.success(`${dispatchTeam.name} dispatched!`); setDispatchOpen(false); void loadTeams()
+    } finally { setDispatching(false) }
   }
 
   return (
@@ -73,7 +150,7 @@ export default function TeamsPage() {
           <Button variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800" render={<Link href="/admin/teams/shifts" />}>
             <Calendar className="w-4 h-4 mr-1" /> Shift Schedule
           </Button>
-          <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => void createTeam()}>
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setCreateOpen(true)}>
             <Plus className="w-4 h-4 mr-1" /> Add Team
           </Button>
         </div>
@@ -98,6 +175,7 @@ export default function TeamsPage() {
         {teams.map((unit) => {
           const statusCfg = STATUS_CONFIG[unit.status as TeamStatus] || STATUS_CONFIG.unavailable
           const isExpanded = expanded === unit.id
+          const activeMembers = unit.members?.filter((m: any) => m.is_active) || []
 
           return (
             <Card key={unit.id} className="bg-slate-900 border-slate-700">
@@ -112,7 +190,7 @@ export default function TeamsPage() {
                       </Badge>
                     </div>
                     <h3 className="font-semibold text-white">{unit.name}</h3>
-                    <p className="text-sm text-slate-400">{unit.team_leader_name}</p>
+                    <p className="text-sm text-slate-400">{unit.team_leader_name || 'No leader assigned'}</p>
                   </div>
                   <div className="flex items-center gap-1.5">
                     {unit.contact_number && (
@@ -132,7 +210,7 @@ export default function TeamsPage() {
                 <div className="grid grid-cols-3 gap-3 text-xs">
                   <div>
                     <p className="text-slate-500">Members</p>
-                    <p className="text-white font-medium">{unit.members?.filter((m: any) => m.is_active).length || 0}</p>
+                    <p className="text-white font-medium">{activeMembers.length}</p>
                   </div>
                   <div>
                     <p className="text-slate-500">Vehicle</p>
@@ -147,20 +225,29 @@ export default function TeamsPage() {
                 {/* Expanded details */}
                 {isExpanded && (
                   <div className="pt-3 border-t border-slate-800 space-y-3">
-                    {unit.members && unit.members.length > 0 && (
-                      <div>
-                        <p className="text-xs text-slate-500 mb-2">Team Members</p>
-                        <div className="space-y-1.5">
-                          {unit.members.map((m: any) => (
-                            <div key={m.id} className="flex items-center gap-2">
-                              <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', m.role === 'team_leader' ? 'bg-amber-400' : m.is_active ? 'bg-green-400' : 'bg-slate-600')} />
-                              <span className={cn('text-xs', m.is_active ? 'text-slate-300' : 'text-slate-600 line-through')}>{m.user_name}</span>
-                              {m.role === 'team_leader' && <Badge className="text-xs bg-amber-600/20 text-amber-400 border border-amber-500/30 py-0 px-1">Leader</Badge>}
-                            </div>
-                          ))}
-                        </div>
+                    {/* Members with management */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <p className="text-xs text-slate-500">Team Members</p>
+                        <Button size="sm" variant="ghost" className="h-6 text-xs text-blue-400 hover:text-blue-300 px-2" onClick={() => void openAddMember(unit.id)}>
+                          <UserPlus className="w-3 h-3 mr-1" /> Add
+                        </Button>
                       </div>
-                    )}
+                      {activeMembers.length === 0 && <p className="text-xs text-slate-600 py-2">No members assigned yet.</p>}
+                      <div className="space-y-1.5">
+                        {activeMembers.map((m: any) => (
+                          <div key={m.id} className="flex items-center justify-between group">
+                            <div className="flex items-center gap-2">
+                              <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', m.role === 'team_leader' ? 'bg-amber-400' : 'bg-green-400')} />
+                              <span className="text-xs text-slate-300">{m.user_name}</span>
+                              <Badge className="text-[10px] py-0 px-1 border" variant="outline" style={{ color: m.role === 'team_leader' ? '#fbbf24' : '#94a3b8', borderColor: m.role === 'team_leader' ? 'rgba(245,158,11,0.3)' : 'rgba(100,116,139,0.3)' }}>
+                                {POSITION_LABELS[m.role] || m.role}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
 
                     {unit.vehicle_info && (
                       <div>
@@ -172,7 +259,7 @@ export default function TeamsPage() {
                       </div>
                     )}
 
-                    {unit.equipment.length > 0 && (
+                    {unit.equipment?.length > 0 && (
                       <div>
                         <p className="text-xs text-slate-500 mb-1">Equipment</p>
                         <div className="flex flex-wrap gap-1">
@@ -183,7 +270,7 @@ export default function TeamsPage() {
                       </div>
                     )}
 
-                    {unit.specializations.length > 0 && (
+                    {unit.specializations?.length > 0 && (
                       <div>
                         <p className="text-xs text-slate-500 mb-1">Specializations</p>
                         <div className="flex flex-wrap gap-1">
@@ -211,11 +298,11 @@ export default function TeamsPage() {
                 )}
 
                 <div className="flex gap-2 pt-1">
-                  <Button size="sm" variant="outline" className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800 text-xs" onClick={() => void editTeam(unit)}>
-                    Edit Team
+                  <Button size="sm" variant="outline" className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800 text-xs" onClick={() => { setEditTeamData({ id: unit.id, name: unit.name, code: unit.code, contact_number: unit.contact_number ?? '', status: unit.status }); setEditOpen(true) }}>
+                    <Edit2 className="w-3 h-3 mr-1" /> Edit
                   </Button>
-                  <Button size="sm" variant="outline" className="border-amber-700/50 text-amber-400 hover:bg-amber-900/20 text-xs" onClick={() => toast.info('Open an active incident and use Assign Team to dispatch this unit.')}>
-                    Dispatch
+                  <Button size="sm" variant="outline" className="border-amber-700/50 text-amber-400 hover:bg-amber-900/20 text-xs" disabled={unit.status !== 'available'} onClick={() => void openDispatch(unit)}>
+                    <Send className="w-3 h-3 mr-1" /> Dispatch
                   </Button>
                 </div>
               </CardContent>
@@ -224,22 +311,169 @@ export default function TeamsPage() {
         })}
       </div>
 
-      {/* Add Team Dialog */}
-      <Dialog open={addOpen} onOpenChange={setAddOpen}>
+      {/* Create Team Dialog */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="bg-slate-900 border-slate-700 text-white">
           <DialogHeader>
             <DialogTitle>Add New Rescue Team</DialogTitle>
-            <DialogDescription className="text-slate-400">
-              In demo mode, team creation is simulated. Connect to Supabase to enable real team management.
-            </DialogDescription>
+            <DialogDescription className="text-slate-400">Register a new rescue unit for your municipality.</DialogDescription>
           </DialogHeader>
-          <div className="py-4 text-center text-slate-400 text-sm">
-            <Users className="w-10 h-10 text-slate-600 mx-auto mb-3" />
-            Demo mode — form would appear here
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label className="text-slate-300 text-xs">Team Name *</Label>
+              <Input placeholder="e.g. Bravo Rescue Unit" value={newTeam.name} onChange={e => setNewTeam(p => ({ ...p, name: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-slate-300 text-xs">Team Code *</Label>
+              <Input placeholder="e.g. BRU-01" value={newTeam.code} onChange={e => setNewTeam(p => ({ ...p, code: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-slate-300 text-xs">Contact Number</Label>
+              <Input placeholder="e.g. 09171234567" value={newTeam.contact_number} onChange={e => setNewTeam(p => ({ ...p, contact_number: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+            </div>
           </div>
-          <Button onClick={() => { setAddOpen(false); toast.success('Demo: Team would be created') }} className="bg-blue-600 hover:bg-blue-700 text-white">
-            Simulate Create
-          </Button>
+          <div className="flex gap-2 justify-end">
+            <Button variant="ghost" className="text-slate-400" onClick={() => setCreateOpen(false)}>Cancel</Button>
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => void handleCreateTeam()}>Create Team</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Team Dialog */}
+      <Dialog open={editOpen} onOpenChange={setEditOpen}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle>Edit Rescue Team</DialogTitle>
+          </DialogHeader>
+          {editTeamData && (
+            <div className="space-y-3 py-2">
+              <div className="space-y-1">
+                <Label className="text-slate-300 text-xs">Team Name</Label>
+                <Input value={editTeamData.name} onChange={e => setEditTeamData((p: any) => ({ ...p, name: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-slate-300 text-xs">Code</Label>
+                <Input value={editTeamData.code} onChange={e => setEditTeamData((p: any) => ({ ...p, code: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-slate-300 text-xs">Contact Number</Label>
+                <Input value={editTeamData.contact_number} onChange={e => setEditTeamData((p: any) => ({ ...p, contact_number: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-slate-300 text-xs">Status</Label>
+                <Select value={editTeamData.status} onValueChange={v => setEditTeamData((p: any) => ({ ...p, status: v }))}>
+                  <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-600">
+                    {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+                      <SelectItem key={k} value={k} className="text-white">{v.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          <div className="flex gap-2 justify-end">
+            <Button variant="ghost" className="text-slate-400" onClick={() => setEditOpen(false)}>Cancel</Button>
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => void handleEditTeam()}>Save Changes</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Add Member Dialog */}
+      <Dialog open={addMemberOpen} onOpenChange={setAddMemberOpen}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle>Add Team Member</DialogTitle>
+            <DialogDescription className="text-slate-400">Assign a staff member to this rescue team.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            <div className="space-y-1">
+              <Label className="text-slate-300 text-xs">Staff Member</Label>
+              <Select value={selectedStaffId} onValueChange={setSelectedStaffId}>
+                <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                  <SelectValue placeholder="Select staff member" />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-600">
+                  {staffList.length === 0 && <SelectItem value="none" disabled className="text-slate-500">No staff available</SelectItem>}
+                  {staffList.map((s: any) => (
+                    <SelectItem key={s.id} value={s.id} className="text-white">{s.full_name} ({s.role})</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-slate-300 text-xs">Position</Label>
+              <Select value={selectedPosition} onValueChange={setSelectedPosition}>
+                <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-600">
+                  {Object.entries(POSITION_LABELS).map(([k, v]) => (
+                    <SelectItem key={k} value={k} className="text-white">{v}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="ghost" className="text-slate-400" onClick={() => setAddMemberOpen(false)}>Cancel</Button>
+            <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => void handleAddMember()}>
+              <UserPlus className="w-4 h-4 mr-1" /> Add Member
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dispatch Dialog */}
+      <Dialog open={dispatchOpen} onOpenChange={setDispatchOpen}>
+        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Send className="w-5 h-5 text-amber-400" />
+              Dispatch {dispatchTeam?.name}
+            </DialogTitle>
+            <DialogDescription className="text-slate-400">Select an active incident to dispatch this team to.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 py-2">
+            {activeIncidents.length === 0 ? (
+              <div className="text-center py-6">
+                <p className="text-sm text-slate-500">No active incidents waiting for dispatch.</p>
+                <p className="text-xs text-slate-600 mt-1">Incidents appear here when residents submit emergency requests.</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-64 overflow-y-auto">
+                {activeIncidents.map((incident: any) => (
+                  <div
+                    key={incident.id}
+                    onClick={() => setSelectedIncidentId(incident.id)}
+                    className={cn(
+                      'p-3 rounded-lg border cursor-pointer transition-colors',
+                      selectedIncidentId === incident.id
+                        ? 'border-amber-500 bg-amber-900/20'
+                        : 'border-slate-700 bg-slate-800 hover:border-slate-600'
+                    )}
+                  >
+                    <div className="flex items-start justify-between">
+                      <div>
+                        <p className="text-sm text-white font-medium">{incident.emergency_type || incident.type || 'Emergency'}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{incident.reporter_name || 'Unknown'} · {incident.barangay || incident.address || '—'}</p>
+                        <p className="text-xs text-slate-500 mt-0.5">{incident.description?.slice(0, 80) || 'No description'}</p>
+                      </div>
+                      <Badge variant="outline" className="text-xs border-amber-600/30 text-amber-400 shrink-0">{incident.status}</Badge>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="flex gap-2 justify-end">
+            <Button variant="ghost" className="text-slate-400" onClick={() => setDispatchOpen(false)}>Cancel</Button>
+            <Button disabled={!selectedIncidentId || dispatching} className="bg-amber-600 hover:bg-amber-700 text-white" onClick={() => void handleDispatch()}>
+              <Send className="w-4 h-4 mr-1" /> {dispatching ? 'Dispatching…' : 'Dispatch Now'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

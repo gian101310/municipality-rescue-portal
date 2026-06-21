@@ -151,6 +151,7 @@ export async function POST(request: Request) {
     const confirmPassword = String(body?.confirmPassword ?? '')
     const municipalityCode = clean(body?.municipalityCode)
     const municipalityName = clean(body?.municipality)
+    const qrOrganizationId = clean(body?.organizationId) // from QR scan handoff
 
     if (!fullName) throw new Error('Enter your full name.')
     if (!phone) throw new Error('Enter your phone number.')
@@ -173,7 +174,22 @@ export async function POST(request: Request) {
 
     adminClient = await createAdminClient()
     const admin = adminClient as unknown as SupabaseDataClient
-    const organization = await findOrganization(admin, municipalityCode)
+
+    // If QR scan provided an organization ID, verify it and use it directly
+    let organization: OrganizationRow
+    if (qrOrganizationId) {
+      const { data: qrOrg, error: qrOrgError } = await admin
+        .from('organizations')
+        .select('id, name, slug, is_active')
+        .eq('id', qrOrganizationId)
+        .eq('is_active', true)
+        .maybeSingle<OrganizationRow>()
+      if (qrOrgError) throw new Error(qrOrgError.message ?? 'Unable to verify municipality.')
+      if (!qrOrg) throw new Error('The municipality from the QR code is no longer active.')
+      organization = qrOrg
+    } else {
+      organization = await findOrganization(admin, municipalityCode)
+    }
     const municipality = await findMunicipality(admin, organization.id, municipalityName)
     const referenceNumber = makeReferenceNumber()
 

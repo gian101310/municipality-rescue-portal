@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Save, Plus, Edit2, Eye, EyeOff } from 'lucide-react'
+import { Save, Plus, Edit2, Eye, EyeOff, Upload, Trash2, X, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -57,6 +57,8 @@ export default function SettingsPage() {
   const [orgName, setOrgName] = useState(settings.municipalityName || DEMO_ORGANIZATION.name)
   const [hotline, setHotline] = useState(settings.hotline || DEMO_ORGANIZATION.emergency_hotline)
   const [secondaryHotline, setSecondaryHotline] = useState(settings.secondaryHotline || DEMO_ORGANIZATION.secondary_hotline || '')
+  const [localDescription, setLocalDescription] = useState('')
+  const [dialect, setDialect] = useState('')
   const [email, setEmail] = useState(settings.email || DEMO_ORGANIZATION.email || '')
   const [province, setProvince] = useState(DEMO_ORGANIZATION.province)
   const [region, setRegion] = useState(DEMO_ORGANIZATION.region)
@@ -70,8 +72,50 @@ export default function SettingsPage() {
   const [barangays, setBarangays] = useState<Array<{ id: string; name: string; captain_name: string | null; captain_phone: string | null }>>([])
   const [emergencyTypes, setEmergencyTypes] = useState<Array<{ id: string; name: string; icon: string; color: string; is_active: boolean; organization_id: string | null }>>([])
 
+  const [editingBarangay, setEditingBarangay] = useState<{ id: string; name: string; captain_name: string; captain_phone: string } | null>(null)
+  const [showAddBarangay, setShowAddBarangay] = useState(false)
+  const [newBarangay, setNewBarangay] = useState({ name: '', captain_name: '', captain_phone: '' })
+  const [showCsvImport, setShowCsvImport] = useState(false)
+  const [csvText, setCsvText] = useState('')
+  const [csvImporting, setCsvImporting] = useState(false)
+
   async function loadBarangays() { const response = await fetch('/api/admin/barangays'); const payload = await response.json().catch(() => ({})); if (response.ok) setBarangays(payload.barangays ?? []) }
-  async function addBarangay() { const name = window.prompt('Barangay name')?.trim(); if (!name) return; const captain_name = window.prompt('Captain name (optional)')?.trim() || ''; const captain_phone = window.prompt('Captain phone (optional)')?.trim() || ''; const response = await fetch('/api/admin/barangays', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, captain_name, captain_phone }) }); const payload = await response.json().catch(() => ({})); if (!response.ok) return toast.error(payload.message ?? 'Unable to add barangay.'); toast.success('Barangay saved'); void loadBarangays() }
+
+  async function addBarangay() {
+    if (!newBarangay.name.trim()) return toast.error('Barangay name is required.')
+    const response = await fetch('/api/admin/barangays', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newBarangay) })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) return toast.error(payload.message ?? 'Unable to add barangay.')
+    toast.success('Barangay added'); setShowAddBarangay(false); setNewBarangay({ name: '', captain_name: '', captain_phone: '' }); void loadBarangays()
+  }
+
+  async function saveBarangayEdit() {
+    if (!editingBarangay) return
+    const response = await fetch(`/api/admin/barangays/${editingBarangay.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editingBarangay.name, captain_name: editingBarangay.captain_name, captain_phone: editingBarangay.captain_phone }) })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) return toast.error(payload.message ?? 'Unable to update barangay.')
+    toast.success('Barangay updated'); setEditingBarangay(null); void loadBarangays()
+  }
+
+  async function deleteBarangay(id: string, name: string) {
+    if (!confirm(`Delete barangay "${name}"? This cannot be undone.`)) return
+    const response = await fetch(`/api/admin/barangays/${id}`, { method: 'DELETE' })
+    if (!response.ok) { const p = await response.json().catch(() => ({})); return toast.error(p.message ?? 'Unable to delete.') }
+    toast.success('Barangay deleted'); void loadBarangays()
+  }
+
+  async function importCsv() {
+    if (!csvText.trim()) return toast.error('Paste CSV data first.')
+    setCsvImporting(true)
+    try {
+      const response = await fetch('/api/admin/barangays/import', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ csv: csvText }) })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) return toast.error(payload.message ?? 'Import failed.')
+      toast.success(`Imported ${payload.imported} barangay(s)${payload.skipped ? `, ${payload.skipped} skipped` : ''}`)
+      if (payload.errors?.length) payload.errors.forEach((e: string) => toast.error(e))
+      setShowCsvImport(false); setCsvText(''); void loadBarangays()
+    } finally { setCsvImporting(false) }
+  }
 
   useEffect(() => { void loadBarangays() }, [])
   async function loadEmergencyTypes() { const response = await fetch('/api/admin/emergency-types'); const payload = await response.json().catch(() => ({})); if (response.ok) setEmergencyTypes(payload.emergencyTypes ?? []) }
@@ -156,8 +200,18 @@ export default function SettingsPage() {
       setCoveragePersistence(result.persistence)
     }
 
+    async function loadOrgSettings() {
+      const res = await fetch('/api/admin/organization-settings')
+      const payload = await res.json().catch(() => ({}))
+      if (cancelled || !res.ok) return
+      const s = payload.settings
+      if (s?.branding?.localDescription) setLocalDescription(s.branding.localDescription)
+      if (s?.branding?.dialect) setDialect(s.branding.dialect)
+    }
+
     void loadProfileRole()
     loadSavedCoverageLock()
+    void loadOrgSettings()
 
     return () => {
       cancelled = true
@@ -178,7 +232,7 @@ export default function SettingsPage() {
       mapCenterLat: parseFloat(mapLat) || 0,
       mapCenterLng: parseFloat(mapLng) || 0,
     })
-    const response = await fetch('/api/admin/organization-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emergency_hotline: hotline, secondary_hotline: secondaryHotline }) })
+    const response = await fetch('/api/admin/organization-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emergency_hotline: hotline, secondary_hotline: secondaryHotline, localDescription, dialect }) })
     if (!response.ok) return toast.error('Unable to save municipal contact settings.')
     toast.success('Municipal contact settings saved')
   }
@@ -267,6 +321,20 @@ export default function SettingsPage() {
                 <div className="space-y-1.5">
                   <Label className="text-slate-300">Email</Label>
                   <Input value={email} onChange={(e) => setEmail(e.target.value)} type="email" className="bg-slate-800 border-slate-600 text-white" />
+                </div>
+              </div>
+              <Separator className="bg-slate-800" />
+              <div className="space-y-4">
+                <h3 className="text-sm font-semibold text-slate-300">QR Registration Page</h3>
+                <p className="text-xs text-slate-500">These fields appear on the resident registration page when accessed via QR code poster.</p>
+                <div className="space-y-1.5">
+                  <Label className="text-slate-300">Local Description</Label>
+                  <Input value={localDescription} onChange={(e) => setLocalDescription(e.target.value)} placeholder="e.g. Lungsod ng San Fernando — Serbisyong Pang-emerhensiya" className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" />
+                  <p className="text-xs text-slate-500">Shown on registration page when resident scans QR poster. Supports local language.</p>
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-slate-300">Dialect / Language</Label>
+                  <Input value={dialect} onChange={(e) => setDialect(e.target.value)} placeholder="e.g. Kapampangan, Tagalog, Cebuano" className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" />
                 </div>
               </div>
               <Separator className="bg-slate-800" />
@@ -479,26 +547,91 @@ export default function SettingsPage() {
                   <CardTitle className="text-white text-base">Barangays</CardTitle>
                   <CardDescription className="text-slate-400">Manage barangay list and captains.</CardDescription>
                 </div>
-                <Button size="sm" disabled={!canEditSettings} className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50" onClick={() => void addBarangay()}>
-                  <Plus className="w-4 h-4 mr-1" /> Add
-                </Button>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" disabled={!canEditSettings} className="border-slate-600 text-slate-300 hover:bg-slate-800 disabled:opacity-50" onClick={() => { setShowCsvImport(true); setShowAddBarangay(false) }}>
+                    <Upload className="w-4 h-4 mr-1" /> Import CSV
+                  </Button>
+                  <Button size="sm" disabled={!canEditSettings} className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50" onClick={() => { setShowAddBarangay(true); setShowCsvImport(false) }}>
+                    <Plus className="w-4 h-4 mr-1" /> Add
+                  </Button>
+                </div>
               </div>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {barangays.length === 0 && <p className="text-sm text-slate-500 text-center py-6">No barangays yet. Add your municipality list and captains.</p>}
-                {barangays.map((b) => (
-                  <div key={b.id} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
-                    <div>
-                      <p className="text-sm text-white">{b.name}</p>
-                      <p className="text-xs text-slate-400">{b.captain_name} · {b.captain_phone}</p>
-                    </div>
-                    <Button size="sm" variant="ghost" disabled={!canEditSettings} className="h-7 w-7 p-0 text-slate-400 hover:text-white disabled:opacity-50" onClick={() => toast.info('Edit support is next; add uses live municipal data now.')}>
-                      <Edit2 className="w-3.5 h-3.5" />
+            <CardContent className="space-y-3">
+              {/* Add form */}
+              {showAddBarangay && (
+                <div className="p-3 bg-slate-800 rounded-lg border border-blue-600/50 space-y-2">
+                  <p className="text-xs text-blue-400 font-medium">New Barangay</p>
+                  <Input placeholder="Barangay name *" value={newBarangay.name} onChange={e => setNewBarangay(p => ({ ...p, name: e.target.value }))} className="bg-slate-700 border-slate-600 text-white text-sm" />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input placeholder="Captain name" value={newBarangay.captain_name} onChange={e => setNewBarangay(p => ({ ...p, captain_name: e.target.value }))} className="bg-slate-700 border-slate-600 text-white text-sm" />
+                    <Input placeholder="Captain phone" value={newBarangay.captain_phone} onChange={e => setNewBarangay(p => ({ ...p, captain_phone: e.target.value }))} className="bg-slate-700 border-slate-600 text-white text-sm" />
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button size="sm" variant="ghost" className="text-slate-400" onClick={() => setShowAddBarangay(false)}><X className="w-3.5 h-3.5 mr-1" /> Cancel</Button>
+                    <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => void addBarangay()}><Check className="w-3.5 h-3.5 mr-1" /> Save</Button>
+                  </div>
+                </div>
+              )}
+
+              {/* CSV Import */}
+              {showCsvImport && (
+                <div className="p-3 bg-slate-800 rounded-lg border border-emerald-600/50 space-y-2">
+                  <p className="text-xs text-emerald-400 font-medium">Bulk CSV Import</p>
+                  <p className="text-xs text-slate-400">Paste CSV with columns: name, captain_name, captain_phone (header row required)</p>
+                  <textarea
+                    rows={6}
+                    placeholder={"name,captain_name,captain_phone\nBarangay San Jose,Juan Dela Cruz,09171234567\nBarangay Poblacion,Maria Santos,09181234567"}
+                    value={csvText}
+                    onChange={e => setCsvText(e.target.value)}
+                    className="w-full bg-slate-700 border border-slate-600 text-white text-xs rounded-md p-2 font-mono resize-y"
+                  />
+                  <div className="flex gap-2 justify-end">
+                    <Button size="sm" variant="ghost" className="text-slate-400" onClick={() => { setShowCsvImport(false); setCsvText('') }}><X className="w-3.5 h-3.5 mr-1" /> Cancel</Button>
+                    <Button size="sm" disabled={csvImporting} className="bg-emerald-600 hover:bg-emerald-700 text-white" onClick={() => void importCsv()}>
+                      <Upload className="w-3.5 h-3.5 mr-1" /> {csvImporting ? 'Importing…' : 'Import'}
                     </Button>
+                  </div>
+                </div>
+              )}
+
+              {/* Barangay list */}
+              <div className="space-y-2">
+                {barangays.length === 0 && <p className="text-sm text-slate-500 text-center py-6">No barangays yet. Add individually or import from CSV.</p>}
+                {barangays.map((b) => (
+                  <div key={b.id} className="p-3 bg-slate-800 rounded-lg">
+                    {editingBarangay?.id === b.id ? (
+                      <div className="space-y-2">
+                        <Input value={editingBarangay.name} onChange={e => setEditingBarangay(p => p ? { ...p, name: e.target.value } : p)} className="bg-slate-700 border-slate-600 text-white text-sm" placeholder="Barangay name" />
+                        <div className="grid grid-cols-2 gap-2">
+                          <Input value={editingBarangay.captain_name} onChange={e => setEditingBarangay(p => p ? { ...p, captain_name: e.target.value } : p)} className="bg-slate-700 border-slate-600 text-white text-sm" placeholder="Captain name" />
+                          <Input value={editingBarangay.captain_phone} onChange={e => setEditingBarangay(p => p ? { ...p, captain_phone: e.target.value } : p)} className="bg-slate-700 border-slate-600 text-white text-sm" placeholder="Captain phone" />
+                        </div>
+                        <div className="flex gap-2 justify-end">
+                          <Button size="sm" variant="ghost" className="text-slate-400" onClick={() => setEditingBarangay(null)}><X className="w-3.5 h-3.5 mr-1" /> Cancel</Button>
+                          <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => void saveBarangayEdit()}><Check className="w-3.5 h-3.5 mr-1" /> Save</Button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-sm text-white">{b.name}</p>
+                          <p className="text-xs text-slate-400">{b.captain_name || '—'} · {b.captain_phone || '—'}</p>
+                        </div>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="ghost" disabled={!canEditSettings} className="h-7 w-7 p-0 text-slate-400 hover:text-white disabled:opacity-50" onClick={() => setEditingBarangay({ id: b.id, name: b.name, captain_name: b.captain_name ?? '', captain_phone: b.captain_phone ?? '' })}>
+                            <Edit2 className="w-3.5 h-3.5" />
+                          </Button>
+                          <Button size="sm" variant="ghost" disabled={!canEditSettings} className="h-7 w-7 p-0 text-slate-400 hover:text-red-400 disabled:opacity-50" onClick={() => void deleteBarangay(b.id, b.name)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
+              {barangays.length > 0 && <p className="text-xs text-slate-500 text-right">{barangays.length} barangay(s)</p>}
             </CardContent>
           </Card>
         </TabsContent>
