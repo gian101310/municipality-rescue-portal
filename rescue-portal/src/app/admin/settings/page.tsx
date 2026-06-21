@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { DEMO_ORGANIZATION, DEMO_EMERGENCY_TYPES } from '@/lib/demo-data'
+import { DEMO_ORGANIZATION } from '@/lib/demo-data'
 import {
   DEMO_TENANT_GEO_SCOPE,
   PH_LOCALITIES,
@@ -68,11 +68,15 @@ export default function SettingsPage() {
   const [scopeProvinceCode, setScopeProvinceCode] = useState(DEMO_TENANT_GEO_SCOPE.provinceCode ?? '')
   const [scopeMunicipalityCode, setScopeMunicipalityCode] = useState(DEMO_TENANT_GEO_SCOPE.municipalityCode ?? '')
   const [barangays, setBarangays] = useState<Array<{ id: string; name: string; captain_name: string | null; captain_phone: string | null }>>([])
+  const [emergencyTypes, setEmergencyTypes] = useState<Array<{ id: string; name: string; icon: string; color: string; is_active: boolean; organization_id: string | null }>>([])
 
   async function loadBarangays() { const response = await fetch('/api/admin/barangays'); const payload = await response.json().catch(() => ({})); if (response.ok) setBarangays(payload.barangays ?? []) }
   async function addBarangay() { const name = window.prompt('Barangay name')?.trim(); if (!name) return; const captain_name = window.prompt('Captain name (optional)')?.trim() || ''; const captain_phone = window.prompt('Captain phone (optional)')?.trim() || ''; const response = await fetch('/api/admin/barangays', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, captain_name, captain_phone }) }); const payload = await response.json().catch(() => ({})); if (!response.ok) return toast.error(payload.message ?? 'Unable to add barangay.'); toast.success('Barangay saved'); void loadBarangays() }
 
   useEffect(() => { void loadBarangays() }, [])
+  async function loadEmergencyTypes() { const response = await fetch('/api/admin/emergency-types'); const payload = await response.json().catch(() => ({})); if (response.ok) setEmergencyTypes(payload.emergencyTypes ?? []) }
+  async function addEmergencyType() { const name = window.prompt('Emergency type name')?.trim(); if (!name) return; const response = await fetch('/api/admin/emergency-types', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) }); const payload = await response.json().catch(() => ({})); if (!response.ok) return toast.error(payload.message ?? 'Unable to add emergency type.'); toast.success('Custom emergency type added'); void loadEmergencyTypes() }
+  useEffect(() => { void loadEmergencyTypes() }, [])
 
   const currentScope = makeTenantScope(
     scopeLevel,
@@ -437,23 +441,23 @@ export default function SettingsPage() {
                   <CardTitle className="text-white text-base">Emergency Types</CardTitle>
                   <CardDescription className="text-slate-400">Configure available emergency categories.</CardDescription>
                 </div>
-                <Button size="sm" disabled={!canEditSettings} className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50" onClick={() => toast.info('Demo: Add type dialog')}>
+                <Button size="sm" disabled={!canEditSettings} className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50" onClick={() => void addEmergencyType()}>
                   <Plus className="w-4 h-4 mr-1" /> Add Type
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {DEMO_EMERGENCY_TYPES.map((et) => (
+                {emergencyTypes.map((et) => (
                   <div key={et.id} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
                     <div className="flex items-center gap-3">
                       <div className="w-3 h-3 rounded-full" style={{ background: et.color }} />
                       <span className="text-sm text-white">{et.name}</span>
-                      <Badge variant="outline" className="text-xs border-slate-600 text-slate-400">{et.triage_questions.length} questions</Badge>
+                      <Badge variant="outline" className="text-xs border-slate-600 text-slate-400">{et.organization_id ? 'Custom' : 'Default'}</Badge>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Switch checked={et.is_active} disabled={!canEditSettings} onCheckedChange={() => toast.info('Demo: Toggle type')} />
-                      <Button size="sm" variant="ghost" disabled={!canEditSettings} className="h-7 w-7 p-0 text-slate-400 hover:text-white disabled:opacity-50" onClick={() => toast.info('Demo: Edit type')}>
+                      <Switch checked={et.is_active} disabled={!canEditSettings || !et.organization_id} onCheckedChange={async (is_active) => { if (!et.organization_id) return; await fetch(`/api/admin/emergency-types/${et.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...et, is_active }) }); void loadEmergencyTypes() }} />
+                      <Button size="sm" variant="ghost" disabled={!canEditSettings || !et.organization_id} className="h-7 w-7 p-0 text-slate-400 hover:text-white disabled:opacity-50" onClick={() => toast.info('Custom type editing uses its live settings API; defaults are protected.')}>
                         <Edit2 className="w-3.5 h-3.5" />
                       </Button>
                     </div>
