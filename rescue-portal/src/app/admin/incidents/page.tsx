@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { Search, Filter, Eye, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Search, Filter, Eye, ChevronLeft, ChevronRight, Send } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,10 +11,13 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue
 } from '@/components/ui/select'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
+} from '@/components/ui/dialog'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
-import { formatRelativeTime } from '@/lib/utils'
+import { formatRelativeTime, cn } from '@/lib/utils'
 import type { DemoIncident, EmergencyType, IncidentStatus, SeverityLevel } from '@/lib/types'
 import { toast } from 'sonner'
 
@@ -40,6 +43,51 @@ export default function IncidentsPage() {
   const [page, setPage] = useState(1)
   const [incidents, setIncidents] = useState<DemoIncident[]>([])
   const [loading, setLoading] = useState(true)
+
+  // Dispatch dialog state
+  const [dispatchOpen, setDispatchOpen] = useState(false)
+  const [dispatchIncident, setDispatchIncident] = useState<DemoIncident | null>(null)
+  const [availableTeams, setAvailableTeams] = useState<Array<{ id: string; name: string; status: string; team_leader_name?: string; contact_number?: string }>>([])
+  const [loadingTeams, setLoadingTeams] = useState(false)
+  const [assigningTeamId, setAssigningTeamId] = useState<string | null>(null)
+
+  async function openDispatch(incident: DemoIncident) {
+    setDispatchIncident(incident)
+    setDispatchOpen(true)
+    setLoadingTeams(true)
+    try {
+      const res = await fetch('/api/admin/teams')
+      const data = await res.json().catch(() => ({}))
+      setAvailableTeams(data.teams ?? [])
+    } catch {
+      toast.error('Unable to load teams')
+    } finally {
+      setLoadingTeams(false)
+    }
+  }
+
+  async function confirmDispatch(teamId: string) {
+    if (!dispatchIncident) return
+    setAssigningTeamId(teamId)
+    try {
+      const res = await fetch(`/api/admin/incidents/${dispatchIncident.id}/assignments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rescueUnitId: teamId }),
+      })
+      const payload = await res.json().catch(() => ({}))
+      if (!res.ok) return toast.error(payload.message ?? 'Unable to dispatch team.')
+      // Update the incident in the list
+      setIncidents((prev) => prev.map((inc) => inc.id === dispatchIncident.id ? (payload.incident as DemoIncident) : inc))
+      const teamName = availableTeams.find((t) => t.id === teamId)?.name ?? 'team'
+      toast.success(`Dispatched ${teamName} to ${dispatchIncident.reference_number}`)
+      setDispatchOpen(false)
+    } catch {
+      toast.error('Unable to dispatch team')
+    } finally {
+      setAssigningTeamId(null)
+    }
+  }
 
   useEffect(() => {
     const timer = window.setTimeout(async () => {
@@ -223,9 +271,16 @@ export default function IncidentsPage() {
                       <span className="text-xs text-slate-500 whitespace-nowrap">{formatRelativeTime(inc.created_at)}</span>
                     </td>
                     <td className="px-4 py-3">
-                      <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-400 hover:text-white" render={<Link href={`/admin/incidents/${inc.id}`} />}>
-                        <Eye className="w-3.5 h-3.5" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        {!['resolved', 'closed', 'false_alert', 'cancelled', 'duplicate', 'invalid'].includes(inc.status) && (
+                          <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-amber-400 hover:text-amber-300 hover:bg-amber-900/20" title="Dispatch team" onClick={() => void openDispatch(inc)}>
+                            <Send className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-slate-400 hover:text-white" render={<Link href={`/admin/incidents/${inc.id}`} />}>
+                          <Eye className="w-3.5 h-3.5" />
+                        </Button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -252,6 +307,67 @@ export default function IncidentsPage() {
           )}
         </CardContent>
       </Card>
+      {/* Dispatch Team Dialog */}
+      <Dialog open={dispatchOpen} onOpenChange={setDispatchOpen}>
+        <DialogContent className="bg-slate-900 border-slate-700 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">Dispatch Rescue Team</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              {dispatchIncident && (
+                <>Select a team to dispatch for <span className="font-mono text-slate-300">{dispatchIncident.reference_number}</span> — {dispatchIncident.emergency_type?.name}</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {loadingTeams ? (
+              <p className="text-center text-slate-500 py-6">Loading teams...</p>
+            ) : availableTeams.length === 0 ? (
+              <p className="text-center text-slate-500 py-6">No rescue teams found. Add teams in the Rescue Teams section.</p>
+            ) : (
+              availableTeams.map((team) => {
+                const isAvailable = team.status === 'available'
+                return (
+                  <button
+                    key={team.id}
+                    onClick={() => void confirmDispatch(team.id)}
+                    disabled={assigningTeamId !== null || !isAvailable}
+                    className={cn(
+                      'w-full p-3 rounded-lg border text-left transition-colors',
+                      isAvailable
+                        ? 'border-slate-700 hover:border-amber-500 hover:bg-slate-800 cursor-pointer'
+                        : 'border-slate-800 opacity-50 cursor-not-allowed',
+                      assigningTeamId === team.id && 'border-amber-500 bg-amber-900/20'
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-white text-sm">{team.name}</p>
+                        {team.team_leader_name && (
+                          <p className="text-xs text-slate-400">Leader: {team.team_leader_name}</p>
+                        )}
+                        {team.contact_number && (
+                          <p className="text-xs text-slate-500">{team.contact_number}</p>
+                        )}
+                      </div>
+                      <Badge className={cn(
+                        'text-xs border',
+                        isAvailable
+                          ? 'bg-green-600/20 text-green-400 border-green-500/30'
+                          : 'bg-amber-600/20 text-amber-400 border-amber-500/30'
+                      )}>
+                        {team.status}
+                      </Badge>
+                    </div>
+                    {assigningTeamId === team.id && (
+                      <p className="text-xs text-amber-400 mt-1">Dispatching...</p>
+                    )}
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
