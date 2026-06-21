@@ -11,7 +11,7 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { DEMO_ORGANIZATION, DEMO_EMERGENCY_TYPES, DEMO_BARANGAYS } from '@/lib/demo-data'
+import { DEMO_ORGANIZATION, DEMO_EMERGENCY_TYPES } from '@/lib/demo-data'
 import {
   DEMO_TENANT_GEO_SCOPE,
   PH_LOCALITIES,
@@ -67,6 +67,12 @@ export default function SettingsPage() {
   const [scopeRegionCode, setScopeRegionCode] = useState(DEMO_TENANT_GEO_SCOPE.regionCode ?? '')
   const [scopeProvinceCode, setScopeProvinceCode] = useState(DEMO_TENANT_GEO_SCOPE.provinceCode ?? '')
   const [scopeMunicipalityCode, setScopeMunicipalityCode] = useState(DEMO_TENANT_GEO_SCOPE.municipalityCode ?? '')
+  const [barangays, setBarangays] = useState<Array<{ id: string; name: string; captain_name: string | null; captain_phone: string | null }>>([])
+
+  async function loadBarangays() { const response = await fetch('/api/admin/barangays'); const payload = await response.json().catch(() => ({})); if (response.ok) setBarangays(payload.barangays ?? []) }
+  async function addBarangay() { const name = window.prompt('Barangay name')?.trim(); if (!name) return; const captain_name = window.prompt('Captain name (optional)')?.trim() || ''; const captain_phone = window.prompt('Captain phone (optional)')?.trim() || ''; const response = await fetch('/api/admin/barangays', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, captain_name, captain_phone }) }); const payload = await response.json().catch(() => ({})); if (!response.ok) return toast.error(payload.message ?? 'Unable to add barangay.'); toast.success('Barangay saved'); void loadBarangays() }
+
+  useEffect(() => { void loadBarangays() }, [])
 
   const currentScope = makeTenantScope(
     scopeLevel,
@@ -467,20 +473,21 @@ export default function SettingsPage() {
                   <CardTitle className="text-white text-base">Barangays</CardTitle>
                   <CardDescription className="text-slate-400">Manage barangay list and captains.</CardDescription>
                 </div>
-                <Button size="sm" disabled={!canEditSettings} className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50" onClick={() => toast.info('Demo: Add barangay')}>
+                <Button size="sm" disabled={!canEditSettings} className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50" onClick={() => void addBarangay()}>
                   <Plus className="w-4 h-4 mr-1" /> Add
                 </Button>
               </div>
             </CardHeader>
             <CardContent>
               <div className="space-y-2">
-                {DEMO_BARANGAYS.map((b) => (
+                {barangays.length === 0 && <p className="text-sm text-slate-500 text-center py-6">No barangays yet. Add your municipality list and captains.</p>}
+                {barangays.map((b) => (
                   <div key={b.id} className="flex items-center justify-between p-3 bg-slate-800 rounded-lg">
                     <div>
                       <p className="text-sm text-white">{b.name}</p>
                       <p className="text-xs text-slate-400">{b.captain_name} · {b.captain_phone}</p>
                     </div>
-                    <Button size="sm" variant="ghost" disabled={!canEditSettings} className="h-7 w-7 p-0 text-slate-400 hover:text-white disabled:opacity-50" onClick={() => toast.info('Demo: Edit barangay')}>
+                    <Button size="sm" variant="ghost" disabled={!canEditSettings} className="h-7 w-7 p-0 text-slate-400 hover:text-white disabled:opacity-50" onClick={() => toast.info('Edit support is next; add uses live municipal data now.')}>
                       <Edit2 className="w-3.5 h-3.5" />
                     </Button>
                   </div>
