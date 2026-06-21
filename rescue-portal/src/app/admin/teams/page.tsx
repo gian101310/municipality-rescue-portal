@@ -348,7 +348,7 @@ export default function TeamsPage() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1">
                   <Label className="text-slate-300 text-xs">Vehicle Type</Label>
-                  <Select value={newTeam.vehicle_type} onValueChange={v => setNewTeam(p => ({ ...p, vehicle_type: v }))}>
+                  <Select value={newTeam.vehicle_type} onValueChange={(v) => setNewTeam(p => ({ ...p, vehicle_type: v ?? '' }))}>
                     <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
                       <SelectValue placeholder="Select vehicle" />
                     </SelectTrigger>
@@ -381,7 +381,7 @@ export default function TeamsPage() {
                   </Badge>
                 ))}
               </div>
-              <Select onValueChange={v => { if (v && !newTeam.equipment.includes(v)) setNewTeam(p => ({ ...p, equipment: [...p.equipment, v] })) }}>
+              <Select onValueChange={(v) => { const s = String(v || ''); if (s && !newTeam.equipment.includes(s)) setNewTeam(p => ({ ...p, equipment: [...p.equipment, s] })) }}>
                 <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
                   <SelectValue placeholder="Add equipment..." />
                 </SelectTrigger>
@@ -506,7 +506,7 @@ export default function TeamsPage() {
           <div className="space-y-3 py-2">
             <div className="space-y-1">
               <Label className="text-slate-300 text-xs">Staff Member</Label>
-              <Select value={selectedStaffId} onValueChange={setSelectedStaffId}>
+              <Select value={selectedStaffId} onValueChange={(v) => setSelectedStaffId(v ?? '')}>
                 <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
                   <SelectValue placeholder="Select staff member" />
                 </SelectTrigger>
@@ -520,7 +520,7 @@ export default function TeamsPage() {
             </div>
             <div className="space-y-1">
               <Label className="text-slate-300 text-xs">Position</Label>
-              <Select value={selectedPosition} onValueChange={setSelectedPosition}>
+              <Select value={selectedPosition} onValueChange={(v) => setSelectedPosition(v ?? '')}>
                 <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
                   <SelectValue />
                 </SelectTrigger>

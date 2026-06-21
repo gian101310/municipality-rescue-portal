@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, Phone, Shield, Upload } from 'lucide-react'
@@ -79,7 +79,15 @@ interface MunicipalityInfo {
   dialect: string | null
 }
 
-export default function RegisterPage() {
+export default function RegisterPageWrapper() {
+  return (
+    <Suspense fallback={<div className="min-h-screen bg-slate-950 flex items-center justify-center"><p className="text-slate-400">Loading...</p></div>}>
+      <RegisterPage />
+    </Suspense>
+  )
+}
+
+function RegisterPage() {
   const searchParams = useSearchParams()
   const municipalityParam = searchParams.get('municipality')
 
