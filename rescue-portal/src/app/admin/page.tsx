@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import {
   AlertTriangle, Users, CheckCircle2, Clock, Activity,
@@ -24,6 +24,8 @@ import type { DemoIncident, EmergencyType } from '@/lib/types'
 import { useRealtimeIncidents } from '@/lib/use-realtime-incidents'
 import { playAdminNotificationSound } from '@/lib/notification-sound'
 import { EscalationMonitor } from '@/components/escalation-monitor'
+import { MapView } from '@/components/map-view'
+import { buildDashboardIncidentMarkers } from '@/lib/dashboard-live-map'
 
 const ACTIVE_STATUSES = ['submitted', 'received', 'verification_pending', 'verified', 'assigned', 'dispatched', 'on_the_way', 'arrived', 'operation_in_progress']
 
@@ -146,6 +148,11 @@ export default function CommandCenterPage() {
     }
     return true
   })
+
+  const dashboardMapMarkers = useMemo(() => buildDashboardIncidentMarkers(incidents), [incidents])
+  const dashboardMapCenter = dashboardMapMarkers[0]
+    ? { lat: dashboardMapMarkers[0].lat, lng: dashboardMapMarkers[0].lng }
+    : { lat: settings.mapCenterLat, lng: settings.mapCenterLng }
 
   function handleSubmitManualAlert() {
     if (!alertType || !alertDescription.trim()) {
@@ -298,6 +305,33 @@ export default function CommandCenterPage() {
             <Map className="w-4 h-4 mr-1" /> View Map
         </Button>
       </div>
+
+      <Card className="bg-slate-900 border-slate-700">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-white text-base flex items-center gap-2">
+                <Map className="w-4 h-4 text-blue-400" />
+                Live GPS Map
+              </CardTitle>
+              <p className="text-xs text-slate-500 mt-1">Incoming SOS locations appear here immediately.</p>
+            </div>
+            <Badge className={realtimeConnected
+              ? 'bg-green-500/20 text-green-400 border-green-500/30'
+              : 'bg-amber-500/20 text-amber-300 border-amber-500/30'}>
+              {realtimeConnected ? 'LIVE' : 'RECONNECTING'}
+            </Badge>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <MapView
+            center={dashboardMapCenter}
+            zoom={dashboardMapMarkers.length ? 15 : 12}
+            markers={dashboardMapMarkers}
+            height="360px"
+          />
+        </CardContent>
+      </Card>
 
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
         {/* Live Incidents Table */}

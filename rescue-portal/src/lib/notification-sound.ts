@@ -8,6 +8,8 @@ type WindowWithAudio = Window & {
   webkitAudioContext?: typeof AudioContext
 }
 
+let adminAudioContext: AudioContext | null = null
+
 export function getStoredSoundPreference(storage: ReadableStorage | null) {
   try {
     return storage?.getItem(SOUND_PREF_KEY) === 'enabled'
@@ -24,15 +26,47 @@ export function setStoredSoundPreference(storage: WritableStorage | null, enable
   }
 }
 
-function playTone(frequency: number, startTime: number, duration: number, volume: number) {
-  if (typeof window === 'undefined') return
+export function shouldAutoEnableAdminSound(storage: ReadableStorage | null) {
+  try {
+    return storage?.getItem(SOUND_PREF_KEY) !== 'disabled'
+  } catch {
+    return true
+  }
+}
+
+function getAdminAudioContext() {
+  if (typeof window === 'undefined') return null
+  if (adminAudioContext) return adminAudioContext
 
   const audioWindow = window as WindowWithAudio
   const AudioContextCtor = audioWindow.AudioContext ?? audioWindow.webkitAudioContext
-  if (!AudioContextCtor) return
+  if (!AudioContextCtor) return null
 
   try {
-    const context = new AudioContextCtor()
+    adminAudioContext = new AudioContextCtor()
+    return adminAudioContext
+  } catch {
+    return null
+  }
+}
+
+export async function armAdminNotificationSound() {
+  const context = getAdminAudioContext()
+  if (!context) return false
+
+  try {
+    if (context.state === 'suspended') await context.resume()
+    return context.state === 'running'
+  } catch {
+    return false
+  }
+}
+
+function playTone(frequency: number, startTime: number, duration: number, volume: number) {
+  const context = adminAudioContext
+  if (!context || context.state !== 'running') return
+
+  try {
     const oscillator = context.createOscillator()
     const gain = context.createGain()
 
@@ -47,17 +81,16 @@ function playTone(frequency: number, startTime: number, duration: number, volume
     oscillator.start(context.currentTime + startTime)
     oscillator.stop(context.currentTime + startTime + duration + 0.02)
 
-    window.setTimeout(() => {
-      void context.close().catch(() => null)
-    }, (startTime + duration + 0.08) * 1000)
   } catch {
     // Audio is optional; blocked playback should not break the UI.
   }
 }
 
 export function playSosDemoSound() {
-  playTone(880, 0, 0.16, 0.09)
-  playTone(660, 0.24, 0.18, 0.06)
+  void armAdminNotificationSound().then(() => {
+    playTone(880, 0, 0.16, 0.09)
+    playTone(660, 0.24, 0.18, 0.06)
+  })
 }
 
 export function getIncidentAlarmPattern() {
@@ -65,6 +98,8 @@ export function getIncidentAlarmPattern() {
 }
 
 export function playAdminNotificationSound() {
+  if (typeof window === 'undefined' || !getStoredSoundPreference(window.localStorage)) return
+
   getIncidentAlarmPattern().forEach((frequency, index) => {
     playTone(frequency, index * 0.22, 0.16, 0.075)
   })

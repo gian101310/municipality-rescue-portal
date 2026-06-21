@@ -5,6 +5,7 @@ import {
   getIncidentAlarmPattern,
   getStoredSoundPreference,
   setStoredSoundPreference,
+  shouldAutoEnableAdminSound,
 } from './notification-sound.ts'
 
 test('sound preference defaults to false when storage is unavailable', () => {
@@ -18,6 +19,12 @@ test('incident alarm uses a repeated urgent pattern', () => {
 test('sound preference reads true only from the enabled value', () => {
   assert.equal(getStoredSoundPreference({ getItem: () => 'enabled' }), true)
   assert.equal(getStoredSoundPreference({ getItem: () => 'disabled' }), false)
+})
+
+test('automatic audio arming preserves an explicit mute', () => {
+  assert.equal(shouldAutoEnableAdminSound(null), true)
+  assert.equal(shouldAutoEnableAdminSound({ getItem: () => 'enabled' }), true)
+  assert.equal(shouldAutoEnableAdminSound({ getItem: () => 'disabled' }), false)
 })
 
 test('setStoredSoundPreference writes stable enabled and disabled values', () => {

@@ -4,9 +4,10 @@ import { useEffect, useState } from 'react'
 import { Bell, BellOff } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
-  getStoredSoundPreference,
+  armAdminNotificationSound,
   playAdminNotificationSound,
   setStoredSoundPreference,
+  shouldAutoEnableAdminSound,
 } from '@/lib/notification-sound'
 import { toast } from 'sonner'
 
@@ -16,21 +17,42 @@ export function AdminSoundToggle() {
 
   useEffect(() => {
     const id = window.setTimeout(() => {
-      setEnabled(getStoredSoundPreference(window.localStorage))
+      setEnabled(shouldAutoEnableAdminSound(window.localStorage))
       setMounted(true)
     }, 0)
 
     return () => window.clearTimeout(id)
   }, [])
 
-  function toggleSound() {
+  useEffect(() => {
+    function armOnFirstInteraction() {
+      if (shouldAutoEnableAdminSound(window.localStorage)) {
+        setStoredSoundPreference(window.localStorage, true)
+        setEnabled(true)
+      }
+      void armAdminNotificationSound()
+      window.removeEventListener('pointerdown', armOnFirstInteraction)
+      window.removeEventListener('keydown', armOnFirstInteraction)
+    }
+
+    window.addEventListener('pointerdown', armOnFirstInteraction)
+    window.addEventListener('keydown', armOnFirstInteraction)
+
+    return () => {
+      window.removeEventListener('pointerdown', armOnFirstInteraction)
+      window.removeEventListener('keydown', armOnFirstInteraction)
+    }
+  }, [])
+
+  async function toggleSound() {
     const next = !enabled
     setEnabled(next)
     setStoredSoundPreference(window.localStorage, next)
 
     if (next) {
+      const armed = await armAdminNotificationSound()
       playAdminNotificationSound()
-      toast.success('Notification sound enabled')
+      toast.success(armed ? 'Incident alarm enabled' : 'Tap the page once to enable browser audio')
     } else {
       toast.info('Notification sound muted')
     }
