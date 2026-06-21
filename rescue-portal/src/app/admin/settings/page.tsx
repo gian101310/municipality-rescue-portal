@@ -164,7 +164,7 @@ export default function SettingsPage() {
     }
   }, [])
 
-  function save() {
+  async function save() {
     if (!canEditSettings) {
       toast.error('Unlock settings with the secret key first.')
       return
@@ -178,7 +178,9 @@ export default function SettingsPage() {
       mapCenterLat: parseFloat(mapLat) || 0,
       mapCenterLng: parseFloat(mapLng) || 0,
     })
-    toast.success('Settings saved — changes reflected across the portal')
+    const response = await fetch('/api/admin/organization-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emergency_hotline: hotline, secondary_hotline: secondaryHotline }) })
+    if (!response.ok) return toast.error('Unable to save municipal contact settings.')
+    toast.success('Municipal contact settings saved')
   }
 
   async function saveCoverage() {
