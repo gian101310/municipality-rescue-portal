@@ -167,6 +167,15 @@ export async function PATCH(
         created_at: now,
       })
 
+    // Release the assigned rescue team back to "available" when the incident reaches a terminal state
+    const terminalStatuses: IncidentStatus[] = ['resolved', 'closed', 'false_alert', 'cancelled', 'duplicate', 'invalid', 'unable_to_contact', 'transferred']
+    if (terminalStatuses.includes(status) && updatedIncident.assigned_unit_id) {
+      await admin
+        .from('rescue_units')
+        .update({ status: 'available', updated_at: now })
+        .eq('id', updatedIncident.assigned_unit_id as string)
+    }
+
     const { data: emergencyTypes } = await admin
       .from('emergency_types')
       .select('id, name, icon, color, description') as QueryResult<EmergencyTypeRow[]>
