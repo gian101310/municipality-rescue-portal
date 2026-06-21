@@ -34,6 +34,7 @@ function LoginContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const defaultRole = searchParams.get('role') === 'resident' ? 'resident' : 'staff'
+  const redirectTo = searchParams.get('redirect')
   const [activeTab, setActiveTab] = useState<'resident' | 'staff'>(defaultRole as 'resident' | 'staff')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -96,7 +97,10 @@ function LoginContent() {
         return
       }
 
-      if (profile.role === 'super_admin') {
+      if (redirectTo && (redirectTo.startsWith('/admin') || redirectTo.startsWith('/super-admin') || redirectTo.startsWith('/resident'))) {
+        toast.success('Signed in successfully')
+        router.push(redirectTo)
+      } else if (profile.role === 'super_admin') {
         toast.success('Welcome back, Boss!')
         router.push('/super-admin')
       } else if (profile.role === 'resident') {

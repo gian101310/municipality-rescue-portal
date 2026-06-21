@@ -1,6 +1,9 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
+const PROTECTED_PREFIXES = ['/admin', '/super-admin', '/resident']
+const LOGIN_PATH = '/auth/login'
+
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
@@ -28,8 +31,20 @@ export async function middleware(request: NextRequest) {
     },
   })
 
-  // Refresh the auth session (important!)
-  await supabase.auth.getUser()
+  // Refresh the auth session
+  const { data: { user } } = await supabase.auth.getUser()
+
+  const pathname = request.nextUrl.pathname
+
+  // Protect admin and super-admin routes
+  const isProtected = PROTECTED_PREFIXES.some((prefix) => pathname.startsWith(prefix))
+
+  if (isProtected && !user) {
+    const loginUrl = request.nextUrl.clone()
+    loginUrl.pathname = LOGIN_PATH
+    loginUrl.searchParams.set('redirect', pathname)
+    return NextResponse.redirect(loginUrl)
+  }
 
   return supabaseResponse
 }
