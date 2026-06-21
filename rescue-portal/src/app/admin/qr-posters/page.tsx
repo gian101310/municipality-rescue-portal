@@ -10,10 +10,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useSettings } from '@/lib/settings-context'
 import { DEMO_ORGANIZATION, DEMO_BARANGAYS } from '@/lib/demo-data'
 import { toast } from 'sonner'
+import QRCode from 'qrcode'
 
 const BARANGAYS = DEMO_BARANGAYS.map((b) => b.name)
 
-// Simple QR code generator using SVG (no external dep needed)
 function generateQRMatrix(data: string): boolean[][] {
   // This is a simplified visual representation — in production use a real QR lib
   const size = 25
@@ -91,10 +91,14 @@ export default function QRPostersPage() {
   const [posterTitle, setPosterTitle] = useState('')
   const [customMessage, setCustomMessage] = useState('')
   const [posterStyle, setPosterStyle] = useState<'standard' | 'emergency'>('standard')
+  const [qrImage, setQrImage] = useState('')
+  const [municipalityName, setMunicipalityName] = useState(settings.municipalityName)
   const posterRef = useRef<HTMLDivElement>(null)
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://rescue-portal.vercel.app'
-  const emergencyUrl = `${baseUrl}/auth/login?role=resident&barangay=${encodeURIComponent(selectedBarangay)}`
+  const emergencyUrl = `${baseUrl}/auth/register`
+
+  useEffect(() => { void (async () => { const response = await fetch('/api/admin/qr-context'); const payload = await response.json().catch(() => ({})); if (response.ok) { setMunicipalityName(payload.organization?.name ?? municipalityName); const url = `${baseUrl}/auth/register?municipality=${encodeURIComponent(payload.organizationId)}`; setQrImage(await QRCode.toDataURL(url, { width: 600, margin: 2 })) } })() }, [])
 
   const title = posterTitle || `${settings.municipalityName} Emergency Rescue`
 
@@ -191,7 +195,7 @@ export default function QRPostersPage() {
                 <Shield className="w-8 h-8 text-white" />
                 <span className="text-white font-black text-2xl tracking-tight">Emergency Rescue Portal</span>
               </div>
-              <p className="text-white/90 text-sm font-medium">{settings.municipalityName}</p>
+              <p className="text-white/90 text-sm font-medium">{municipalityName}</p>
             </div>
 
             {/* Body */}
@@ -199,12 +203,12 @@ export default function QRPostersPage() {
               <h2 className="text-2xl font-black text-slate-900 mb-1">{title}</h2>
               <div className="flex items-center justify-center gap-1.5 text-slate-600 mb-6">
                 <MapPin className="w-4 h-4" />
-                <span className="text-sm font-medium">Barangay {selectedBarangay}</span>
+                <span className="text-sm font-medium">{municipalityName}</span>
               </div>
 
               {/* QR Code */}
               <div className="inline-block p-4 bg-white border-4 border-slate-900 rounded-xl mb-4">
-                <QRCodeSVG data={emergencyUrl} size={200} />
+                {qrImage ? <img src={qrImage} alt={`QR code for ${municipalityName}`} width={200} height={200} /> : <QRCodeSVG data={emergencyUrl} size={200} />}
               </div>
 
               <p className="text-lg font-bold text-slate-800 mb-1">
