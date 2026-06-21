@@ -27,6 +27,7 @@ import type { DemoIncident, IncidentStatus, RescueUnit } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { buildStatusUpdateRequest } from '@/lib/incident-status-actions'
 import { buildEscalationPayload, buildVerificationRequest } from '@/lib/incident-actions'
+import { getIncidentDetailMarker } from '@/lib/incident-detail-location'
 
 const ALL_STATUSES: IncidentStatus[] = [
   'received', 'verification_pending', 'verified', 'assigned', 'dispatched',
@@ -94,14 +95,14 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
   // Assigned unit info will be loaded from real data when teams feature is built
   const assignedUnit = null as RescueUnit | null
 
-  const mapMarker = [{
+  const mapMarker = getIncidentDetailMarker({
     id: incident.id,
-    lat: incident.latitude,
-    lng: incident.longitude,
-    label: incident.reference_number.slice(-6),
+    latitude: incident.latitude,
+    longitude: incident.longitude,
+    referenceNumber: incident.reference_number,
     color: incident.emergency_type.color,
-    pulse: ['submitted', 'on_the_way', 'arrived'].includes(incident.status),
-  }]
+    isActive: !['resolved', 'closed', 'false_alert', 'cancelled'].includes(incident.status),
+  })
 
   async function applyStatus(status: IncidentStatus, reason = '') {
     if (!incident) return
@@ -279,13 +280,21 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-3">
-              <MapView
-                center={{ lat: incident.latitude, lng: incident.longitude }}
-                zoom={14}
-                markers={mapMarker}
-                selectedMarkerId={incident.id}
-                height="220px"
-              />
+              {mapMarker ? (
+                <MapView
+                  center={{ lat: mapMarker.lat, lng: mapMarker.lng }}
+                  zoom={16}
+                  markers={[mapMarker]}
+                  selectedMarkerId={incident.id}
+                  height="220px"
+                />
+              ) : (
+                <div className="flex h-[220px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-950/40 px-6 text-center">
+                  <MapPin className="mb-2 h-6 w-6 text-slate-600" />
+                  <p className="text-sm font-medium text-slate-300">Reporter location was not shared</p>
+                  <p className="mt-1 text-xs text-slate-500">Use the reported address or contact the reporter for directions.</p>
+                </div>
+              )}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <p className="text-xs text-slate-500">Barangay</p>
@@ -297,16 +306,18 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">Coordinates</p>
-                  <p className="text-sm font-mono text-slate-300">{incident.latitude.toFixed(5)}, {incident.longitude.toFixed(5)}</p>
+                  <p className="text-sm font-mono text-slate-300">{mapMarker ? `${mapMarker.lat.toFixed(5)}, ${mapMarker.lng.toFixed(5)}` : 'Not shared'}</p>
                 </div>
                 <div>
                   <p className="text-xs text-slate-500">GPS Accuracy</p>
                   <p className="text-sm text-slate-300">{incident.gps_accuracy ? `±${incident.gps_accuracy}m` : '—'}</p>
                 </div>
               </div>
-              <Button size="sm" variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 w-full" render={<a href={`https://www.google.com/maps?q=${incident.latitude},${incident.longitude}`} target="_blank" rel="noopener noreferrer" />}>
-                <ExternalLink className="w-3.5 h-3.5 mr-1" /> Open in Google Maps
-              </Button>
+              {mapMarker && (
+                <Button size="sm" variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 w-full" render={<a href={`https://www.google.com/maps?q=${mapMarker.lat},${mapMarker.lng}`} target="_blank" rel="noopener noreferrer" />}>
+                  <ExternalLink className="w-3.5 h-3.5 mr-1" /> Open reporter pin in Google Maps
+                </Button>
+              )}
             </CardContent>
           </Card>
 
