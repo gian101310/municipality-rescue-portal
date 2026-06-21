@@ -106,6 +106,13 @@ export const ROLE_PERMISSIONS: Record<UserRole, Permission[]> = {
     'residents:reject',
     'dashboard:view_admin',
   ],
+  staff: [
+    'incidents:view_all', 'incidents:create', 'incidents:update_status',
+    'incidents:assign_unit', 'incidents:verify', 'incidents:close',
+    'residents:view_all',
+    'units:view_all', 'units:manage', 'units:update_status',
+    'dashboard:view_admin',
+  ],
   resident: [
     'incidents:view_own', 'incidents:create',
   ],
@@ -161,6 +168,7 @@ export function getDefaultRoute(role: UserRole): string {
     case 'admin':
     case 'dispatcher':
     case 'verifier':
+    case 'staff':
       return '/admin'
     case 'team_leader':
     case 'responder':
@@ -257,7 +265,7 @@ export async function requireAuth(allowedRoles?: UserRole[]): Promise<UserProfil
  * Redirects with an unauthorized error if the user is a resident.
  */
 export async function requireStaff(): Promise<UserProfile> {
-  return requireAuth(['super_admin', 'admin', 'dispatcher', 'team_leader', 'responder', 'verifier'])
+  return requireAuth(['super_admin', 'admin', 'dispatcher', 'team_leader', 'responder', 'verifier', 'staff'])
 }
 
 /**

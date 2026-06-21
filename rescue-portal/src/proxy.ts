@@ -4,7 +4,20 @@ import { NextResponse, type NextRequest } from 'next/server'
 const PROTECTED_PREFIXES = ['/admin', '/super-admin', '/resident']
 const LOGIN_PATH = '/auth/login'
 
-export async function middleware(request: NextRequest) {
+export const config = {
+  matcher: [
+    /*
+     * Match all request paths except for:
+     * - _next/static (static files)
+     * - _next/image (image optimization files)
+     * - favicon.ico, icons, manifest
+     * - public files with extensions
+     */
+    '/((?!_next/static|_next/image|favicon.ico|icons/|manifest.json|sw.js|offline|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+  ],
+}
+
+export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
@@ -47,17 +60,4 @@ export async function middleware(request: NextRequest) {
   }
 
   return supabaseResponse
-}
-
-export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for:
-     * - _next/static (static files)
-     * - _next/image (image optimization)
-     * - favicon.ico, icons, manifest
-     * - public files with extensions
-     */
-    '/((?!_next/static|_next/image|favicon.ico|icons/|manifest.json|sw.js|offline|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
-  ],
 }
