@@ -111,8 +111,8 @@ export function MapView({
       const isSelected = marker.id === selectedMarkerId
       const radius = isSelected ? 12 : 9
 
-      // Pulse ring for selected/critical
-      if (isSelected || marker.severity === 'critical') {
+      // Pulse ring for selected/critical/pulse
+      if (isSelected || marker.severity === 'critical' || marker.pulse) {
         const pulseRing = L.circleMarker([marker.lat, marker.lng], {
           radius: radius + 8,
           color: color,
@@ -171,7 +171,7 @@ export function MapView({
 
       markersRef.current.push(circleMarker)
     })
-  }, [markers, selectedMarkerId, onMarkerClick])
+  }, [markers, selectedMarkerId, onMarkerClick, leafletLoaded])
 
   // Pan to selected marker
   useEffect(() => {
