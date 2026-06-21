@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { Search, Eye, CheckCircle2, XCircle, MessageSquare, ChevronLeft, ChevronRight, Upload, UserPlus, Loader2, RefreshCw } from 'lucide-react'
+import { Search, Eye, CheckCircle2, XCircle, MessageSquare, ChevronLeft, ChevronRight, Upload, UserPlus, Loader2, RefreshCw, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -18,6 +18,7 @@ import { formatDate, formatRelativeTime } from '@/lib/utils'
 import type { ResidentProfile, RegistrationStatus } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
+import { buildResidentCsvTemplate, RESIDENT_CSV_HEADER } from '@/lib/resident-import'
 
 const PAGE_SIZE = 10
 
@@ -28,6 +29,9 @@ type ResidentFormState = {
   password: string
   barangay: string
   address: string
+  emergency_contact_name: string
+  emergency_contact_phone: string
+  emergency_contact_relationship: string
   registration_status: RegistrationStatus
 }
 
@@ -41,11 +45,6 @@ const STATUS_CONFIG: Record<RegistrationStatus, { label: string; color: string }
   suspended: { label: 'Suspended', color: 'bg-slate-800 text-slate-500' },
 }
 
-const LOCAL_BARANGAYS = [
-  'Poblacion', 'San Isidro', 'Santo Nino', 'San Jose', 'Bagong Pag-asa',
-  'Mabuhay', 'Pag-asa', 'Maligaya', 'Bagong Silang', 'Lumang Bayan',
-]
-
 const emptyResidentForm: ResidentFormState = {
   full_name: '',
   phone: '',
@@ -53,6 +52,9 @@ const emptyResidentForm: ResidentFormState = {
   password: '',
   barangay: '',
   address: '',
+  emergency_contact_name: '',
+  emergency_contact_phone: '',
+  emergency_contact_relationship: '',
   registration_status: 'approved',
 }
 
@@ -65,7 +67,7 @@ export default function ResidentsPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [manualForm, setManualForm] = useState<ResidentFormState>(emptyResidentForm)
-  const [bulkText, setBulkText] = useState('Full Name, Phone, Email, Barangay, Address\nAna Lopez Cruz, 0917-555-0001, ana.cruz@email.com, Poblacion, 22 Rizal St.')
+  const [bulkText, setBulkText] = useState(`${RESIDENT_CSV_HEADER}\n`)
 
   const fetchResidents = useCallback(async () => {
     try {
@@ -112,6 +114,9 @@ export default function ResidentsPage() {
             password: manualForm.password.trim(),
             barangay: manualForm.barangay || undefined,
             address: manualForm.address.trim() || undefined,
+            emergency_contact_name: manualForm.emergency_contact_name.trim() || undefined,
+            emergency_contact_phone: manualForm.emergency_contact_phone.trim() || undefined,
+            emergency_contact_relationship: manualForm.emergency_contact_relationship.trim() || undefined,
             registration_status: manualForm.registration_status,
           }],
         }),
@@ -146,8 +151,8 @@ export default function ResidentsPage() {
     }
 
     const residents = rows.map((row) => {
-      const [full_name, phone, email, barangay, address] = row.split(',').map((s) => s.trim())
-      return { full_name, phone, email, barangay, address, registration_status: 'submitted' as RegistrationStatus }
+      const [full_name, phone, email, barangay, address, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship] = row.split(',').map((s) => s.trim())
+      return { full_name, phone, email, barangay, address, emergency_contact_name, emergency_contact_phone, emergency_contact_relationship, registration_status: 'submitted' as RegistrationStatus }
     }).filter((r) => r.full_name && r.phone)
 
     if (residents.length === 0) {
@@ -305,16 +310,7 @@ export default function ResidentsPage() {
               </div>
               <div className="space-y-1.5">
                 <Label className="text-slate-300">Barangay</Label>
-                <Select value={manualForm.barangay} onValueChange={(value) => value && setManualForm((prev) => ({ ...prev, barangay: value }))}>
-                  <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-                    <SelectValue placeholder="Select barangay" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-slate-800 border-slate-600">
-                    {LOCAL_BARANGAYS.map((barangay) => (
-                      <SelectItem key={barangay} value={barangay} className="text-white hover:bg-slate-700">{barangay}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Input value={manualForm.barangay} onChange={(event) => setManualForm((prev) => ({ ...prev, barangay: event.target.value }))} className="bg-slate-800 border-slate-600 text-white" placeholder="Barangay from this municipality" />
               </div>
               <div className="space-y-1.5">
                 <Label className="text-slate-300">Status</Label>
@@ -332,6 +328,8 @@ export default function ResidentsPage() {
                 <Label className="text-slate-300">Address</Label>
                 <Input value={manualForm.address} onChange={(e) => setManualForm((prev) => ({ ...prev, address: e.target.value }))} placeholder="Street or purok" className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" />
               </div>
+              <div className="space-y-1.5"><Label className="text-slate-300">Emergency Contact Name</Label><Input value={manualForm.emergency_contact_name} onChange={(e) => setManualForm((prev) => ({ ...prev, emergency_contact_name: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" /></div>
+              <div className="space-y-1.5"><Label className="text-slate-300">Emergency Contact Phone</Label><Input value={manualForm.emergency_contact_phone} onChange={(e) => setManualForm((prev) => ({ ...prev, emergency_contact_phone: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" /></div>
             </div>
             <button
               type="button"
@@ -358,7 +356,8 @@ export default function ResidentsPage() {
                 onChange={(event) => setBulkText(event.target.value)}
                 className="min-h-40 bg-slate-800 border-slate-600 text-white font-mono text-xs"
               />
-              <p className="text-xs text-slate-500">Format: Full Name, Phone, Email, Barangay, Address</p>
+              <Button type="button" size="sm" variant="outline" className="border-slate-600 text-slate-300" onClick={() => { const blob = new Blob([buildResidentCsvTemplate()], { type: 'text/csv' }); const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = 'resident-import-template.csv'; link.click(); URL.revokeObjectURL(url) }}><Download className="w-4 h-4 mr-1" /> Download CSV template</Button>
+              <p className="text-xs text-slate-500">Format: {RESIDENT_CSV_HEADER}</p>
             </div>
             <button
               type="button"

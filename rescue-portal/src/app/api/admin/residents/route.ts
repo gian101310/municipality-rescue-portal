@@ -40,6 +40,9 @@ type ResidentInput = {
   password?: string
   barangay?: string
   address?: string
+  emergency_contact_name?: string
+  emergency_contact_phone?: string
+  emergency_contact_relationship?: string
   registration_status?: RegistrationStatus
 }
 
@@ -167,6 +170,9 @@ export async function POST(request: Request) {
       const rawEmail = clean(input.email)
       const barangay = clean(input.barangay)
       const address = clean(input.address)
+      const emergencyContactName = clean(input.emergency_contact_name)
+      const emergencyContactPhone = clean(input.emergency_contact_phone)
+      const emergencyContactRelationship = clean(input.emergency_contact_relationship)
       const status: RegistrationStatus = input.registration_status === 'approved' ? 'approved' : 'submitted'
 
       if (!fullName) { errors.push({ index: i, name: '(empty)', error: 'Name is required' }); continue }
@@ -220,6 +226,9 @@ export async function POST(request: Request) {
           is_active: true,
           barangay: barangay || null,
           address: address || null,
+          emergency_contact_name: emergencyContactName || null,
+          emergency_contact_phone: emergencyContactPhone || null,
+          emergency_contact_relationship: emergencyContactRelationship || null,
           municipality: municipality?.name ?? null,
           province: municipality?.province ?? null,
           registration_status: status,
@@ -276,4 +285,3 @@ export async function POST(request: Request) {
     )
   }
 }
-
