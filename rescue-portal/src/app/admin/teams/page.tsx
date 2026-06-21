@@ -1,13 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Users, Phone, MapPin, Plus, ChevronDown, ChevronUp, Calendar } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
-import { DEMO_RESCUE_UNITS } from '@/lib/demo-data'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import type { TeamStatus } from '@/lib/types'
@@ -35,19 +34,46 @@ const VEHICLE_TYPE_LABELS: Record<string, string> = {
 export default function TeamsPage() {
   const [expanded, setExpanded] = useState<string | null>(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [teams, setTeams] = useState<any[]>([])
+
+  async function loadTeams() {
+    const response = await fetch('/api/admin/teams', { cache: 'no-store' })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) return toast.error(payload.message ?? 'Unable to load rescue teams.')
+    setTeams(payload.teams ?? [])
+  }
+
+  useEffect(() => { void loadTeams() }, [])
+
+  async function createTeam() {
+    const name = window.prompt('Team name')?.trim(); const code = window.prompt('Team code')?.trim()
+    if (!name || !code) return
+    const contact_number = window.prompt('Contact number (optional)')?.trim() || null
+    const response = await fetch('/api/admin/teams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, code, contact_number }) })
+    const payload = await response.json().catch(() => ({})); if (!response.ok) return toast.error(payload.message ?? 'Unable to add team.')
+    toast.success('Rescue team created'); void loadTeams()
+  }
+
+  async function editTeam(unit: any) {
+    const name = window.prompt('Team name', unit.name)?.trim(); const contact_number = window.prompt('Contact number', unit.contact_number ?? '')?.trim() || null
+    if (!name) return
+    const response = await fetch(`/api/admin/teams/${unit.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name, contact_number }) })
+    const payload = await response.json().catch(() => ({})); if (!response.ok) return toast.error(payload.message ?? 'Unable to update team.')
+    toast.success('Rescue team updated'); void loadTeams()
+  }
 
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-screen-xl mx-auto">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Rescue Teams</h1>
-          <p className="text-slate-400 text-sm">{DEMO_RESCUE_UNITS.length} units registered</p>
+          <p className="text-slate-400 text-sm">{teams.length} units registered</p>
         </div>
         <div className="flex gap-2">
           <Button variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800" render={<Link href="/admin/teams/shifts" />}>
             <Calendar className="w-4 h-4 mr-1" /> Shift Schedule
           </Button>
-          <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => setAddOpen(true)}>
+          <Button className="bg-blue-600 hover:bg-blue-700 text-white" onClick={() => void createTeam()}>
             <Plus className="w-4 h-4 mr-1" /> Add Team
           </Button>
         </div>
@@ -56,7 +82,7 @@ export default function TeamsPage() {
       {/* Status summary */}
       <div className="flex flex-wrap gap-3">
         {Object.entries(STATUS_CONFIG).map(([status, cfg]) => {
-          const count = DEMO_RESCUE_UNITS.filter((u) => u.status === status).length
+          const count = teams.filter((u) => u.status === status).length
           if (count === 0) return null
           return (
             <div key={status} className={cn('flex items-center gap-2 px-3 py-1.5 rounded-full border text-xs font-medium', cfg.color)}>
@@ -69,8 +95,8 @@ export default function TeamsPage() {
 
       {/* Team Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {DEMO_RESCUE_UNITS.map((unit) => {
-          const statusCfg = STATUS_CONFIG[unit.status] || STATUS_CONFIG.unavailable
+        {teams.map((unit) => {
+          const statusCfg = STATUS_CONFIG[unit.status as TeamStatus] || STATUS_CONFIG.unavailable
           const isExpanded = expanded === unit.id
 
           return (
@@ -106,7 +132,7 @@ export default function TeamsPage() {
                 <div className="grid grid-cols-3 gap-3 text-xs">
                   <div>
                     <p className="text-slate-500">Members</p>
-                    <p className="text-white font-medium">{unit.members?.filter((m) => m.is_active).length || 0}</p>
+                    <p className="text-white font-medium">{unit.members?.filter((m: any) => m.is_active).length || 0}</p>
                   </div>
                   <div>
                     <p className="text-slate-500">Vehicle</p>
@@ -125,7 +151,7 @@ export default function TeamsPage() {
                       <div>
                         <p className="text-xs text-slate-500 mb-2">Team Members</p>
                         <div className="space-y-1.5">
-                          {unit.members.map((m) => (
+                          {unit.members.map((m: any) => (
                             <div key={m.id} className="flex items-center gap-2">
                               <span className={cn('w-1.5 h-1.5 rounded-full shrink-0', m.role === 'team_leader' ? 'bg-amber-400' : m.is_active ? 'bg-green-400' : 'bg-slate-600')} />
                               <span className={cn('text-xs', m.is_active ? 'text-slate-300' : 'text-slate-600 line-through')}>{m.user_name}</span>
@@ -150,7 +176,7 @@ export default function TeamsPage() {
                       <div>
                         <p className="text-xs text-slate-500 mb-1">Equipment</p>
                         <div className="flex flex-wrap gap-1">
-                          {unit.equipment.map((eq) => (
+                          {unit.equipment.map((eq: string) => (
                             <Badge key={eq} variant="outline" className="text-xs border-slate-700 text-slate-400">{eq}</Badge>
                           ))}
                         </div>
@@ -161,7 +187,7 @@ export default function TeamsPage() {
                       <div>
                         <p className="text-xs text-slate-500 mb-1">Specializations</p>
                         <div className="flex flex-wrap gap-1">
-                          {unit.specializations.map((sp) => (
+                          {unit.specializations.map((sp: string) => (
                             <Badge key={sp} variant="outline" className="text-xs border-blue-700/50 text-blue-400">{sp}</Badge>
                           ))}
                         </div>
@@ -185,10 +211,10 @@ export default function TeamsPage() {
                 )}
 
                 <div className="flex gap-2 pt-1">
-                  <Button size="sm" variant="outline" className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800 text-xs" onClick={() => toast.success('Demo: Team details would open here')}>
+                  <Button size="sm" variant="outline" className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800 text-xs" onClick={() => void editTeam(unit)}>
                     Edit Team
                   </Button>
-                  <Button size="sm" variant="outline" className="border-amber-700/50 text-amber-400 hover:bg-amber-900/20 text-xs" onClick={() => toast.success('Demo: Dispatch dialog would open')}>
+                  <Button size="sm" variant="outline" className="border-amber-700/50 text-amber-400 hover:bg-amber-900/20 text-xs" onClick={() => toast.info('Open an active incident and use Assign Team to dispatch this unit.')}>
                     Dispatch
                   </Button>
                 </div>

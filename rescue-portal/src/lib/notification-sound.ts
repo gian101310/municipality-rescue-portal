@@ -97,10 +97,20 @@ export function getIncidentAlarmPattern() {
   return [740, 980, 740, 980, 740, 980]
 }
 
-export function playAdminNotificationSound() {
-  if (typeof window === 'undefined' || !getStoredSoundPreference(window.localStorage)) return
+export function isIncidentAlarmMandatory() {
+  return true
+}
 
-  getIncidentAlarmPattern().forEach((frequency, index) => {
-    playTone(frequency, index * 0.22, 0.16, 0.075)
+export function getMandatoryIncidentSirenPattern() {
+  return [520, 960, 520, 960, 520, 960, 520, 960, 520, 960, 520, 960]
+}
+
+export function playAdminNotificationSound() {
+  if (typeof window === 'undefined') return
+
+  getMandatoryIncidentSirenPattern().forEach((frequency, index) => {
+    for (let cycle = 0; cycle < 3; cycle += 1) {
+      playTone(frequency, cycle * 3.6 + index * 0.28, 0.24, 0.16)
+    }
   })
 }

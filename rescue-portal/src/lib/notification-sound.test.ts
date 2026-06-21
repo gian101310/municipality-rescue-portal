@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 import {
   SOUND_PREF_KEY,
   getIncidentAlarmPattern,
+  getMandatoryIncidentSirenPattern,
+  isIncidentAlarmMandatory,
   getStoredSoundPreference,
   setStoredSoundPreference,
   shouldAutoEnableAdminSound,
@@ -14,6 +16,11 @@ test('sound preference defaults to false when storage is unavailable', () => {
 
 test('incident alarm uses a repeated urgent pattern', () => {
   assert.deepEqual(getIncidentAlarmPattern(), [740, 980, 740, 980, 740, 980])
+})
+
+test('incident alarm is mandatory and uses an extended siren pattern', () => {
+  assert.equal(isIncidentAlarmMandatory(), true)
+  assert.deepEqual(getMandatoryIncidentSirenPattern(), [520, 960, 520, 960, 520, 960, 520, 960, 520, 960, 520, 960])
 })
 
 test('sound preference reads true only from the enabled value', () => {

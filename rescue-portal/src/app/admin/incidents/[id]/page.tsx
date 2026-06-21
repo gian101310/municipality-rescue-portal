@@ -23,6 +23,7 @@ import { toast } from 'sonner'
 import type { DemoIncident, IncidentStatus, RescueUnit } from '@/lib/types'
 import { cn } from '@/lib/utils'
 import { buildStatusUpdateRequest } from '@/lib/incident-status-actions'
+import { buildEscalationPayload, buildVerificationRequest } from '@/lib/incident-actions'
 
 const ALL_STATUSES: IncidentStatus[] = [
   'received', 'verification_pending', 'verified', 'assigned', 'dispatched',
@@ -126,6 +127,32 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
       setNewStatus('')
       setStatusReason('')
     }
+  }
+
+  async function escalateIncident() {
+    if (!incident) return
+    const reason = window.prompt('Why is this incident being escalated?')?.trim()
+    if (!reason) return
+    const response = await fetch(`/api/admin/incidents/${incident.id}/escalate`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(buildEscalationPayload(reason)) })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) return toast.error(payload.message ?? 'Unable to escalate incident.')
+    setIncident(payload.incident)
+    toast.success('Incident escalated to critical')
+  }
+
+  async function assignTeam() {
+    if (!incident) return
+    const teamsResponse = await fetch('/api/admin/teams')
+    const teamsPayload = await teamsResponse.json().catch(() => ({}))
+    const teams = (teamsPayload.teams ?? []).filter((team: { status: string }) => team.status === 'available')
+    if (!teams.length) return toast.error('No available rescue teams.')
+    const choice = window.prompt(`Choose a rescue team:\n${teams.map((team: { id: string; name: string }) => `${team.id}: ${team.name}`).join('\n')}`)?.trim()
+    if (!choice) return
+    const response = await fetch(`/api/admin/incidents/${incident.id}/assignments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rescueUnitId: choice }) })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) return toast.error(payload.message ?? 'Unable to assign rescue team.')
+    setIncident(payload.incident)
+    toast.success(`Assigned ${payload.team.name}`)
   }
 
   function handleAddNote() {
@@ -399,10 +426,10 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
                   <Phone className="w-3.5 h-3.5 mr-2" /> Call Reporter
                 </Button>
               )}
-              <Button size="sm" variant="outline" className="w-full border-slate-600 text-slate-300 hover:bg-slate-800" onClick={() => toast.success('Demo: Verification flagged')}>
+              <Button size="sm" variant="outline" className="w-full border-slate-600 text-slate-300 hover:bg-slate-800" onClick={() => void applyStatus(buildVerificationRequest().status)}>
                 <Shield className="w-3.5 h-3.5 mr-2" /> Verify Incident
               </Button>
-              <Button size="sm" variant="outline" className="w-full border-slate-600 text-slate-300 hover:bg-slate-800" onClick={() => toast.success('Demo: Team assigned')}>
+              <Button size="sm" variant="outline" className="w-full border-slate-600 text-slate-300 hover:bg-slate-800" onClick={() => void assignTeam()}>
                 <Users className="w-3.5 h-3.5 mr-2" /> Assign Team
               </Button>
               <Button size="sm" className="w-full bg-amber-700 hover:bg-amber-600 text-white" onClick={() => void applyStatus('dispatched')}>
@@ -412,7 +439,7 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
               <Button size="sm" className="w-full bg-green-700 hover:bg-green-600 text-white" onClick={() => void applyStatus('resolved')}>
                 <CheckCircle2 className="w-3.5 h-3.5 mr-2" /> Resolve Incident
               </Button>
-              <Button size="sm" variant="outline" className="w-full border-red-700/50 text-red-400 hover:bg-red-900/20" onClick={() => toast.success('Demo: Marked as escalated')}>
+              <Button size="sm" variant="outline" className="w-full border-red-700/50 text-red-400 hover:bg-red-900/20" onClick={() => void escalateIncident()}>
                 <AlertTriangle className="w-3.5 h-3.5 mr-2" /> Escalate
               </Button>
             </CardContent>

@@ -1,23 +1,21 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Bell, BellOff } from 'lucide-react'
+import { Siren } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
   armAdminNotificationSound,
   playAdminNotificationSound,
   setStoredSoundPreference,
-  shouldAutoEnableAdminSound,
 } from '@/lib/notification-sound'
 import { toast } from 'sonner'
 
 export function AdminSoundToggle() {
-  const [enabled, setEnabled] = useState(false)
+  const [armed, setArmed] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
     const id = window.setTimeout(() => {
-      setEnabled(shouldAutoEnableAdminSound(window.localStorage))
       setMounted(true)
     }, 0)
 
@@ -25,12 +23,10 @@ export function AdminSoundToggle() {
   }, [])
 
   useEffect(() => {
-    function armOnFirstInteraction() {
-      if (shouldAutoEnableAdminSound(window.localStorage)) {
-        setStoredSoundPreference(window.localStorage, true)
-        setEnabled(true)
-      }
-      void armAdminNotificationSound()
+    async function armOnFirstInteraction() {
+      setStoredSoundPreference(window.localStorage, true)
+      const isArmed = await armAdminNotificationSound()
+      setArmed(isArmed)
       window.removeEventListener('pointerdown', armOnFirstInteraction)
       window.removeEventListener('keydown', armOnFirstInteraction)
     }
@@ -44,33 +40,28 @@ export function AdminSoundToggle() {
     }
   }, [])
 
-  async function toggleSound() {
-    const next = !enabled
-    setEnabled(next)
-    setStoredSoundPreference(window.localStorage, next)
-
-    if (next) {
-      const armed = await armAdminNotificationSound()
+  async function armAlarm() {
+    setStoredSoundPreference(window.localStorage, true)
+    const isArmed = await armAdminNotificationSound()
+    setArmed(isArmed)
+    if (isArmed) {
       playAdminNotificationSound()
-      toast.success(armed ? 'Incident alarm enabled' : 'Tap the page once to enable browser audio')
-    } else {
-      toast.info('Notification sound muted')
-    }
+      toast.success('Mandatory incident alarm armed')
+    } else toast.error('Browser audio is blocked. Click the page once and arm the alarm again.')
   }
-
-  const Icon = enabled ? Bell : BellOff
 
   return (
     <Button
-      variant="ghost"
-      size="icon"
-      onClick={toggleSound}
-      className="text-slate-300 hover:bg-slate-700 hover:text-white"
-      title={enabled ? 'Mute notification sound' : 'Enable notification sound'}
-      aria-label={enabled ? 'Mute notification sound' : 'Enable notification sound'}
+      variant="outline"
+      size="sm"
+      onClick={armAlarm}
+      className={armed ? 'border-red-500/50 bg-red-500/10 text-red-200 hover:bg-red-500/20' : 'border-amber-500/50 text-amber-200 hover:bg-amber-500/10'}
+      title="Mandatory incident alarm"
+      aria-label="Arm mandatory incident alarm"
       disabled={!mounted}
     >
-      <Icon className="h-4 w-4" />
+      <Siren className="h-4 w-4 mr-1" />
+      <span className="hidden sm:inline text-xs">{armed ? 'Alarm armed' : 'Arm alarm'}</span>
     </Button>
   )
 }
