@@ -13,7 +13,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Progress } from '@/components/ui/progress'
 import { DemoBanner } from '@/components/demo-banner'
 import {
-  DEMO_TENANT_GEO_SCOPE,
   getLocalitiesForProvince,
   getLocalitiesForRegionWithoutProvince,
   getLocalityLabel,
@@ -24,8 +23,8 @@ import {
   PSGC_VERSION_LABEL,
 } from '@/lib/philippines-geography'
 import type { TenantGeographyScope } from '@/lib/philippines-geography'
-import { loadCoverageLock } from '@/lib/coverage-lock-client'
-import { getPasswordRequirementText, isStrongPassword, isValidEmail } from '@/lib/auth-validation'
+import { getPasswordRequirementText, isStrongPassword, isValidEmail, requiresBarangay } from '@/lib/auth-validation'
+import { getRegistrationGeoScope } from '@/lib/registration-context'
 import { toast } from 'sonner'
 
 const TOTAL_STEPS = 6
@@ -96,8 +95,7 @@ function RegisterPage() {
   const [refNumber, setRefNumber] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
-  const [geoScope, setGeoScope] = useState<TenantGeographyScope>(DEMO_TENANT_GEO_SCOPE)
-  const [geoScopePersistence, setGeoScopePersistence] = useState<'checking' | 'supabase' | 'demo'>('checking')
+  const [geoScope, setGeoScope] = useState<TenantGeographyScope>(() => getRegistrationGeoScope())
   const [municipalityInfo, setMunicipalityInfo] = useState<MunicipalityInfo | null>(null)
   const [municipalityLoading, setMunicipalityLoading] = useState(!!municipalityParam)
   const [orgBarangays, setOrgBarangays] = useState<{ id: string; name: string }[]>([])
@@ -124,34 +122,6 @@ function RegisterPage() {
   const selectedMunicipality = municipalityOptions.find((item) => item.code === form.municipalityCode)
   const selectedMunicipalityLabel = selectedMunicipality ? getLocalityLabel(selectedMunicipality) : ''
 
-  useEffect(() => {
-    let cancelled = false
-
-    async function loadSavedCoverageLock() {
-      const result = await loadCoverageLock()
-      if (cancelled) return
-
-      setGeoScope(result.scope)
-      setForm((prev) => ({
-        ...prev,
-        region: '',
-        regionCode: '',
-        province: '',
-        provinceCode: '',
-        municipality: '',
-        municipalityCode: '',
-        barangay: '',
-      }))
-      setGeoScopePersistence(result.persistence)
-    }
-
-    loadSavedCoverageLock()
-
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
   // When ?municipality= param is present (from QR scan), fetch the org info
   // and lock the registration to that municipality
   useEffect(() => {
@@ -173,9 +143,8 @@ function RegisterPage() {
             const gs = payload.geoScope
             const scopeLevel = gs.scope_level ?? 'country'
             const scopeCode = gs.municipality_code ?? gs.province_code ?? gs.region_code ?? undefined
-            const scope = makeTenantScope(scopeLevel, scopeCode)
+            const scope = getRegistrationGeoScope(makeTenantScope(scopeLevel, scopeCode))
             setGeoScope(scope)
-            setGeoScopePersistence('supabase')
 
             // Auto-fill geo fields from the resolved scope
             const regions = getScopedRegions(scope)
@@ -238,7 +207,7 @@ function RegisterPage() {
     }
 
     if (currentStep === 2) {
-      if (!form.regionCode || !form.municipalityCode || !form.barangay || !form.address.trim()) {
+      if (!form.regionCode || !form.municipalityCode || (requiresBarangay(form.municipalityCode) && !form.barangay) || !form.address.trim()) {
         toast.error('Complete your address before continuing.')
         return false
       }
@@ -478,15 +447,8 @@ function RegisterPage() {
                     <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
                       <p className="text-xs font-semibold text-blue-200">Geography scope</p>
                       <p className="mt-1 text-xs text-blue-100/80">
-                        Registration is scoped to {geoScope.level === 'country' ? 'all Philippines regions, provinces, and cities/municipalities' : 'the configured coverage area'}.
+                        This public link is open to all supported locations. A municipality QR code locks registration to its configured coverage area.
                         Source: {PSGC_VERSION_LABEL}.
-                      </p>
-                      <p className="mt-1 text-xs text-blue-100/60">
-                        Storage: {geoScopePersistence === 'checking'
-                          ? 'Checking...'
-                          : geoScopePersistence === 'supabase'
-                          ? 'Supabase persisted'
-                          : 'Demo fallback'}
                       </p>
                     </div>
                   )}
@@ -537,23 +499,30 @@ function RegisterPage() {
                       </Select>
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-slate-300">Barangay *</Label>
-                    <Select value={form.barangay} onValueChange={(v) => { if (v) update('barangay', v) }} disabled={!form.municipalityCode && orgBarangays.length === 0}>
-                      <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-                        <SelectValue placeholder={orgBarangays.length > 0 ? 'Select barangay' : form.municipalityCode ? 'Select barangay' : 'Select city/municipality first'} />
-                      </SelectTrigger>
-                      <SelectContent className="bg-slate-800 border-slate-600">
-                        {orgBarangays.length > 0
-                          ? orgBarangays.map((b) => (
-                              <SelectItem key={b.id} value={b.name} className="text-white hover:bg-slate-700">{b.name}</SelectItem>
-                            ))
-                          : <SelectItem value="__none" disabled className="text-slate-500">No barangays configured for this municipality</SelectItem>
-                        }
-                      </SelectContent>
-                    </Select>
-                    {orgBarangays.length === 0 && <p className="text-xs text-slate-500">Barangays will load from the municipality&apos;s admin configuration.</p>}
-                  </div>
+                  {requiresBarangay(form.municipalityCode) ? (
+                    <div className="space-y-1.5">
+                      <Label className="text-slate-300">Barangay *</Label>
+                      <Select value={form.barangay} onValueChange={(v) => { if (v) update('barangay', v) }} disabled={!form.municipalityCode && orgBarangays.length === 0}>
+                        <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                          <SelectValue placeholder={orgBarangays.length > 0 ? 'Select barangay' : form.municipalityCode ? 'Select barangay' : 'Select city/municipality first'} />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-800 border-slate-600">
+                          {orgBarangays.length > 0
+                            ? orgBarangays.map((b) => (
+                                <SelectItem key={b.id} value={b.name} className="text-white hover:bg-slate-700">{b.name}</SelectItem>
+                              ))
+                            : <SelectItem value="__none" disabled className="text-slate-500">No barangays configured for this municipality</SelectItem>
+                          }
+                        </SelectContent>
+                      </Select>
+                      {orgBarangays.length === 0 && <p className="text-xs text-slate-500">Barangays will load from the municipality&apos;s admin configuration.</p>}
+                    </div>
+                  ) : (
+                    <div className="space-y-1.5">
+                      <Label className="text-slate-300">Community / Area <span className="text-slate-500">(optional)</span></Label>
+                      <Input placeholder="e.g. Jumeirah, Al Barsha, or nearest landmark" value={form.barangay} onChange={(e) => update('barangay', e.target.value)} className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" />
+                    </div>
+                  )}
                   <div className="space-y-1.5">
                     <Label className="text-slate-300">Full Street Address *</Label>
                     <Input placeholder="House/Unit #, Street, Subdivision" value={form.address} onChange={(e) => update('address', e.target.value)} className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" />

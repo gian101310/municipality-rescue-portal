@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/server'
-import { isStrongPassword, isValidEmail } from '@/lib/auth-validation'
+import { isStrongPassword, isValidEmail, requiresBarangay } from '@/lib/auth-validation'
 
 export const dynamic = 'force-dynamic'
 
@@ -162,7 +162,7 @@ export async function POST(request: Request) {
     }
     if (!clean(body?.regionCode)) throw new Error('Choose your region.')
     if (!municipalityCode || !municipalityName) throw new Error('Choose your city or municipality.')
-    if (!clean(body?.barangay)) throw new Error('Choose your barangay.')
+    if (requiresBarangay(municipalityCode) && !clean(body?.barangay)) throw new Error('Choose your barangay.')
     if (!clean(body?.address)) throw new Error('Enter your complete address.')
     if (!clean(body?.id_type) || !clean(body?.id_number)) throw new Error('Enter your government ID details.')
     if (!clean(body?.ec_name) || !clean(body?.ec_phone) || !clean(body?.ec_relationship)) {
@@ -289,4 +289,3 @@ export async function POST(request: Request) {
     )
   }
 }
-

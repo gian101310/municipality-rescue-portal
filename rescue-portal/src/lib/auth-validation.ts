@@ -14,3 +14,6 @@ export function getPasswordRequirementText() {
   return 'Use at least 8 characters with uppercase, lowercase, number, and special character.'
 }
 
+export function requiresBarangay(municipalityCode: string) {
+  return !municipalityCode.startsWith('AE-')
+}
