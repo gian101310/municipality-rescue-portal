@@ -310,7 +310,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <div className="text-slate-500 font-normal">{adminProfile?.email ?? '...'}</div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator className="bg-slate-700" />
-                  <DropdownMenuItem className="text-slate-300 hover:text-white cursor-pointer">
+                  <DropdownMenuItem className="text-slate-300 hover:text-white cursor-pointer" render={<Link href="/admin/profile" />}>
                     <User className="w-4 h-4 mr-2" />
                     Profile
                   </DropdownMenuItem>

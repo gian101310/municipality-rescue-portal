@@ -64,7 +64,7 @@ export async function GET() {
     // Get current user profile
     const { data: profile, error: profileError } = await admin
       .from('user_profiles')
-      .select('id, user_id, full_name, email, role, organization_id, is_active, registration_status, avatar_url')
+      .select('id, user_id, full_name, email, role, organization_id, is_active, registration_status, avatar_url, phone')
       .eq('user_id', user.id)
       .single<ProfileRow>()
 
@@ -133,12 +133,20 @@ export async function GET() {
       total_incidents: incidents.length,
     }
 
+    let organizationName: string | null = null
+    if (profile.organization_id) {
+      const { data: org } = await admin.from('organizations').select('name').eq('id', profile.organization_id).single()
+      organizationName = (org as { name: string } | null)?.name ?? null
+    }
+
     return NextResponse.json({
       profile: {
         full_name: profile.full_name,
         email: profile.email,
         role: profile.role,
         avatar_url: profile.avatar_url,
+        phone: (profile as Record<string, unknown>).phone ?? '',
+        organization_name: organizationName,
       },
       stats,
       incidents: attachEmergencyTypes(incidents, emergencyTypes ?? []),

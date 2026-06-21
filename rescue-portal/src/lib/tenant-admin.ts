@@ -43,7 +43,7 @@ export const SETTINGS_TABS: SettingsTab[] = [
   { label: 'General', value: 'general' },
   { label: 'Coverage Lock', value: 'coverage_lock', platformOnly: true },
   { label: 'Emergency Types', value: 'emergency_types' },
-  { label: 'Barangays', value: 'barangays' },
+  { label: 'Barangay Captains', value: 'barangays' },
   { label: 'Telegram', value: 'telegram' },
   { label: 'Notifications', value: 'notifications' },
 ]

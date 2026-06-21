@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Save, Plus, Edit2, Eye, EyeOff, Upload, Trash2, X, Check } from 'lucide-react'
+import { Save, Plus, Edit2, Eye, EyeOff, Upload, Trash2, X, Check, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -544,10 +544,20 @@ export default function SettingsPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <div>
-                  <CardTitle className="text-white text-base">Barangays</CardTitle>
-                  <CardDescription className="text-slate-400">Manage barangay list and captains.</CardDescription>
+                  <CardTitle className="text-white text-base">Barangay Captains</CardTitle>
+                  <CardDescription className="text-slate-400">Manage barangay list and captains. Download the template below for bulk import.</CardDescription>
                 </div>
                 <div className="flex gap-2">
+                  <Button size="sm" variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800" onClick={() => {
+                    const csv = 'barangay_name,captain_name,captain_phone\nBarangay 1,Juan Dela Cruz,+639171234567\nBarangay 2,Maria Santos,+639181234567\n'
+                    const blob = new Blob([csv], { type: 'text/csv' })
+                    const url = URL.createObjectURL(blob)
+                    const a = document.createElement('a'); a.href = url; a.download = 'barangay_captains_template.csv'; a.click()
+                    URL.revokeObjectURL(url)
+                    toast.success('Template downloaded')
+                  }}>
+                    <Download className="w-4 h-4 mr-1" /> Download Template
+                  </Button>
                   <Button size="sm" variant="outline" disabled={!canEditSettings} className="border-slate-600 text-slate-300 hover:bg-slate-800 disabled:opacity-50" onClick={() => { setShowCsvImport(true); setShowAddBarangay(false) }}>
                     <Upload className="w-4 h-4 mr-1" /> Import CSV
                   </Button>

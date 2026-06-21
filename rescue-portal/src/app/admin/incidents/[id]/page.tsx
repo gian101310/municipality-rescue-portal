@@ -13,6 +13,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription
+} from '@/components/ui/dialog'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
@@ -38,6 +41,10 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
   const [note, setNote] = useState('')
   const [newStatus, setNewStatus] = useState<IncidentStatus | ''>('')
   const [statusReason, setStatusReason] = useState('')
+  const [showTeamDialog, setShowTeamDialog] = useState(false)
+  const [availableTeams, setAvailableTeams] = useState<Array<{ id: string; name: string; status: string; team_leader_name?: string; contact_number?: string }>>([])
+  const [loadingTeams, setLoadingTeams] = useState(false)
+  const [assigningTeamId, setAssigningTeamId] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -140,19 +147,37 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
     toast.success('Incident escalated to critical')
   }
 
-  async function assignTeam() {
+  async function openTeamDialog() {
     if (!incident) return
-    const teamsResponse = await fetch('/api/admin/teams')
-    const teamsPayload = await teamsResponse.json().catch(() => ({}))
-    const teams = (teamsPayload.teams ?? []).filter((team: { status: string }) => team.status === 'available')
-    if (!teams.length) return toast.error('No available rescue teams.')
-    const choice = window.prompt(`Choose a rescue team:\n${teams.map((team: { id: string; name: string }) => `${team.id}: ${team.name}`).join('\n')}`)?.trim()
-    if (!choice) return
-    const response = await fetch(`/api/admin/incidents/${incident.id}/assignments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rescueUnitId: choice }) })
-    const payload = await response.json().catch(() => ({}))
-    if (!response.ok) return toast.error(payload.message ?? 'Unable to assign rescue team.')
-    setIncident(payload.incident)
-    toast.success(`Assigned ${payload.team.name}`)
+    setLoadingTeams(true)
+    setShowTeamDialog(true)
+    try {
+      const teamsResponse = await fetch('/api/admin/teams')
+      const teamsPayload = await teamsResponse.json().catch(() => ({}))
+      const allTeams = teamsPayload.teams ?? []
+      setAvailableTeams(allTeams)
+    } catch {
+      toast.error('Unable to load teams')
+    } finally {
+      setLoadingTeams(false)
+    }
+  }
+
+  async function confirmAssignTeam(teamId: string) {
+    if (!incident) return
+    setAssigningTeamId(teamId)
+    try {
+      const response = await fetch(`/api/admin/incidents/${incident.id}/assignments`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ rescueUnitId: teamId }) })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) return toast.error(payload.message ?? 'Unable to assign rescue team.')
+      setIncident(payload.incident)
+      toast.success(`Assigned ${payload.team?.name ?? 'team'}`)
+      setShowTeamDialog(false)
+    } catch {
+      toast.error('Unable to assign team')
+    } finally {
+      setAssigningTeamId(null)
+    }
   }
 
   function handleAddNote() {
@@ -429,10 +454,10 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
               <Button size="sm" variant="outline" className="w-full border-slate-600 text-slate-300 hover:bg-slate-800" onClick={() => void applyStatus(buildVerificationRequest().status)}>
                 <Shield className="w-3.5 h-3.5 mr-2" /> Verify Incident
               </Button>
-              <Button size="sm" variant="outline" className="w-full border-slate-600 text-slate-300 hover:bg-slate-800" onClick={() => void assignTeam()}>
+              <Button size="sm" variant="outline" className="w-full border-slate-600 text-slate-300 hover:bg-slate-800" onClick={() => void openTeamDialog()}>
                 <Users className="w-3.5 h-3.5 mr-2" /> Assign Team
               </Button>
-              <Button size="sm" className="w-full bg-amber-700 hover:bg-amber-600 text-white" onClick={() => void applyStatus('dispatched')}>
+              <Button size="sm" className="w-full bg-amber-700 hover:bg-amber-600 text-white" onClick={() => void openTeamDialog()}>
                 <CheckCircle2 className="w-3.5 h-3.5 mr-2" /> Dispatch
               </Button>
               <Separator className="bg-slate-800" />
@@ -496,6 +521,64 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
           )}
         </div>
       </div>
+
+      {/* Team Selection Dialog */}
+      <Dialog open={showTeamDialog} onOpenChange={setShowTeamDialog}>
+        <DialogContent className="bg-slate-900 border-slate-700 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white">Select Rescue Team</DialogTitle>
+            <DialogDescription className="text-slate-400">Choose a team to dispatch for this incident.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2 max-h-80 overflow-y-auto">
+            {loadingTeams ? (
+              <p className="text-center text-slate-500 py-6">Loading teams...</p>
+            ) : availableTeams.length === 0 ? (
+              <p className="text-center text-slate-500 py-6">No rescue teams found. Add teams in the Rescue Teams section.</p>
+            ) : (
+              availableTeams.map((team) => {
+                const isAvailable = team.status === 'available'
+                return (
+                  <button
+                    key={team.id}
+                    onClick={() => void confirmAssignTeam(team.id)}
+                    disabled={assigningTeamId !== null || !isAvailable}
+                    className={cn(
+                      'w-full p-3 rounded-lg border text-left transition-colors',
+                      isAvailable
+                        ? 'border-slate-700 hover:border-blue-500 hover:bg-slate-800 cursor-pointer'
+                        : 'border-slate-800 opacity-50 cursor-not-allowed',
+                      assigningTeamId === team.id && 'border-blue-500 bg-blue-900/20'
+                    )}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="font-medium text-white text-sm">{team.name}</p>
+                        {team.team_leader_name && (
+                          <p className="text-xs text-slate-400">Leader: {team.team_leader_name}</p>
+                        )}
+                        {team.contact_number && (
+                          <p className="text-xs text-slate-500">{team.contact_number}</p>
+                        )}
+                      </div>
+                      <Badge className={cn(
+                        'text-xs border',
+                        isAvailable
+                          ? 'bg-green-600/20 text-green-400 border-green-500/30'
+                          : 'bg-amber-600/20 text-amber-400 border-amber-500/30'
+                      )}>
+                        {team.status}
+                      </Badge>
+                    </div>
+                    {assigningTeamId === team.id && (
+                      <p className="text-xs text-blue-400 mt-1">Assigning...</p>
+                    )}
+                  </button>
+                )
+              })
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

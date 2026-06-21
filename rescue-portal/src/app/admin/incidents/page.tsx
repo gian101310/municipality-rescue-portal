@@ -18,7 +18,7 @@ import { formatRelativeTime } from '@/lib/utils'
 import type { DemoIncident, EmergencyType, IncidentStatus, SeverityLevel } from '@/lib/types'
 import { toast } from 'sonner'
 
-const PAGE_SIZE = 8
+const PAGE_SIZE = 100
 type IncidentEmergencyType = Pick<EmergencyType, 'id' | 'name' | 'icon' | 'color'>
 
 const STATUS_TABS = [

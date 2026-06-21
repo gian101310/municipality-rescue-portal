@@ -8,11 +8,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useSettings } from '@/lib/settings-context'
-import { DEMO_ORGANIZATION, DEMO_BARANGAYS } from '@/lib/demo-data'
 import { toast } from 'sonner'
 import QRCode from 'qrcode'
-
-const BARANGAYS = DEMO_BARANGAYS.map((b) => b.name)
 
 function generateQRMatrix(data: string): boolean[][] {
   // This is a simplified visual representation — in production use a real QR lib
@@ -87,7 +84,8 @@ function QRCodeSVG({ data, size = 200 }: { data: string; size?: number }) {
 
 export default function QRPostersPage() {
   const { settings } = useSettings()
-  const [selectedBarangay, setSelectedBarangay] = useState(BARANGAYS[0] || 'Poblacion')
+  const [barangayList, setBarangayList] = useState<string[]>([])
+  const [selectedBarangay, setSelectedBarangay] = useState('')
   const [posterTitle, setPosterTitle] = useState('')
   const [customMessage, setCustomMessage] = useState('')
   const [posterStyle, setPosterStyle] = useState<'standard' | 'emergency'>('standard')
@@ -98,7 +96,18 @@ export default function QRPostersPage() {
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://rescue-portal.vercel.app'
   const emergencyUrl = `${baseUrl}/auth/register`
 
-  useEffect(() => { void (async () => { const response = await fetch('/api/admin/qr-context'); const payload = await response.json().catch(() => ({})); if (response.ok) { setMunicipalityName(payload.organization?.name ?? municipalityName); const url = `${baseUrl}/auth/register?municipality=${encodeURIComponent(payload.organizationId)}`; setQrImage(await QRCode.toDataURL(url, { width: 600, margin: 2 })) } })() }, [])
+  useEffect(() => { void (async () => {
+    const response = await fetch('/api/admin/qr-context')
+    const payload = await response.json().catch(() => ({}))
+    if (response.ok) {
+      setMunicipalityName(payload.organization?.name ?? municipalityName)
+      const url = `${baseUrl}/auth/register?municipality=${encodeURIComponent(payload.organizationId)}`
+      setQrImage(await QRCode.toDataURL(url, { width: 600, margin: 2 }))
+      const names = (payload.barangays ?? []).map((b: { name: string }) => b.name)
+      setBarangayList(names)
+      if (names.length > 0) setSelectedBarangay(names[0])
+    }
+  })() }, [])
 
   const title = posterTitle || `${settings.municipalityName} Emergency Rescue`
 
@@ -135,9 +144,11 @@ export default function QRPostersPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {BARANGAYS.map((b) => (
+                  {barangayList.length > 0 ? barangayList.map((b) => (
                     <SelectItem key={b} value={b}>{b}</SelectItem>
-                  ))}
+                  )) : (
+                    <SelectItem value="none" disabled>No barangays found — add them in Settings</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
             </div>

@@ -1,3 +1,13 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
-export async function GET() { const client = await createClient(); const { data: { user } } = await client.auth.getUser(); if (!user) return NextResponse.json({ message: 'Sign in required.' }, { status: 401 }); const { data: profile } = await client.from('user_profiles').select('organization_id').eq('user_id', user.id).single() as any; if (!profile?.organization_id) return NextResponse.json({ message: 'Municipality profile required.' }, { status: 400 }); const admin = await createAdminClient() as any; const { data: organization } = await admin.from('organizations').select('name, emergency_hotline, secondary_hotline, branding').eq('id', profile.organization_id).single(); return NextResponse.json({ organizationId: profile.organization_id, organization }) }
+export async function GET() {
+  const client = await createClient()
+  const { data: { user } } = await client.auth.getUser()
+  if (!user) return NextResponse.json({ message: 'Sign in required.' }, { status: 401 })
+  const { data: profile } = await client.from('user_profiles').select('organization_id').eq('user_id', user.id).single() as any
+  if (!profile?.organization_id) return NextResponse.json({ message: 'Municipality profile required.' }, { status: 400 })
+  const admin = await createAdminClient() as any
+  const { data: organization } = await admin.from('organizations').select('name, emergency_hotline, secondary_hotline, branding').eq('id', profile.organization_id).single()
+  const { data: barangays } = await admin.from('barangays').select('id, name').eq('organization_id', profile.organization_id).order('name')
+  return NextResponse.json({ organizationId: profile.organization_id, organization, barangays: barangays ?? [] })
+}
