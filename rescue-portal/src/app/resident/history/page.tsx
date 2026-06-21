@@ -5,6 +5,7 @@ import { useSearchParams } from 'next/navigation'
 import { ChevronDown, ChevronUp, Clock } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
+import { IncidentProgressTracker } from '@/components/incident-progress-tracker'
 import { SeverityBadge } from '@/components/severity-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
 import { formatDateTime, formatRelativeTime } from '@/lib/utils'
@@ -105,6 +106,11 @@ function HistoryPageContent() {
 
                   {isExpanded && (
                     <div className="px-4 pb-4 border-t border-slate-100 pt-3 space-y-3">
+                      <IncidentProgressTracker
+                        status={inc.status}
+                        assignedUnitName={inc.assigned_unit_name}
+                        className="pb-3 border-b border-slate-100"
+                      />
                       <p className="text-sm text-slate-700">{inc.description}</p>
                       <div className="grid grid-cols-2 gap-2 text-xs">
                         <div><p className="text-slate-400">Location</p><p className="text-slate-700">{inc.address || inc.barangay || '—'}</p></div>

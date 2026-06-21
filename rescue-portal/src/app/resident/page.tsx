@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Shield, Phone, AlertTriangle, Clock, ChevronRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
+import { IncidentProgressTracker } from '@/components/incident-progress-tracker'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
 import { formatRelativeTime } from '@/lib/utils'
 import { useSettings } from '@/lib/settings-context'
@@ -168,6 +169,11 @@ function ResidentDashboardContent() {
                   {activeIncident.assigned_unit_name} is responding
                 </p>
               )}
+              <IncidentProgressTracker
+                status={activeIncident.status}
+                assignedUnitName={activeIncident.assigned_unit_name}
+                className="mt-4 pt-3 border-t border-amber-200"
+              />
             </CardContent>
           </Card>
         </Link>
