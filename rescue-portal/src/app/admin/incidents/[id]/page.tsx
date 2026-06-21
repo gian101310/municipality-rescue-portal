@@ -436,12 +436,22 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
                 <CheckCircle2 className="w-3.5 h-3.5 mr-2" /> Dispatch
               </Button>
               <Separator className="bg-slate-800" />
-              <Button size="sm" className="w-full bg-green-700 hover:bg-green-600 text-white" onClick={() => void applyStatus('resolved')}>
-                <CheckCircle2 className="w-3.5 h-3.5 mr-2" /> Resolve Incident
-              </Button>
-              <Button size="sm" variant="outline" className="w-full border-red-700/50 text-red-400 hover:bg-red-900/20" onClick={() => void escalateIncident()}>
-                <AlertTriangle className="w-3.5 h-3.5 mr-2" /> Escalate
-              </Button>
+              {incident.status !== 'resolved' && incident.status !== 'closed' && (
+                <Button size="sm" className="w-full bg-green-700 hover:bg-green-600 text-white" onClick={() => void applyStatus('resolved')}>
+                  <CheckCircle2 className="w-3.5 h-3.5 mr-2" /> Resolve Incident
+                </Button>
+              )}
+              {(incident.status === 'resolved' || incident.status === 'closed') ? (
+                incident.status !== 'closed' && (
+                  <Button size="sm" className="w-full bg-slate-700 hover:bg-slate-600 text-white" onClick={() => void applyStatus('closed')}>
+                    <CheckCircle2 className="w-3.5 h-3.5 mr-2" /> Close Incident
+                  </Button>
+                )
+              ) : (
+                <Button size="sm" variant="outline" className="w-full border-red-700/50 text-red-400 hover:bg-red-900/20" onClick={() => void escalateIncident()}>
+                  <AlertTriangle className="w-3.5 h-3.5 mr-2" /> Escalate
+                </Button>
+              )}
             </CardContent>
           </Card>
 

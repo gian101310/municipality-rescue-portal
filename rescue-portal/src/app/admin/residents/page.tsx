@@ -330,6 +330,19 @@ export default function ResidentsPage() {
               </div>
               <div className="space-y-1.5"><Label className="text-slate-300">Emergency Contact Name</Label><Input value={manualForm.emergency_contact_name} onChange={(e) => setManualForm((prev) => ({ ...prev, emergency_contact_name: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" /></div>
               <div className="space-y-1.5"><Label className="text-slate-300">Emergency Contact Phone</Label><Input value={manualForm.emergency_contact_phone} onChange={(e) => setManualForm((prev) => ({ ...prev, emergency_contact_phone: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" /></div>
+              <div className="space-y-1.5 sm:col-span-2">
+                <Label className="text-slate-300">Emergency Contact Relationship</Label>
+                <Select value={manualForm.emergency_contact_relationship} onValueChange={(v) => v && setManualForm((prev) => ({ ...prev, emergency_contact_relationship: v }))}>
+                  <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                    <SelectValue placeholder="Select relationship" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-slate-800 border-slate-600">
+                    {['Spouse', 'Parent', 'Child', 'Sibling', 'Relative', 'Friend', 'Neighbor', 'Other'].map((r) => (
+                      <SelectItem key={r} value={r} className="text-white hover:bg-slate-700">{r}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
             <button
               type="button"

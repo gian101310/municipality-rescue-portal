@@ -39,6 +39,14 @@ export async function GET(request: NextRequest) {
 
     const geoScope = geoScopes?.[0] ?? null
 
+    // Fetch barangays for this org so registration can show them in dropdown
+    const { data: barangays } = await admin
+      .from('barangays')
+      .select('id, name')
+      .eq('organization_id', orgId)
+      .eq('is_active', true)
+      .order('name')
+
     return NextResponse.json({
       organization: {
         id: org.id,
@@ -50,6 +58,7 @@ export async function GET(request: NextRequest) {
         dialect: (org.branding as any)?.dialect ?? null,
       },
       geoScope,
+      barangays: barangays ?? [],
     })
   } catch (error) {
     return NextResponse.json(

@@ -144,7 +144,7 @@ export default function SettingsPage() {
   const coveredLocalities = getScopedLocalities(currentScope)
   const selectedScopeLocality = PH_LOCALITIES.find((item) => item.code === scopeMunicipalityCode)
   const settingsTabs = getSettingsTabsForRole(profileRole)
-  const canEditSettings = isUnlocked
+  const canEditSettings = isUnlocked || profileRole === 'admin' || profileRole === 'super_admin'
   const currentCountry = getCountryForScope(currentScope)
   const scopeLabel = scopeLevel === 'country'
     ? (currentCountry === 'AE' ? 'Entire UAE' : 'Entire Philippines')

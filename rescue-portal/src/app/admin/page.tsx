@@ -154,19 +154,38 @@ export default function CommandCenterPage() {
     ? { lat: dashboardMapMarkers[0].lat, lng: dashboardMapMarkers[0].lng }
     : { lat: settings.mapCenterLat, lng: settings.mapCenterLng }
 
-  function handleSubmitManualAlert() {
+  async function handleSubmitManualAlert() {
     if (!alertType || !alertDescription.trim()) {
       toast.error('Please fill in the emergency type and description')
       return
     }
-    toast.success('Manual alert creation coming soon — use the resident portal for now.')
-    setShowManualAlert(false)
-    setAlertType('')
-    setAlertDescription('')
-    setAlertReporterName('')
-    setAlertReporterPhone('')
-    setAlertBarangay('')
-    setAlertSeverity('moderate')
+    try {
+      const response = await fetch('/api/admin/incidents/manual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          emergency_type_id: alertType,
+          description: alertDescription.trim(),
+          reporter_name: alertReporterName.trim() || 'Walk-in / Call-in',
+          reporter_phone: alertReporterPhone.trim() || null,
+          barangay: alertBarangay.trim() || null,
+          severity: alertSeverity,
+        }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload.message ?? 'Unable to create alert.')
+      toast.success(`Alert created: ${payload.reference_number ?? 'New incident'}`)
+      setShowManualAlert(false)
+      setAlertType('')
+      setAlertDescription('')
+      setAlertReporterName('')
+      setAlertReporterPhone('')
+      setAlertBarangay('')
+      setAlertSeverity('moderate')
+      void fetchDashboard()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to create alert.')
+    }
   }
 
   if (loading) {

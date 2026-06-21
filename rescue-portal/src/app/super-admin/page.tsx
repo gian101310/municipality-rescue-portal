@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Shield, Building2, Plus, Search,
-  Lock, Eye, EyeOff, CheckCircle2, XCircle, Clock, LogOut, Loader2, X, KeyRound, UserX, ExternalLink, Trash2, LogIn, Pencil
+  Lock, Eye, EyeOff, CheckCircle2, XCircle, Clock, LogOut, Loader2, X, KeyRound, UserX, ExternalLink, Trash2, LogIn, Pencil, Users
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -96,6 +96,14 @@ export default function SuperAdminPage() {
   const [showAdminPassword, setShowAdminPassword] = useState(false)
   const [showMasterKey, setShowMasterKey] = useState(false)
   const [actionLoading, setActionLoading] = useState<string | null>(null)
+
+  // Staff management
+  const [staffTenant, setStaffTenant] = useState<Tenant | null>(null)
+  const [staffList, setStaffList] = useState<any[]>([])
+  const [staffMax, setStaffMax] = useState(10)
+  const [staffLoading, setStaffLoading] = useState(false)
+  const [staffAddOpen, setStaffAddOpen] = useState(false)
+  const [newStaff, setNewStaff] = useState({ email: '', fullName: '', role: 'staff', password: '' })
 
   const loadTenants = useCallback(async () => {
     const response = await fetch('/api/super-admin/tenants', { cache: 'no-store' })
@@ -345,6 +353,68 @@ export default function SuperAdminPage() {
     } finally {
       setActionLoading(null)
     }
+  }
+
+  async function openStaffPanel(tenant: Tenant) {
+    setStaffTenant(tenant)
+    setStaffLoading(true)
+    try {
+      const res = await fetch(`/api/super-admin/staff?tenantId=${tenant.id}`)
+      const payload = await res.json()
+      if (res.ok) {
+        setStaffList(payload.staff ?? [])
+        setStaffMax(payload.max ?? 10)
+      } else {
+        toast.error(payload.message ?? 'Unable to load staff')
+      }
+    } catch { toast.error('Unable to load staff') }
+    finally { setStaffLoading(false) }
+  }
+
+  async function handleCreateStaff() {
+    if (!staffTenant || !newStaff.email || !newStaff.password) {
+      toast.error('Email and password are required')
+      return
+    }
+    setStaffLoading(true)
+    try {
+      const res = await fetch('/api/super-admin/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tenantId: staffTenant.id, ...newStaff }),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.message)
+      toast.success('Staff account created')
+      setNewStaff({ email: '', fullName: '', role: 'staff', password: '' })
+      setStaffAddOpen(false)
+      await openStaffPanel(staffTenant)
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Unable to create staff') }
+    finally { setStaffLoading(false) }
+  }
+
+  async function handleStaffAction(staffId: string, action: string) {
+    if (!staffTenant) return
+    let password: string | undefined
+    if (action === 'change_password') {
+      password = window.prompt('Enter new password') ?? undefined
+      if (!password) return
+    }
+    if (action === 'delete' && !window.confirm('Delete this staff account permanently?')) return
+
+    setStaffLoading(true)
+    try {
+      const res = await fetch('/api/super-admin/staff', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ staffId, action, password }),
+      })
+      const payload = await res.json()
+      if (!res.ok) throw new Error(payload.message)
+      toast.success(payload.message)
+      await openStaffPanel(staffTenant)
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Unable to update staff') }
+    finally { setStaffLoading(false) }
   }
 
   async function handleCreateTenant(event: FormEvent<HTMLFormElement>) {
@@ -603,6 +673,9 @@ export default function SuperAdminPage() {
                           <Button variant="ghost" size="sm" className="text-emerald-400 hover:text-emerald-300 h-8 w-8 p-0" title="Login as this tenant's admin" disabled={Boolean(actionLoading) || !tenant.admin_user_id} onClick={() => handleLoginAsAdmin(tenant)}>
                             <LogIn className="w-4 h-4" />
                           </Button>
+                          <Button variant="ghost" size="sm" className="text-cyan-400 hover:text-cyan-300 h-8 w-8 p-0" title="Manage staff accounts" disabled={Boolean(actionLoading)} onClick={() => openStaffPanel(tenant)}>
+                            <Users className="w-4 h-4" />
+                          </Button>
                           <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white h-8 w-8 p-0" title="View client" onClick={() => toast.info(`Viewing ${tenant.name}`)}>
                             <Eye className="w-4 h-4" />
                           </Button>
@@ -693,6 +766,9 @@ export default function SuperAdminPage() {
                     <Button variant="ghost" size="sm" className="text-emerald-400 hover:text-emerald-300 h-8 w-8 p-0" title="Login as this tenant's admin" disabled={Boolean(actionLoading) || !tenant.admin_user_id} onClick={() => handleLoginAsAdmin(tenant)}>
                       <LogIn className="w-4 h-4" />
                     </Button>
+                    <Button variant="ghost" size="sm" className="text-cyan-400 hover:text-cyan-300 h-8 w-8 p-0" title="Manage staff accounts" disabled={Boolean(actionLoading)} onClick={() => openStaffPanel(tenant)}>
+                      <Users className="w-4 h-4" />
+                    </Button>
                     <Button variant="ghost" size="sm" className="text-slate-400 hover:text-white h-8 w-8 p-0" title="View client" onClick={() => toast.info(`Viewing ${tenant.name}`)}>
                       <Eye className="w-4 h-4" />
                     </Button>
@@ -746,6 +822,84 @@ export default function SuperAdminPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Staff Management Dialog */}
+      {staffTenant && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-xl max-h-[85vh] overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-800 p-5">
+              <div>
+                <h2 className="text-lg font-bold text-white flex items-center gap-2"><Users className="w-5 h-5 text-cyan-400" /> Staff Accounts</h2>
+                <p className="text-sm text-slate-400 mt-1">{staffTenant.name} — {staffList.length}/{staffMax} accounts</p>
+              </div>
+              <button type="button" onClick={() => { setStaffTenant(null); setStaffAddOpen(false) }} className="rounded-md p-1 text-slate-400 hover:bg-slate-800 hover:text-white"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="p-5 space-y-4">
+              {staffLoading && <div className="text-center py-6"><Loader2 className="w-6 h-6 text-cyan-400 animate-spin mx-auto" /></div>}
+              {!staffLoading && staffList.length === 0 && <p className="text-slate-500 text-center py-6 text-sm">No staff accounts yet.</p>}
+              {!staffLoading && staffList.map((s: any) => (
+                <div key={s.id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                  <div>
+                    <p className="text-white text-sm font-medium">{s.full_name || 'Unnamed'}</p>
+                    <p className="text-xs text-slate-500">{s.email} · {s.role} · {s.is_active ? 'Active' : 'Inactive'}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <Button variant="ghost" size="sm" className="text-blue-300 hover:text-blue-200 h-7 w-7 p-0" title="Change password" onClick={() => handleStaffAction(s.id, 'change_password')}>
+                      <Lock className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button variant="ghost" size="sm" className={`h-7 w-7 p-0 ${s.is_active ? 'text-red-400 hover:text-red-300' : 'text-green-400 hover:text-green-300'}`} title={s.is_active ? 'Deactivate' : 'Activate'} onClick={() => handleStaffAction(s.id, 'toggle_active')}>
+                      {s.is_active ? <XCircle className="w-3.5 h-3.5" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                    </Button>
+                    <Button variant="ghost" size="sm" className="text-red-500 hover:text-red-400 h-7 w-7 p-0" title="Delete" onClick={() => handleStaffAction(s.id, 'delete')}>
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+
+              {!staffAddOpen && staffList.length < staffMax && (
+                <Button className="w-full bg-cyan-600 hover:bg-cyan-700 text-white" onClick={() => setStaffAddOpen(true)}>
+                  <Plus className="w-4 h-4 mr-2" /> Add Staff Account
+                </Button>
+              )}
+
+              {staffAddOpen && (
+                <div className="border border-cyan-700/30 rounded-lg p-4 bg-cyan-950/10 space-y-3">
+                  <h3 className="text-sm font-semibold text-cyan-200">New Staff Account</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-slate-300 text-xs">Full Name</Label>
+                      <Input value={newStaff.fullName} onChange={e => setNewStaff(p => ({ ...p, fullName: e.target.value }))} placeholder="Staff name" className="bg-slate-800 border-slate-600 text-white" />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-slate-300 text-xs">Role</Label>
+                      <select value={newStaff.role} onChange={e => setNewStaff(p => ({ ...p, role: e.target.value }))} className="h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 text-sm text-white">
+                        <option value="staff">Staff</option>
+                        <option value="dispatcher">Dispatcher</option>
+                        <option value="admin">Admin</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-slate-300 text-xs">Email *</Label>
+                    <Input type="email" value={newStaff.email} onChange={e => setNewStaff(p => ({ ...p, email: e.target.value }))} placeholder="staff@municipality.gov.ph" className="bg-slate-800 border-slate-600 text-white" required />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-slate-300 text-xs">Temporary Password *</Label>
+                    <Input type="password" value={newStaff.password} onChange={e => setNewStaff(p => ({ ...p, password: e.target.value }))} placeholder="Min 8 chars" className="bg-slate-800 border-slate-600 text-white" required />
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="ghost" className="text-slate-400" onClick={() => setStaffAddOpen(false)}>Cancel</Button>
+                    <Button className="bg-cyan-600 hover:bg-cyan-700 text-white" onClick={() => void handleCreateStaff()} disabled={staffLoading}>
+                      {staffLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Create'}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {(addOpen || editingTenant) && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">

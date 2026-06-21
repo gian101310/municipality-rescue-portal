@@ -49,7 +49,7 @@ export default function TeamsPage() {
 
   // Create team dialog
   const [createOpen, setCreateOpen] = useState(false)
-  const [newTeam, setNewTeam] = useState({ name: '', code: '', contact_number: '' })
+  const [newTeam, setNewTeam] = useState({ name: '', code: '', contact_number: '', vehicle_type: '', plate_number: '', vehicle_model: '', equipment: [] as string[] })
 
   // Edit team dialog
   const [editOpen, setEditOpen] = useState(false)
@@ -80,15 +80,25 @@ export default function TeamsPage() {
 
   async function handleCreateTeam() {
     if (!newTeam.name.trim() || !newTeam.code.trim()) return toast.error('Team name and code are required.')
-    const response = await fetch('/api/admin/teams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(newTeam) })
+    const body: any = { name: newTeam.name, code: newTeam.code, contact_number: newTeam.contact_number }
+    if (newTeam.vehicle_type) {
+      body.vehicle_info = { type: newTeam.vehicle_type, plate_number: newTeam.plate_number, model: newTeam.vehicle_model }
+    }
+    if (newTeam.equipment.length > 0) body.equipment = newTeam.equipment
+    const response = await fetch('/api/admin/teams', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const payload = await response.json().catch(() => ({}))
     if (!response.ok) return toast.error(payload.message ?? 'Unable to create team.')
-    toast.success('Rescue team created'); setCreateOpen(false); setNewTeam({ name: '', code: '', contact_number: '' }); void loadTeams()
+    toast.success('Rescue team created'); setCreateOpen(false); setNewTeam({ name: '', code: '', contact_number: '', vehicle_type: '', plate_number: '', vehicle_model: '', equipment: [] }); void loadTeams()
   }
 
   async function handleEditTeam() {
     if (!editTeamData) return
-    const response = await fetch(`/api/admin/teams/${editTeamData.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: editTeamData.name, code: editTeamData.code, contact_number: editTeamData.contact_number, status: editTeamData.status }) })
+    const body: any = { name: editTeamData.name, code: editTeamData.code, contact_number: editTeamData.contact_number, status: editTeamData.status }
+    if (editTeamData.vehicle_type) {
+      body.vehicle_info = { type: editTeamData.vehicle_type, plate_number: editTeamData.plate_number || '', model: editTeamData.vehicle_model || '' }
+    }
+    body.equipment = editTeamData.equipment || []
+    const response = await fetch(`/api/admin/teams/${editTeamData.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
     const payload = await response.json().catch(() => ({}))
     if (!response.ok) return toast.error(payload.message ?? 'Unable to update team.')
     toast.success('Team updated'); setEditOpen(false); void loadTeams()
@@ -298,7 +308,7 @@ export default function TeamsPage() {
                 )}
 
                 <div className="flex gap-2 pt-1">
-                  <Button size="sm" variant="outline" className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800 text-xs" onClick={() => { setEditTeamData({ id: unit.id, name: unit.name, code: unit.code, contact_number: unit.contact_number ?? '', status: unit.status }); setEditOpen(true) }}>
+                  <Button size="sm" variant="outline" className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800 text-xs" onClick={() => { setEditTeamData({ id: unit.id, name: unit.name, code: unit.code, contact_number: unit.contact_number ?? '', status: unit.status, vehicle_type: unit.vehicle_info?.type ?? '', plate_number: unit.vehicle_info?.plate_number ?? '', vehicle_model: unit.vehicle_info?.model ?? '', equipment: unit.equipment ?? [] }); setEditOpen(true) }}>
                     <Edit2 className="w-3 h-3 mr-1" /> Edit
                   </Button>
                   <Button size="sm" variant="outline" className="border-amber-700/50 text-amber-400 hover:bg-amber-900/20 text-xs" disabled={unit.status !== 'available'} onClick={() => void openDispatch(unit)}>
@@ -313,23 +323,74 @@ export default function TeamsPage() {
 
       {/* Create Team Dialog */}
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Rescue Team</DialogTitle>
             <DialogDescription className="text-slate-400">Register a new rescue unit for your municipality.</DialogDescription>
           </DialogHeader>
           <div className="space-y-3 py-2">
-            <div className="space-y-1">
-              <Label className="text-slate-300 text-xs">Team Name *</Label>
-              <Input placeholder="e.g. Bravo Rescue Unit" value={newTeam.name} onChange={e => setNewTeam(p => ({ ...p, name: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-slate-300 text-xs">Team Code *</Label>
-              <Input placeholder="e.g. BRU-01" value={newTeam.code} onChange={e => setNewTeam(p => ({ ...p, code: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <Label className="text-slate-300 text-xs">Team Name *</Label>
+                <Input placeholder="e.g. Bravo Rescue Unit" value={newTeam.name} onChange={e => setNewTeam(p => ({ ...p, name: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-slate-300 text-xs">Team Code *</Label>
+                <Input placeholder="e.g. BRU-01" value={newTeam.code} onChange={e => setNewTeam(p => ({ ...p, code: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+              </div>
             </div>
             <div className="space-y-1">
               <Label className="text-slate-300 text-xs">Contact Number</Label>
               <Input placeholder="e.g. 09171234567" value={newTeam.contact_number} onChange={e => setNewTeam(p => ({ ...p, contact_number: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+            </div>
+            <div className="border-t border-slate-800 pt-3 mt-3">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Vehicle Information</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-slate-300 text-xs">Vehicle Type</Label>
+                  <Select value={newTeam.vehicle_type} onValueChange={v => setNewTeam(p => ({ ...p, vehicle_type: v }))}>
+                    <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                      <SelectValue placeholder="Select vehicle" />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-600">
+                      {Object.entries(VEHICLE_TYPE_LABELS).map(([k, v]) => (
+                        <SelectItem key={k} value={k} className="text-white">{v}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-slate-300 text-xs">Plate Number</Label>
+                  <Input placeholder="e.g. ABC 1234" value={newTeam.plate_number} onChange={e => setNewTeam(p => ({ ...p, plate_number: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+                </div>
+                <div className="space-y-1 col-span-2">
+                  <Label className="text-slate-300 text-xs">Vehicle Model</Label>
+                  <Input placeholder="e.g. Toyota HiAce" value={newTeam.vehicle_model} onChange={e => setNewTeam(p => ({ ...p, vehicle_model: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+                </div>
+              </div>
+            </div>
+            <div className="border-t border-slate-800 pt-3 mt-3">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Equipment</p>
+              <div className="flex flex-wrap gap-2 mb-2">
+                {newTeam.equipment.map((eq, idx) => (
+                  <Badge key={idx} variant="outline" className="text-xs border-slate-600 text-slate-300 gap-1">
+                    {eq}
+                    <button type="button" className="ml-1 text-slate-500 hover:text-red-400" onClick={() => setNewTeam(p => ({ ...p, equipment: p.equipment.filter((_, i) => i !== idx) }))}>
+                      <X className="w-3 h-3" />
+                    </button>
+                  </Badge>
+                ))}
+              </div>
+              <Select onValueChange={v => { if (v && !newTeam.equipment.includes(v)) setNewTeam(p => ({ ...p, equipment: [...p.equipment, v] })) }}>
+                <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                  <SelectValue placeholder="Add equipment..." />
+                </SelectTrigger>
+                <SelectContent className="bg-slate-800 border-slate-600">
+                  {['First Aid Kit', 'Stretcher', 'Oxygen Tank', 'Fire Extinguisher', 'Hydraulic Rescue Tool', 'Rope & Harness', 'Megaphone', 'Flashlight', 'Radio', 'AED Defibrillator', 'Spine Board', 'Life Vest', 'Chainsaw', 'Generator', 'Water Pump'].filter(eq => !newTeam.equipment.includes(eq)).map(eq => (
+                    <SelectItem key={eq} value={eq} className="text-white">{eq}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
           <div className="flex gap-2 justify-end">
@@ -341,33 +402,87 @@ export default function TeamsPage() {
 
       {/* Edit Team Dialog */}
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
-        <DialogContent className="bg-slate-900 border-slate-700 text-white">
+        <DialogContent className="bg-slate-900 border-slate-700 text-white max-w-lg max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Rescue Team</DialogTitle>
+            <DialogDescription className="text-slate-400">Update team details, vehicle, and equipment.</DialogDescription>
           </DialogHeader>
           {editTeamData && (
             <div className="space-y-3 py-2">
-              <div className="space-y-1">
-                <Label className="text-slate-300 text-xs">Team Name</Label>
-                <Input value={editTeamData.name} onChange={e => setEditTeamData((p: any) => ({ ...p, name: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-slate-300 text-xs">Team Name *</Label>
+                  <Input value={editTeamData.name} onChange={e => setEditTeamData((p: any) => ({ ...p, name: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-slate-300 text-xs">Code *</Label>
+                  <Input value={editTeamData.code} onChange={e => setEditTeamData((p: any) => ({ ...p, code: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label className="text-slate-300 text-xs">Code</Label>
-                <Input value={editTeamData.code} onChange={e => setEditTeamData((p: any) => ({ ...p, code: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-slate-300 text-xs">Contact Number</Label>
+                  <Input value={editTeamData.contact_number} onChange={e => setEditTeamData((p: any) => ({ ...p, contact_number: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-slate-300 text-xs">Status</Label>
+                  <Select value={editTeamData.status} onValueChange={v => setEditTeamData((p: any) => ({ ...p, status: v }))}>
+                    <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="bg-slate-800 border-slate-600">
+                      {Object.entries(STATUS_CONFIG).map(([k, v]) => (
+                        <SelectItem key={k} value={k} className="text-white">{v.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label className="text-slate-300 text-xs">Contact Number</Label>
-                <Input value={editTeamData.contact_number} onChange={e => setEditTeamData((p: any) => ({ ...p, contact_number: e.target.value }))} className="bg-slate-800 border-slate-600 text-white" />
+              <div className="border-t border-slate-800 pt-3 mt-3">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Vehicle Information</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-slate-300 text-xs">Vehicle Type</Label>
+                    <Select value={editTeamData.vehicle_type || ''} onValueChange={v => setEditTeamData((p: any) => ({ ...p, vehicle_type: v }))}>
+                      <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
+                        <SelectValue placeholder="Select vehicle" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-slate-800 border-slate-600">
+                        {Object.entries(VEHICLE_TYPE_LABELS).map(([k, v]) => (
+                          <SelectItem key={k} value={k} className="text-white">{v}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-slate-300 text-xs">Plate Number</Label>
+                    <Input value={editTeamData.plate_number || ''} onChange={e => setEditTeamData((p: any) => ({ ...p, plate_number: e.target.value }))} placeholder="e.g. ABC 1234" className="bg-slate-800 border-slate-600 text-white" />
+                  </div>
+                  <div className="space-y-1 col-span-2">
+                    <Label className="text-slate-300 text-xs">Vehicle Model</Label>
+                    <Input value={editTeamData.vehicle_model || ''} onChange={e => setEditTeamData((p: any) => ({ ...p, vehicle_model: e.target.value }))} placeholder="e.g. Toyota HiAce" className="bg-slate-800 border-slate-600 text-white" />
+                  </div>
+                </div>
               </div>
-              <div className="space-y-1">
-                <Label className="text-slate-300 text-xs">Status</Label>
-                <Select value={editTeamData.status} onValueChange={v => setEditTeamData((p: any) => ({ ...p, status: v }))}>
+              <div className="border-t border-slate-800 pt-3 mt-3">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Equipment</p>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {(editTeamData.equipment || []).map((eq: string, idx: number) => (
+                    <Badge key={idx} variant="outline" className="text-xs border-slate-600 text-slate-300 gap-1">
+                      {eq}
+                      <button type="button" className="ml-1 text-slate-500 hover:text-red-400" onClick={() => setEditTeamData((p: any) => ({ ...p, equipment: p.equipment.filter((_: string, i: number) => i !== idx) }))}>
+                        <X className="w-3 h-3" />
+                      </button>
+                    </Badge>
+                  ))}
+                </div>
+                <Select onValueChange={v => { if (v && !(editTeamData.equipment || []).includes(v)) setEditTeamData((p: any) => ({ ...p, equipment: [...(p.equipment || []), v] })) }}>
                   <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-                    <SelectValue />
+                    <SelectValue placeholder="Add equipment..." />
                   </SelectTrigger>
                   <SelectContent className="bg-slate-800 border-slate-600">
-                    {Object.entries(STATUS_CONFIG).map(([k, v]) => (
-                      <SelectItem key={k} value={k} className="text-white">{v.label}</SelectItem>
+                    {['First Aid Kit', 'Stretcher', 'Oxygen Tank', 'Fire Extinguisher', 'Hydraulic Rescue Tool', 'Rope & Harness', 'Megaphone', 'Flashlight', 'Radio', 'AED Defibrillator', 'Spine Board', 'Life Vest', 'Chainsaw', 'Generator', 'Water Pump'].filter(eq => !(editTeamData.equipment || []).includes(eq)).map(eq => (
+                      <SelectItem key={eq} value={eq} className="text-white">{eq}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

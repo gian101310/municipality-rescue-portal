@@ -12,7 +12,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Progress } from '@/components/ui/progress'
 import { DemoBanner } from '@/components/demo-banner'
-import { DEMO_BARANGAYS } from '@/lib/demo-data'
 import {
   DEMO_TENANT_GEO_SCOPE,
   getLocalitiesForProvince,
@@ -93,6 +92,7 @@ export default function RegisterPage() {
   const [geoScopePersistence, setGeoScopePersistence] = useState<'checking' | 'supabase' | 'demo'>('checking')
   const [municipalityInfo, setMunicipalityInfo] = useState<MunicipalityInfo | null>(null)
   const [municipalityLoading, setMunicipalityLoading] = useState(!!municipalityParam)
+  const [orgBarangays, setOrgBarangays] = useState<{ id: string; name: string }[]>([])
   const [form, setForm] = useState<FormData>({
     full_name: '', phone: '', email: '', password: '', confirmPassword: '', date_of_birth: '',
     region: '', regionCode: '', province: '', provinceCode: '',
@@ -158,6 +158,7 @@ export default function RegisterPage() {
 
         if (res.ok && payload.organization) {
           setMunicipalityInfo(payload.organization)
+          if (payload.barangays?.length) setOrgBarangays(payload.barangays)
 
           // If the API returns a geo scope, apply it to lock the address fields
           if (payload.geoScope) {
@@ -530,17 +531,20 @@ export default function RegisterPage() {
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-slate-300">Barangay *</Label>
-                    <Select value={form.barangay} onValueChange={(v) => { if (v) update('barangay', v) }} disabled={!form.municipalityCode}>
+                    <Select value={form.barangay} onValueChange={(v) => { if (v) update('barangay', v) }} disabled={!form.municipalityCode && orgBarangays.length === 0}>
                       <SelectTrigger className="bg-slate-800 border-slate-600 text-white">
-                        <SelectValue placeholder={form.municipalityCode ? 'Select barangay' : 'Select city/municipality first'} />
+                        <SelectValue placeholder={orgBarangays.length > 0 ? 'Select barangay' : form.municipalityCode ? 'Select barangay' : 'Select city/municipality first'} />
                       </SelectTrigger>
                       <SelectContent className="bg-slate-800 border-slate-600">
-                        {DEMO_BARANGAYS.map((b) => (
-                          <SelectItem key={b.id} value={b.name} className="text-white hover:bg-slate-700">{b.name}</SelectItem>
-                        ))}
+                        {orgBarangays.length > 0
+                          ? orgBarangays.map((b) => (
+                              <SelectItem key={b.id} value={b.name} className="text-white hover:bg-slate-700">{b.name}</SelectItem>
+                            ))
+                          : <SelectItem value="__none" disabled className="text-slate-500">No barangays configured for this municipality</SelectItem>
+                        }
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-slate-500">Barangays are still demo records; production should query PSGC barangays by selected city/municipality.</p>
+                    {orgBarangays.length === 0 && <p className="text-xs text-slate-500">Barangays will load from the municipality&apos;s admin configuration.</p>}
                   </div>
                   <div className="space-y-1.5">
                     <Label className="text-slate-300">Full Street Address *</Label>
