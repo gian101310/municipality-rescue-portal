@@ -24,7 +24,7 @@ export default function DispatchLayout({ children }: { children: React.ReactNode
         .from('user_profiles')
         .select('full_name, role')
         .eq('user_id', user.id)
-        .single()
+        .single() as { data: { full_name: string; role: string } | null }
 
       if (!p || p.role !== 'dispatcher') {
         toast.error('Access denied — Dispatch Ops only')

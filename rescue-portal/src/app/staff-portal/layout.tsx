@@ -24,7 +24,7 @@ export default function StaffPortalLayout({ children }: { children: React.ReactN
         .from('user_profiles')
         .select('full_name, role')
         .eq('user_id', user.id)
-        .single()
+        .single() as { data: { full_name: string; role: string } | null }
 
       if (!p || p.role !== 'staff') {
         toast.error('Access denied — Staff only')

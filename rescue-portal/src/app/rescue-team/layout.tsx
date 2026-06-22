@@ -24,7 +24,7 @@ export default function RescueTeamLayout({ children }: { children: React.ReactNo
         .from('user_profiles')
         .select('full_name, role')
         .eq('user_id', user.id)
-        .single()
+        .single() as { data: { full_name: string; role: string } | null }
 
       if (!p || !['responder', 'team_leader'].includes(p.role)) {
         toast.error('Access denied — Rescue Team only')
