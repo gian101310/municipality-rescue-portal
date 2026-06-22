@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { LandingSosDemo } from '@/components/landing-sos-demo'
 import { PremiumFooter } from '@/components/premium-footer'
+import { MobileNav } from '@/components/mobile-nav'
 
 const responseStats = [
   ['4-step', 'resident emergency flow'],
@@ -87,10 +88,13 @@ export default function HomePage() {
             <Link href="/emergency-hotlines" className="transition-colors hover:text-white">Hotlines</Link>
             <Link href="/auth/login" className="text-slate-400 transition-colors hover:text-white">Municipality Login</Link>
           </nav>
-          <Button variant="outline" className="hidden border-slate-600 bg-slate-900/60 text-white hover:bg-slate-800 sm:inline-flex" render={<Link href="/auth/login" />}>
-            <Shield className="mr-2 h-4 w-4" />
-            Staff / Admin
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" className="hidden border-slate-600 bg-slate-900/60 text-white hover:bg-slate-800 sm:inline-flex" render={<Link href="/auth/login" />}>
+              <Shield className="mr-2 h-4 w-4" />
+              Staff / Admin
+            </Button>
+            <MobileNav />
+          </div>
         </header>
 
         <div className="relative z-10 mx-auto grid min-h-[calc(92vh-4rem)] max-w-7xl items-center gap-10 px-4 pb-16 pt-10 sm:px-6 lg:grid-cols-[0.92fr_1.08fr] lg:px-8">
