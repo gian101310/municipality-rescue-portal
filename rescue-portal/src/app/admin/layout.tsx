@@ -6,7 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard, AlertTriangle, Map, Users, UserCheck,
   ShieldCheck, BarChart3, ScrollText, Settings, Activity,
-  Shield, Menu, ChevronLeft, LogOut, User, Clock, QrCode, TrendingUp,
+  Shield, Menu, ChevronLeft, LogOut, User, Clock, QrCode, TrendingUp, Phone,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -60,6 +60,7 @@ function buildNavItems(stats: DashboardStats | null) {
     { href: '/admin/analytics', label: 'Analytics', icon: TrendingUp },
     { href: '/admin/audit', label: 'Audit Logs', icon: ScrollText },
     { href: '/admin/qr-posters', label: 'QR Posters', icon: QrCode },
+    { href: '/admin/hotlines', label: 'Hotlines', icon: Phone },
     { href: '/admin/settings', label: 'Settings', icon: Settings },
     { href: '/admin/health', label: 'System Health', icon: Activity },
   ]
