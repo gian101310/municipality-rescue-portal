@@ -304,9 +304,9 @@ function RegisterPage() {
       <DemoBanner />
       <div className="flex-1 flex items-center justify-center p-4 py-8">
         <div className="w-full max-w-lg">
-          <Link href="/auth/login" className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white mb-6 transition-colors">
+          <Link href="/" className="inline-flex items-center gap-1.5 text-sm text-slate-400 hover:text-white mb-6 transition-colors">
             <ArrowLeft className="w-4 h-4" />
-            Back to login
+            Back to home
           </Link>
 
           {/* Municipality banner from QR scan */}
@@ -317,12 +317,17 @@ function RegisterPage() {
             </div>
           )}
           {municipalityInfo && !municipalityLoading && (
-            <div className="mb-4 rounded-lg border border-green-500/30 bg-green-600/10 p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <Shield className="w-5 h-5 text-green-400" />
-                <h3 className="text-sm font-semibold text-green-300">
-                  Registering under {municipalityInfo.name}
-                </h3>
+            <div className="mb-4 rounded-xl border-2 border-green-500/40 bg-green-600/10 p-5">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-10 h-10 rounded-lg bg-green-600/20 border border-green-500/30 flex items-center justify-center">
+                  <Shield className="w-5 h-5 text-green-400" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-green-300">
+                    {municipalityInfo.name}
+                  </h3>
+                  <p className="text-xs text-green-200/60">Official Rescue Portal Registration</p>
+                </div>
               </div>
               {municipalityInfo.description && (
                 <p className="text-xs text-green-200/80 mb-2">{municipalityInfo.description}</p>
@@ -331,14 +336,29 @@ function RegisterPage() {
                 <p className="text-xs text-green-200/60 italic mb-2">Language: {municipalityInfo.dialect}</p>
               )}
               {municipalityInfo.hotline && (
-                <div className="flex items-center gap-2 mt-2 pt-2 border-t border-green-500/20">
+                <div className="flex items-center gap-2 mt-3 pt-3 border-t border-green-500/20">
                   <Phone className="w-4 h-4 text-green-400" />
+                  <span className="text-xs text-green-200/60">Emergency Hotline:</span>
                   <span className="text-sm font-bold text-green-300">{municipalityInfo.hotline}</span>
                   {municipalityInfo.secondaryHotline && (
                     <span className="text-xs text-green-300/70 ml-1">/ {municipalityInfo.secondaryHotline}</span>
                   )}
                 </div>
               )}
+            </div>
+          )}
+          {!municipalityParam && !municipalityLoading && (
+            <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4">
+              <div className="flex items-start gap-3">
+                <Shield className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+                <div>
+                  <h3 className="text-sm font-semibold text-amber-300">No municipality link detected</h3>
+                  <p className="text-xs text-amber-200/70 mt-1">
+                    For the best experience, scan the QR code from your municipal hall or barangay office.
+                    The QR code automatically sets your municipality so you don&apos;t have to look for it manually.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 

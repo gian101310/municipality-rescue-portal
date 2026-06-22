@@ -9,6 +9,7 @@ import {
   Lock,
   MapPin,
   Phone,
+  QrCode,
   Radio,
   Shield,
   ShieldCheck,
@@ -82,10 +83,13 @@ export default function HomePage() {
             <a href="#response-flow" className="transition-colors hover:text-white">Residents</a>
             <a href="#operations" className="transition-colors hover:text-white">Command Center</a>
             <a href="#coverage" className="transition-colors hover:text-white">Coverage</a>
-            <Link href="/auth/login" className="transition-colors hover:text-white">Login</Link>
+            <Link href="/how-it-works" className="transition-colors hover:text-white">How It Works</Link>
+            <Link href="/emergency-hotlines" className="transition-colors hover:text-white">Hotlines</Link>
+            <Link href="/auth/login" className="text-slate-400 transition-colors hover:text-white">Municipality Login</Link>
           </nav>
-          <Button className="hidden bg-red-600 text-white hover:bg-red-700 sm:inline-flex" render={<Link href="/auth/register" />}>
-            Register
+          <Button variant="outline" className="hidden border-slate-600 bg-slate-900/60 text-white hover:bg-slate-800 sm:inline-flex" render={<Link href="/auth/login" />}>
+            <Shield className="mr-2 h-4 w-4" />
+            Staff / Admin
           </Button>
         </header>
 
@@ -99,12 +103,13 @@ export default function HomePage() {
               municipality-focused maps, and coordinated rescue operations.
             </p>
             <div className="mt-8 flex flex-col gap-3 sm:flex-row">
-              <Button className="h-10 bg-red-600 px-4 text-white hover:bg-red-700" render={<Link href="/auth/register" />}>
-                Register as Resident
-                <ArrowRight className="ml-2 h-4 w-4" />
+              <Button className="h-10 bg-red-600 px-4 text-white hover:bg-red-700" render={<a href="#how-to-register" />}>
+                <QrCode className="mr-2 h-4 w-4" />
+                How to Register
               </Button>
               <Button variant="outline" className="h-10 border-white/25 bg-white/10 px-4 text-white hover:bg-white/20" render={<Link href="/auth/login" />}>
-                Staff / Admin Login
+                <Shield className="mr-2 h-4 w-4" />
+                Municipality Login
               </Button>
             </div>
 
@@ -264,19 +269,61 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="border-t border-slate-800 bg-slate-900 py-12">
-        <div className="mx-auto flex max-w-7xl flex-col gap-5 px-4 sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
-          <div>
-            <h2 className="text-2xl font-black tracking-tight text-white">Open the portal and test the live flow.</h2>
-            <p className="mt-2 text-sm text-slate-400">Use a resident, staff, municipality admin, or platform owner account.</p>
+      <section id="how-to-register" className="border-t border-slate-800 bg-slate-900 py-16">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mb-10 text-center">
+            <p className="text-sm font-semibold uppercase tracking-[0.16em] text-amber-300">For Residents</p>
+            <h2 className="mt-3 text-3xl font-black tracking-tight text-white sm:text-4xl">How to Register</h2>
+            <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-slate-400">
+              Registration is handled through your municipality. Each participating LGU has a unique QR code and link
+              that connects you directly to their rescue portal.
+            </p>
           </div>
-          <div className="flex flex-col gap-3 sm:flex-row">
-            <Button className="bg-red-600 text-white hover:bg-red-700" render={<Link href="/auth/register" />}>
-              Register Resident
-            </Button>
-            <Button variant="outline" className="border-slate-700 bg-slate-950 text-slate-200 hover:bg-slate-800" render={<Link href="/auth/login" />}>
-              Open Login
-              <Phone className="ml-2 h-4 w-4" />
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="rounded-lg border border-slate-700 bg-slate-950 p-6 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-600/20 border border-amber-500/30">
+                <QrCode className="h-7 w-7 text-amber-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white">1. Scan QR Code</h3>
+              <p className="mt-2 text-sm text-slate-400">
+                Look for the official rescue portal QR code at your municipal hall, barangay office, or local MDRRMO.
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-700 bg-slate-950 p-6 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-600/20 border border-blue-500/30">
+                <Users className="h-7 w-7 text-blue-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white">2. Fill Out Your Details</h3>
+              <p className="mt-2 text-sm text-slate-400">
+                The form will already show your municipality. Enter your personal details, address, ID, and emergency contact.
+              </p>
+            </div>
+            <div className="rounded-lg border border-slate-700 bg-slate-950 p-6 text-center">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-green-600/20 border border-green-500/30">
+                <CheckCircle2 className="h-7 w-7 text-green-400" />
+              </div>
+              <h3 className="text-lg font-bold text-white">3. Wait for Approval</h3>
+              <p className="mt-2 text-sm text-slate-400">
+                Your local admin will verify your identity and approve your registration. You&apos;ll receive login access once approved.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-8 rounded-lg border border-amber-500/20 bg-amber-500/10 p-5 text-center">
+            <p className="text-sm font-semibold text-amber-200">
+              Don&apos;t have a QR code yet?
+            </p>
+            <p className="mt-1 text-sm text-amber-100/70">
+              Ask your barangay captain, municipal hall, or local MDRRMO office for the official rescue portal registration link.
+              Each municipality has its own unique link — there is no generic registration.
+            </p>
+          </div>
+
+          <div className="mt-6 text-center">
+            <Button variant="outline" className="border-slate-700 bg-slate-950 text-slate-300 hover:bg-slate-800" render={<Link href="/auth/login" />}>
+              <Shield className="mr-2 h-4 w-4" />
+              Municipality Staff / Admin Login
             </Button>
           </div>
         </div>

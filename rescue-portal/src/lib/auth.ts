@@ -166,13 +166,16 @@ export function getDefaultRoute(role: UserRole): string {
     case 'super_admin':
       return '/super-admin'
     case 'admin':
-    case 'dispatcher':
-    case 'verifier':
-    case 'staff':
       return '/admin'
+    case 'dispatcher':
+      return '/dispatch'
     case 'team_leader':
     case 'responder':
-      return '/admin/teams'
+      return '/rescue-team'
+    case 'staff':
+      return '/staff-portal'
+    case 'verifier':
+      return '/admin'
     case 'resident':
       return '/resident'
     default:

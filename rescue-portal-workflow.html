@@ -1,0 +1,989 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Municipality Rescue Portal — Workflow Guide</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #0f172a; color: #e2e8f0; overflow-x: hidden; }
+
+/* Navigation */
+.nav { position: fixed; top: 0; left: 0; right: 0; z-index: 100; background: rgba(15, 23, 42, 0.97); backdrop-filter: blur(12px); border-bottom: 1px solid #1e293b; padding: 10px 20px; display: flex; align-items: center; justify-content: space-between; }
+.nav-title { font-weight: 700; font-size: 13px; color: #f8fafc; display: flex; align-items: center; gap: 8px; }
+.nav-title .icon { width: 26px; height: 26px; background: linear-gradient(135deg, #dc2626, #b91c1c); border-radius: 7px; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+.nav-steps { display: flex; gap: 3px; align-items: center; }
+.nav-dot { width: 7px; height: 7px; border-radius: 50%; background: #334155; cursor: pointer; transition: all 0.3s; }
+.nav-dot.active { background: #ef4444; width: 20px; border-radius: 4px; }
+.nav-controls { display: flex; gap: 6px; }
+.nav-btn { background: #1e293b; border: 1px solid #334155; color: #94a3b8; padding: 5px 12px; border-radius: 6px; cursor: pointer; font-size: 11px; font-weight: 600; transition: all 0.2s; }
+.nav-btn:hover { background: #334155; color: #f1f5f9; }
+.nav-btn:disabled { opacity: 0.3; cursor: not-allowed; }
+.progress-bar { position: fixed; top: 49px; left: 0; height: 2px; background: linear-gradient(90deg, #ef4444, #f97316); transition: width 0.4s ease; z-index: 101; }
+
+/* Slides */
+.slides { padding-top: 52px; }
+.slide { min-height: calc(100vh - 52px); display: none; padding: 40px 30px; animation: fadeIn 0.4s ease; }
+.slide.active { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding-top: 40px; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Title slide */
+.title-slide { justify-content: center !important; text-align: center; }
+.title-slide h1 { font-size: 42px; font-weight: 800; background: linear-gradient(135deg, #ef4444, #f97316); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 12px; }
+.title-slide .subtitle { font-size: 17px; color: #94a3b8; max-width: 600px; margin: 0 auto; line-height: 1.5; }
+.title-slide .badge { display: inline-block; margin-top: 20px; padding: 5px 14px; background: #1e293b; border: 1px solid #334155; border-radius: 20px; font-size: 11px; color: #64748b; }
+
+/* Section header */
+.section-header { text-align: center; margin-bottom: 30px; }
+.section-header h2 { font-size: 26px; font-weight: 700; color: #f1f5f9; margin-bottom: 6px; }
+.section-header .step-num { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+
+/* Mockup frame */
+.mockup-frame { background: #1e293b; border: 1px solid #334155; border-radius: 16px; overflow: hidden; max-width: 440px; width: 100%; box-shadow: 0 20px 60px rgba(0,0,0,0.4); margin: 0 auto; }
+.mockup-header { height: 36px; background: #0f172a; display: flex; align-items: center; padding: 0 12px; gap: 6px; border-bottom: 1px solid #334155; }
+.mockup-header .dot { width: 8px; height: 8px; border-radius: 50%; }
+.mockup-header .dot-r { background: #ef4444; }
+.mockup-header .dot-y { background: #eab308; }
+.mockup-header .dot-g { background: #22c55e; }
+.mockup-header .url { flex: 1; text-align: center; font-size: 10px; color: #64748b; font-family: monospace; }
+.mockup-body { padding: 20px; }
+
+/* Form mockup */
+.mock-form { display: flex; flex-direction: column; gap: 12px; }
+.mock-field { position: relative; }
+.mock-field label { display: block; font-size: 11px; font-weight: 600; color: #94a3b8; margin-bottom: 4px; }
+.mock-field input, .mock-field select { width: 100%; padding: 8px 10px; background: #0f172a; border: 1px solid #334155; border-radius: 6px; color: #e2e8f0; font-size: 12px; }
+.mock-field.required label::after { content: ' *'; color: #ef4444; }
+.mock-field.highlight input, .mock-field.highlight select { border-color: #f59e0b; box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.2); }
+.mock-field .field-note { position: absolute; right: -8px; top: 0; width: 6px; height: 6px; border-radius: 50%; background: #f59e0b; }
+.mock-btn { padding: 10px; background: #dc2626; border: none; border-radius: 8px; color: white; font-size: 12px; font-weight: 700; cursor: default; text-align: center; margin-top: 6px; }
+.mock-btn.blue { background: #2563eb; }
+.mock-btn.green { background: #16a34a; }
+.mock-btn.cyan { background: #0891b2; }
+
+/* Notes panel */
+.notes-panel { max-width: 440px; width: 100%; margin-top: 20px; }
+.note { display: flex; gap: 10px; padding: 10px 14px; border-radius: 10px; margin-bottom: 8px; font-size: 12px; line-height: 1.5; }
+.note-icon { width: 20px; height: 20px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 11px; flex-shrink: 0; margin-top: 1px; }
+.note-warn { background: #3d2e0f; border: 1px solid #92400e; }
+.note-warn .note-icon { background: #f59e0b; color: #000; }
+.note-info { background: #0f2d3d; border: 1px solid #0369a1; }
+.note-info .note-icon { background: #0ea5e9; color: #000; }
+.note-success { background: #0f3d1e; border: 1px solid #166534; }
+.note-success .note-icon { background: #22c55e; color: #000; }
+.note-danger { background: #3b1010; border: 1px solid #991b1b; }
+.note-danger .note-icon { background: #ef4444; color: #fff; }
+
+/* Highlight legend */
+.legend { display: flex; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 5px; font-size: 10px; color: #94a3b8; }
+.legend-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+/* Two column layout */
+.two-col { display: flex; gap: 24px; align-items: flex-start; max-width: 900px; width: 100%; }
+.two-col .col { flex: 1; min-width: 0; }
+@media (max-width: 800px) { .two-col { flex-direction: column; } }
+
+/* Dashboard mockup cards */
+.mock-card { background: #0f172a; border: 1px solid #334155; border-radius: 10px; padding: 12px; margin-bottom: 8px; }
+.mock-card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.mock-card-icon { width: 28px; height: 28px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+.mock-card-title { font-size: 12px; font-weight: 600; color: #e2e8f0; }
+.mock-card-sub { font-size: 10px; color: #64748b; }
+.mock-card-actions { display: flex; gap: 6px; margin-top: 8px; }
+.mock-action-btn { padding: 5px 10px; border-radius: 5px; font-size: 10px; font-weight: 600; border: none; cursor: default; }
+.mock-action-btn.approve { background: #166534; color: #4ade80; }
+.mock-action-btn.reject { background: #3b1010; color: #f87171; }
+.mock-action-btn.dispatch { background: #1e3a5f; color: #38bdf8; }
+.mock-action-btn.complete { background: #0f3d1e; color: #4ade80; }
+.mock-action-btn.onway { background: #3d2e0f; color: #fbbf24; }
+.mock-action-btn.arrived { background: #1e3a5f; color: #60a5fa; }
+
+/* Stats row */
+.mock-stats { display: flex; gap: 8px; margin-bottom: 12px; }
+.mock-stat { flex: 1; background: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 8px; text-align: center; }
+.mock-stat .num { font-size: 18px; font-weight: 700; }
+.mock-stat .lbl { font-size: 9px; color: #64748b; text-transform: uppercase; }
+
+/* Tab mockup */
+.mock-tabs { display: flex; gap: 4px; margin-bottom: 12px; background: #0f172a; border-radius: 8px; padding: 3px; border: 1px solid #334155; }
+.mock-tab { flex: 1; padding: 6px 8px; text-align: center; border-radius: 6px; font-size: 10px; font-weight: 600; color: #64748b; cursor: default; }
+.mock-tab.active { background: #1e293b; color: #f1f5f9; }
+
+/* Callout arrows */
+.callout { position: relative; }
+.callout-arrow { position: absolute; font-size: 16px; color: #f59e0b; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+/* Badge in mockup */
+.mock-badge { display: inline-block; padding: 2px 7px; border-radius: 10px; font-size: 9px; font-weight: 600; }
+.badge-red { background: #3b1010; color: #f87171; border: 1px solid #991b1b; }
+.badge-amber { background: #3d2e0f; color: #fbbf24; border: 1px solid #92400e; }
+.badge-green { background: #0f3d1e; color: #4ade80; border: 1px solid #166534; }
+.badge-blue { background: #1e3a5f; color: #60a5fa; border: 1px solid #1d4ed8; }
+.badge-cyan { background: #0f2d3d; color: #22d3ee; border: 1px solid #0e7490; }
+
+/* Role header in mockup */
+.mock-role-header { display: flex; align-items: center; gap: 8px; padding: 8px 12px; background: #0f172a; border-bottom: 1px solid #334155; margin: -20px -20px 16px -20px; }
+.mock-role-header .role-icon { width: 24px; height: 24px; border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 12px; }
+.mock-role-header .role-name { font-size: 12px; font-weight: 700; color: #f1f5f9; }
+.mock-role-header .role-badge { font-size: 9px; padding: 2px 6px; border-radius: 8px; font-weight: 600; }
+
+/* Summary grid */
+.summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-top: 24px; max-width: 900px; width: 100%; }
+.summary-card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; padding: 18px; text-align: center; }
+.summary-card .emoji { font-size: 28px; margin-bottom: 8px; }
+.summary-card h4 { font-size: 13px; font-weight: 700; color: #f1f5f9; margin-bottom: 3px; }
+.summary-card p { font-size: 11px; color: #64748b; line-height: 1.4; }
+
+/* Scrollable */
+.scroll-y { max-height: calc(100vh - 200px); overflow-y: auto; padding-right: 8px; }
+.scroll-y::-webkit-scrollbar { width: 4px; }
+.scroll-y::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<nav class="nav">
+  <div class="nav-title">
+    <div class="icon">🚨</div>
+    <span>Rescue Portal — Workflow Guide</span>
+  </div>
+  <div class="nav-steps" id="navDots"></div>
+  <div class="nav-controls">
+    <button class="nav-btn" id="prevBtn" onclick="prevSlide()">← Prev</button>
+    <button class="nav-btn" id="nextBtn" onclick="nextSlide()">Next →</button>
+  </div>
+</nav>
+<div class="progress-bar" id="progressBar"></div>
+
+<div class="slides" id="slides">
+
+<!-- ==================== SLIDE 1: Title ==================== -->
+<section class="slide active title-slide">
+  <h1>Municipality Rescue Portal</h1>
+  <p class="subtitle">Complete Workflow Guide — From Registration to Case Closure</p>
+  <div class="badge">With Screenshots, Field Highlights & Important Notes</div>
+  <div style="margin-top: 30px; display: flex; gap: 10px; flex-wrap: wrap; justify-content: center;">
+    <span class="mock-badge badge-blue">10 Slides</span>
+    <span class="mock-badge badge-amber">5 Roles</span>
+    <span class="mock-badge badge-green">8 Status Stages</span>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 2: Registration Form ==================== -->
+<section class="slide">
+  <div class="section-header">
+    <span class="step-num" style="background:#1e3a5f;color:#60a5fa;">STEP 1</span>
+    <h2>Resident Registration</h2>
+  </div>
+  <div class="two-col">
+    <div class="col">
+      <div class="mockup-frame">
+        <div class="mockup-header">
+          <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          <div class="url">rescue-portal.ph/auth/register</div>
+        </div>
+        <div class="mockup-body">
+          <div style="text-align:center;margin-bottom:14px;">
+            <div style="font-size:18px;margin-bottom:4px;">🛡️</div>
+            <div style="font-size:14px;font-weight:700;color:#f1f5f9;">Create Your Account</div>
+            <div style="font-size:10px;color:#64748b;">6-step registration</div>
+          </div>
+          <div class="mock-form">
+            <div class="mock-field required highlight">
+              <label>Full Name</label>
+              <input value="Juan Dela Cruz" readonly>
+              <div class="field-note"></div>
+            </div>
+            <div class="mock-field required highlight">
+              <label>Phone Number</label>
+              <input value="+63 9XX XXX XXXX" readonly>
+              <div class="field-note"></div>
+            </div>
+            <div class="mock-field required highlight">
+              <label>Email Address</label>
+              <input value="juan@email.com" readonly>
+              <div class="field-note"></div>
+            </div>
+            <div class="mock-field required highlight">
+              <label>Password</label>
+              <input type="password" value="••••••••" readonly>
+              <div class="field-note"></div>
+            </div>
+            <div class="mock-field required highlight">
+              <label>Government ID Type</label>
+              <select><option>PhilSys National ID</option></select>
+              <div class="field-note"></div>
+            </div>
+            <div class="mock-field required highlight">
+              <label>ID Number</label>
+              <input value="PSN-XXXX-XXXXX-X" readonly>
+              <div class="field-note"></div>
+            </div>
+            <div class="mock-field required">
+              <label>Region / Province / Municipality</label>
+              <input value="Region IV-A › Laguna › San Pablo" readonly style="font-size:10px;">
+            </div>
+            <div class="mock-field required">
+              <label>Barangay</label>
+              <input value="San Lucas" readonly>
+            </div>
+            <div class="mock-field">
+              <label>Emergency Contact Name & Phone</label>
+              <input value="Maria Dela Cruz — +63 917..." readonly style="font-size:10px;">
+            </div>
+            <div class="mock-btn">Register →</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col scroll-y">
+      <div class="legend">
+        <div class="legend-item"><div class="legend-dot" style="background:#f59e0b;"></div> Required / Highlighted Field</div>
+      </div>
+      <div class="note note-warn">
+        <div class="note-icon">⚠️</div>
+        <div><strong>All fields with * are required.</strong> Registration will not proceed if any required field is left blank.</div>
+      </div>
+      <div class="note note-info">
+        <div class="note-icon">📋</div>
+        <div><strong>Accepted Government IDs:</strong> PhilSys National ID, Driver's License, Passport, PhilHealth, SSS, GSIS, Voter's ID, Postal ID, Barangay ID, Senior Citizen ID, PWD ID</div>
+      </div>
+      <div class="note note-warn">
+        <div class="note-icon">🔑</div>
+        <div><strong>Password must be strong:</strong> Minimum 8 characters, include uppercase, lowercase, number, and special character.</div>
+      </div>
+      <div class="note note-info">
+        <div class="note-icon">📍</div>
+        <div><strong>Location fields are scoped</strong> to the municipality's geographic coverage. You'll only see barangays within the registered municipality.</div>
+      </div>
+      <div class="note note-danger">
+        <div class="note-icon">🚫</div>
+        <div><strong>False Alert Agreement:</strong> You must agree to the Terms of Service AND the False Alert policy before submitting. Filing fake emergencies may result in account suspension.</div>
+      </div>
+      <div class="note note-success">
+        <div class="note-icon">✓</div>
+        <div><strong>After registration:</strong> Account status = "Submitted." You CANNOT log in until an admin approves your account. Check your email for updates.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 3: Admin Approval ==================== -->
+<section class="slide">
+  <div class="section-header">
+    <span class="step-num" style="background:#3b1d5e;color:#c084fc;">STEP 2</span>
+    <h2>Admin Approves Resident</h2>
+  </div>
+  <div class="two-col">
+    <div class="col">
+      <div class="mockup-frame">
+        <div class="mockup-header">
+          <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          <div class="url">rescue-portal.ph/admin</div>
+        </div>
+        <div class="mockup-body">
+          <div class="mock-role-header">
+            <div class="role-icon" style="background:#3b1d5e;">👑</div>
+            <div class="role-name">Admin Dashboard</div>
+            <span class="role-badge" style="background:#3b1d5e;color:#c084fc;">Admin</span>
+          </div>
+          <div style="font-size:11px;font-weight:700;color:#f1f5f9;margin-bottom:8px;">📋 Pending Residents</div>
+          <div class="mock-card" style="border-color:#92400e;">
+            <div class="mock-card-header">
+              <div class="mock-card-icon" style="background:#3d2e0f;">👤</div>
+              <div>
+                <div class="mock-card-title">Juan Dela Cruz</div>
+                <div class="mock-card-sub">+63 917 XXX XXXX · PhilSys ID</div>
+              </div>
+              <span class="mock-badge badge-amber">Pending</span>
+            </div>
+            <div style="font-size:10px;color:#64748b;margin:4px 0;">Brgy. San Lucas, San Pablo City</div>
+            <div class="mock-card-actions">
+              <div class="mock-action-btn approve" style="flex:1;text-align:center;">✓ Approve</div>
+              <div class="mock-action-btn reject" style="flex:1;text-align:center;">✗ Reject</div>
+            </div>
+          </div>
+          <div class="mock-card">
+            <div class="mock-card-header">
+              <div class="mock-card-icon" style="background:#1e3a5f;">👤</div>
+              <div>
+                <div class="mock-card-title">Maria Santos</div>
+                <div class="mock-card-sub">+63 918 XXX XXXX · Voter's ID</div>
+              </div>
+              <span class="mock-badge badge-amber">Pending</span>
+            </div>
+            <div class="mock-card-actions">
+              <div class="mock-action-btn approve" style="flex:1;text-align:center;">✓ Approve</div>
+              <div class="mock-action-btn reject" style="flex:1;text-align:center;">✗ Reject</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="note note-warn">
+        <div class="note-icon">⚠️</div>
+        <div><strong>Verify identity before approving.</strong> Cross-check the government ID type and number. Call the resident's phone if anything looks suspicious.</div>
+      </div>
+      <div class="note note-info">
+        <div class="note-icon">📞</div>
+        <div><strong>Direct call button available</strong> next to each resident's phone number for quick verification.</div>
+      </div>
+      <div class="note note-danger">
+        <div class="note-icon">🚫</div>
+        <div><strong>Rejecting an account</strong> blocks the user permanently. They will see "Your account was rejected" on login. Only reject confirmed fake/duplicate registrations.</div>
+      </div>
+      <div class="note note-success">
+        <div class="note-icon">✓</div>
+        <div><strong>Once approved:</strong> Status changes to "approved." The resident can now log in and submit SOS alerts immediately.</div>
+      </div>
+      <div class="note note-info">
+        <div class="note-icon">🔒</div>
+        <div><strong>Only Admin and Super Admin</strong> roles can approve/reject residents. Dispatch Ops, Rescue Team, and Staff cannot access this panel.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 4: Login ==================== -->
+<section class="slide">
+  <div class="section-header">
+    <span class="step-num" style="background:#1e3a5f;color:#60a5fa;">STEP 3</span>
+    <h2>Login & Role-Based Routing</h2>
+  </div>
+  <div class="two-col">
+    <div class="col">
+      <div class="mockup-frame">
+        <div class="mockup-header">
+          <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          <div class="url">rescue-portal.ph/auth/login</div>
+        </div>
+        <div class="mockup-body">
+          <div style="text-align:center;margin-bottom:14px;">
+            <div style="font-size:18px;margin-bottom:4px;">🛡️</div>
+            <div style="font-size:14px;font-weight:700;color:#f1f5f9;">Welcome back</div>
+            <div style="font-size:10px;color:#64748b;">Sign in to Emergency Rescue Portal</div>
+          </div>
+          <!-- Tabs -->
+          <div class="mock-tabs" style="margin-bottom:16px;">
+            <div class="mock-tab">Resident</div>
+            <div class="mock-tab active">Staff / Admin</div>
+          </div>
+          <div class="mock-form">
+            <div class="mock-field required highlight">
+              <label>Email</label>
+              <input value="dispatcher@municipality.gov.ph" readonly>
+              <div class="field-note"></div>
+            </div>
+            <div class="mock-field required highlight">
+              <label>Password</label>
+              <input type="password" value="••••••••" readonly>
+              <div class="field-note"></div>
+            </div>
+            <div style="text-align:right;margin-top:-4px;">
+              <span style="font-size:10px;color:#3b82f6;text-decoration:underline;">Forgot password?</span>
+            </div>
+            <div class="mock-btn">🔐 Sign In</div>
+          </div>
+          <div style="margin-top:16px;padding:10px;background:#0f172a;border-radius:8px;border:1px solid #334155;">
+            <div style="font-size:10px;font-weight:600;color:#94a3b8;margin-bottom:6px;">After login, redirects to:</div>
+            <div style="display:flex;flex-wrap:wrap;gap:4px;">
+              <span class="mock-badge badge-blue">Resident → /resident</span>
+              <span class="mock-badge badge-cyan">Admin → /admin</span>
+              <span class="mock-badge badge-cyan">Dispatch → /dispatch</span>
+              <span class="mock-badge badge-red">Rescue → /rescue-team</span>
+              <span class="mock-badge badge-amber">Staff → /staff-portal</span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="note note-warn">
+        <div class="note-icon">⚠️</div>
+        <div><strong>Accounts must be "approved" to log in.</strong> Pending or rejected accounts will see an error message and cannot proceed.</div>
+      </div>
+      <div class="note note-info">
+        <div class="note-icon">🔀</div>
+        <div><strong>Two login tabs:</strong> "Resident" for community members, "Staff / Admin" for all operational roles (Admin, Dispatch, Rescue Team, Staff).</div>
+      </div>
+      <div class="note note-info">
+        <div class="note-icon">🔐</div>
+        <div><strong>Staff credentials are created by Super Admin</strong> from the Super Admin panel. Staff do NOT self-register — they receive their email/password from their supervisor.</div>
+      </div>
+      <div class="note note-danger">
+        <div class="note-icon">🚫</div>
+        <div><strong>Suspended accounts</strong> are blocked at login with: "This account is suspended. Contact your administrator."</div>
+      </div>
+      <div class="note note-success">
+        <div class="note-icon">✓</div>
+        <div><strong>Each role gets a dedicated dashboard.</strong> Auth guards on each route prevent unauthorized access — e.g., a Staff member cannot access /dispatch.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 5: Resident SOS ==================== -->
+<section class="slide">
+  <div class="section-header">
+    <span class="step-num" style="background:#3b1010;color:#f87171;">STEP 4</span>
+    <h2>Resident Submits SOS</h2>
+  </div>
+  <div class="two-col">
+    <div class="col">
+      <div class="mockup-frame">
+        <div class="mockup-header">
+          <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          <div class="url">rescue-portal.ph/resident</div>
+        </div>
+        <div class="mockup-body">
+          <div class="mock-role-header">
+            <div class="role-icon" style="background:#1e3a5f;">👤</div>
+            <div class="role-name">Good evening, Juan</div>
+          </div>
+          <div style="text-align:center;padding:12px;background:#3b1010;border:1px solid #991b1b;border-radius:12px;margin-bottom:14px;">
+            <div style="font-size:24px;margin-bottom:4px;">🆘</div>
+            <div style="font-size:14px;font-weight:700;color:#f87171;">Request Rescue</div>
+            <div style="font-size:10px;color:#fca5a5;">Tap to send emergency alert</div>
+          </div>
+          <div class="mock-form">
+            <div class="mock-field required highlight">
+              <label>Emergency Type</label>
+              <select><option>🔥 Fire</option></select>
+              <div class="field-note"></div>
+            </div>
+            <div class="mock-field required highlight">
+              <label>Description</label>
+              <input value="House on fire, 2 people trapped..." readonly style="font-size:10px;">
+              <div class="field-note"></div>
+            </div>
+            <div class="mock-field highlight">
+              <label>Severity</label>
+              <select><option>🔴 Critical</option></select>
+              <div class="field-note"></div>
+            </div>
+            <div class="mock-field">
+              <label>📍 GPS Location</label>
+              <input value="14.0689° N, 121.3254° E (auto-detected)" readonly style="font-size:10px;color:#4ade80;">
+            </div>
+            <div class="mock-btn" style="background:#dc2626;">🚨 SEND SOS ALERT</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="note note-danger">
+        <div class="note-icon">🚨</div>
+        <div><strong>GPS must be enabled!</strong> The browser will ask for location permission. If denied, the resident must manually provide an address. GPS is critical for dispatch accuracy.</div>
+      </div>
+      <div class="note note-warn">
+        <div class="note-icon">⚠️</div>
+        <div><strong>Emergency Type is required.</strong> Options: Fire, Flood, Medical, Earthquake, Vehicular Accident, Crime, Typhoon, Landslide, and more.</div>
+      </div>
+      <div class="note note-info">
+        <div class="note-icon">📝</div>
+        <div><strong>Description helps responders prepare.</strong> Be specific: how many people, floor/location, hazards. Even a short sentence helps.</div>
+      </div>
+      <div class="note note-warn">
+        <div class="note-icon">⚠️</div>
+        <div><strong>Severity levels:</strong> Low (non-urgent), Medium (help needed soon), High (urgent, possible injuries), Critical (life-threatening, immediate response).</div>
+      </div>
+      <div class="note note-success">
+        <div class="note-icon">✓</div>
+        <div><strong>After submission:</strong> Incident status = "submitted." A reference number is generated (e.g., INC-20260621-0042). The resident can track progress in real time from their dashboard.</div>
+      </div>
+      <div class="note note-danger">
+        <div class="note-icon">🚫</div>
+        <div><strong>FALSE ALERTS:</strong> Filing fake emergencies will result in immediate account suspension. This wastes critical rescue resources.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 6: Admin Map View ==================== -->
+<section class="slide">
+  <div class="section-header">
+    <span class="step-num" style="background:#3b1d5e;color:#c084fc;">STEP 5</span>
+    <h2>Admin Verifies on Map Dashboard</h2>
+  </div>
+  <div class="two-col">
+    <div class="col">
+      <div class="mockup-frame">
+        <div class="mockup-header">
+          <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          <div class="url">rescue-portal.ph/admin</div>
+        </div>
+        <div class="mockup-body" style="padding:0;">
+          <div class="mock-role-header" style="margin:0;padding:8px 12px;">
+            <div class="role-icon" style="background:#3b1d5e;">🖥️</div>
+            <div class="role-name">Admin Dashboard</div>
+            <span class="role-badge" style="background:#3b1d5e;color:#c084fc;">Admin</span>
+          </div>
+          <!-- Fake map -->
+          <div style="height:160px;background:linear-gradient(135deg,#1a2e1a,#0f2d3d);position:relative;border-bottom:1px solid #334155;">
+            <div style="position:absolute;top:50%;left:55%;transform:translate(-50%,-50%);font-size:9px;color:#64748b;">Google Maps — Live View</div>
+            <!-- Pins -->
+            <div style="position:absolute;top:30%;left:30%;width:20px;height:20px;background:#ef4444;border-radius:50% 50% 50% 0;transform:rotate(-45deg);box-shadow:0 0 8px #ef4444;animation:pulse 1.5s infinite;"></div>
+            <div style="position:absolute;top:60%;left:70%;width:14px;height:14px;background:#f59e0b;border-radius:50% 50% 50% 0;transform:rotate(-45deg);"></div>
+            <div style="position:absolute;top:45%;left:50%;width:14px;height:14px;background:#22c55e;border-radius:50% 50% 50% 0;transform:rotate(-45deg);"></div>
+          </div>
+          <div style="padding:12px;">
+            <div style="font-size:10px;font-weight:700;color:#f1f5f9;margin-bottom:6px;">🔴 New Alert — Requires Verification</div>
+            <div class="mock-card" style="border-color:#991b1b;">
+              <div style="font-size:11px;font-weight:600;color:#f87171;">🔥 Fire — CRITICAL</div>
+              <div style="font-size:10px;color:#94a3b8;margin:4px 0;">Juan Dela Cruz · Brgy. San Lucas</div>
+              <div style="font-size:10px;color:#64748b;">14.0689° N, 121.3254° E</div>
+              <div class="mock-card-actions">
+                <div class="mock-action-btn approve">✓ Verify</div>
+                <div class="mock-action-btn" style="background:#1e3a5f;color:#60a5fa;">📞 Call</div>
+                <div class="mock-action-btn dispatch">🚀 Assign Unit</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="note note-warn">
+        <div class="note-icon">⚠️</div>
+        <div><strong>Verify before dispatching!</strong> Click "Call" to confirm with the reporter. Check if the location pin makes sense. Mark as verified only if confirmed real.</div>
+      </div>
+      <div class="note note-info">
+        <div class="note-icon">🗺️</div>
+        <div><strong>Map pins are color-coded:</strong> 🔴 Red = critical/new, 🟡 Amber = active/in-progress, 🟢 Green = resolved. Click any pin to view full details.</div>
+      </div>
+      <div class="note note-info">
+        <div class="note-icon">👥</div>
+        <div><strong>Assign Unit:</strong> Select which rescue team/unit to dispatch. This associates the team with the incident and notifies them.</div>
+      </div>
+      <div class="note note-success">
+        <div class="note-icon">✓</div>
+        <div><strong>Status flow here:</strong> submitted → received → verified → assigned. Admin handles the first three transitions. Then Dispatch Ops takes over.</div>
+      </div>
+      <div class="note note-warn">
+        <div class="note-icon">📊</div>
+        <div><strong>All actions are logged</strong> with timestamps in the audit trail. Who verified, when, and what unit was assigned — all recorded.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 7: Dispatch Ops ==================== -->
+<section class="slide">
+  <div class="section-header">
+    <span class="step-num" style="background:#0f2d3d;color:#38bdf8;">STEP 6</span>
+    <h2>Dispatch Ops — Send Mission</h2>
+  </div>
+  <div class="two-col">
+    <div class="col">
+      <div class="mockup-frame">
+        <div class="mockup-header">
+          <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          <div class="url">rescue-portal.ph/dispatch</div>
+        </div>
+        <div class="mockup-body">
+          <div class="mock-role-header">
+            <div class="role-icon" style="background:#0f2d3d;">📡</div>
+            <div class="role-name">Dispatch Ops</div>
+            <span class="role-badge" style="background:#0f2d3d;color:#38bdf8;">Dispatcher</span>
+          </div>
+          <div class="mock-stats">
+            <div class="mock-stat"><div class="num" style="color:#f59e0b;">3</div><div class="lbl">Pending</div></div>
+            <div class="mock-stat"><div class="num" style="color:#38bdf8;">2</div><div class="lbl">Dispatched</div></div>
+            <div class="mock-stat"><div class="num" style="color:#4ade80;">1</div><div class="lbl">On Scene</div></div>
+            <div class="mock-stat"><div class="num" style="color:#c084fc;">1</div><div class="lbl">To Close</div></div>
+          </div>
+          <div class="mock-tabs">
+            <div class="mock-tab active">Pending</div>
+            <div class="mock-tab">Active</div>
+            <div class="mock-tab">To Close</div>
+            <div class="mock-tab">Closed</div>
+          </div>
+          <div class="mock-card" style="border-color:#92400e;">
+            <div class="mock-card-header">
+              <div class="mock-card-icon" style="background:#3b1010;">🔥</div>
+              <div>
+                <div class="mock-card-title">Fire — Critical</div>
+                <div class="mock-card-sub">Brgy. San Lucas · 2m ago</div>
+              </div>
+            </div>
+            <div style="font-size:10px;color:#94a3b8;">Verified by Admin · Unit: Alpha Team</div>
+            <div class="mock-card-actions">
+              <div class="mock-action-btn dispatch" style="flex:1;text-align:center;font-size:11px;">🚀 Dispatch Now</div>
+            </div>
+          </div>
+          <div class="mock-card">
+            <div class="mock-card-header">
+              <div class="mock-card-icon" style="background:#1e3a5f;">🏥</div>
+              <div>
+                <div class="mock-card-title">Medical — High</div>
+                <div class="mock-card-sub">Brgy. Del Remedio · 8m ago</div>
+              </div>
+            </div>
+            <div class="mock-card-actions">
+              <div class="mock-action-btn dispatch" style="flex:1;text-align:center;">🚀 Dispatch Now</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="note note-warn">
+        <div class="note-icon">⚠️</div>
+        <div><strong>"Dispatch Now" sends the mission.</strong> This changes status to "dispatched" and the Rescue Team is immediately notified on their dashboard.</div>
+      </div>
+      <div class="note note-info">
+        <div class="note-icon">📋</div>
+        <div><strong>4 Tabs:</strong><br>• <strong>Pending</strong> — verified incidents waiting to be dispatched<br>• <strong>Active</strong> — dispatched/en-route missions (monitoring)<br>• <strong>To Close</strong> — resolved by rescue team, awaiting your confirmation<br>• <strong>Closed</strong> — completed case log</div>
+      </div>
+      <div class="note note-danger">
+        <div class="note-icon">❗</div>
+        <div><strong>Do NOT dispatch without a verified incident.</strong> Only incidents that have been verified by Admin appear in your Pending tab.</div>
+      </div>
+      <div class="note note-success">
+        <div class="note-icon">✓</div>
+        <div><strong>Dispatcher's final job:</strong> After rescue team marks "resolved," the case appears in "To Close." Click "Confirm & Close Case" to officially close it.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 8: Rescue Team ==================== -->
+<section class="slide">
+  <div class="section-header">
+    <span class="step-num" style="background:#3b1010;color:#f87171;">STEP 7</span>
+    <h2>Rescue Team — Field Response</h2>
+  </div>
+  <div class="two-col">
+    <div class="col">
+      <div class="mockup-frame">
+        <div class="mockup-header">
+          <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          <div class="url">rescue-portal.ph/rescue-team</div>
+        </div>
+        <div class="mockup-body">
+          <div class="mock-role-header">
+            <div class="role-icon" style="background:#3b1010;">🚒</div>
+            <div class="role-name">Rescue Portal</div>
+            <span class="role-badge" style="background:#0f2d3d;color:#22d3ee;">Responder</span>
+          </div>
+          <div class="mock-stats">
+            <div class="mock-stat"><div class="num" style="color:#f87171;">2</div><div class="lbl">Active</div></div>
+            <div class="mock-stat"><div class="num" style="color:#f59e0b;">1</div><div class="lbl">Incoming</div></div>
+            <div class="mock-stat"><div class="num" style="color:#4ade80;">5</div><div class="lbl">Resolved</div></div>
+          </div>
+          <!-- Incoming SOS -->
+          <div style="font-size:10px;font-weight:700;color:#f59e0b;margin-bottom:6px;">🔔 INCOMING SOS — Prepare for Dispatch</div>
+          <div class="mock-card" style="border-color:#92400e;background:#1a1000;">
+            <div class="mock-card-header">
+              <div class="mock-card-icon" style="background:#3b1010;">🔥</div>
+              <div>
+                <div class="mock-card-title">Fire — Critical</div>
+                <div class="mock-card-sub">Brgy. San Lucas · Just now</div>
+              </div>
+              <span class="mock-badge badge-red">NEW</span>
+            </div>
+            <div class="mock-card-actions">
+              <div class="mock-action-btn approve" style="flex:1;text-align:center;">👍 Approve</div>
+              <div class="mock-action-btn reject" style="flex:1;text-align:center;">✗ Reject</div>
+            </div>
+          </div>
+          <!-- Active mission -->
+          <div style="font-size:10px;font-weight:700;color:#f87171;margin:10px 0 6px;">🚨 Active Mission</div>
+          <div class="mock-card" style="border-color:#1d4ed8;">
+            <div class="mock-card-header">
+              <div class="mock-card-icon" style="background:#1e3a5f;">🏥</div>
+              <div>
+                <div class="mock-card-title">Medical — High</div>
+                <div class="mock-card-sub">Brgy. Del Remedio</div>
+              </div>
+              <span class="mock-badge badge-blue">On the Way</span>
+            </div>
+            <div class="mock-card-actions">
+              <div class="mock-action-btn arrived">📌 Arrived</div>
+              <div class="mock-action-btn complete">✅ Complete</div>
+              <div class="mock-action-btn" style="background:#1e3a5f;color:#60a5fa;">📞 Call</div>
+              <div class="mock-action-btn" style="background:#0f3d1e;color:#4ade80;">🗺️ Nav</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="note note-danger">
+        <div class="note-icon">🔔</div>
+        <div><strong>SOS notification pops up</strong> with a toast alert when new incoming incidents are detected (dashboard polls every 10 seconds).</div>
+      </div>
+      <div class="note note-warn">
+        <div class="note-icon">⚠️</div>
+        <div><strong>Action buttons appear based on status:</strong><br>• Assigned → <strong>Approve / Reject</strong><br>• Accepted/Dispatched → <strong>On the Way</strong><br>• On the Way → <strong>Arrived</strong><br>• Arrived/In Progress → <strong>Complete</strong></div>
+      </div>
+      <div class="note note-info">
+        <div class="note-icon">📞</div>
+        <div><strong>Call button</strong> dials the reporter directly. <strong>Navigate button</strong> opens Google Maps with turn-by-turn directions to the GPS coordinates.</div>
+      </div>
+      <div class="note note-info">
+        <div class="note-icon">👁️</div>
+        <div><strong>This dashboard is READ-ONLY for editing.</strong> Rescue team can only change the status via the action buttons. They cannot modify incident details, descriptions, or assignments.</div>
+      </div>
+      <div class="note note-success">
+        <div class="note-icon">✓</div>
+        <div><strong>After clicking "Complete":</strong> Status → "resolved." The case moves back to Dispatch Ops for final closure confirmation.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 9: Case Closure ==================== -->
+<section class="slide">
+  <div class="section-header">
+    <span class="step-num" style="background:#0f3d1e;color:#4ade80;">STEP 8</span>
+    <h2>Case Closure & Audit Log</h2>
+  </div>
+  <div class="two-col">
+    <div class="col">
+      <div class="mockup-frame">
+        <div class="mockup-header">
+          <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          <div class="url">rescue-portal.ph/dispatch (To Close tab)</div>
+        </div>
+        <div class="mockup-body">
+          <div class="mock-role-header">
+            <div class="role-icon" style="background:#0f2d3d;">📡</div>
+            <div class="role-name">Dispatch Ops</div>
+            <span class="role-badge" style="background:#0f3d1e;color:#4ade80;">Closing Cases</span>
+          </div>
+          <div class="mock-tabs">
+            <div class="mock-tab">Pending</div>
+            <div class="mock-tab">Active</div>
+            <div class="mock-tab active">To Close</div>
+            <div class="mock-tab">Closed</div>
+          </div>
+          <div class="mock-card" style="border-color:#166534;">
+            <div class="mock-card-header">
+              <div class="mock-card-icon" style="background:#0f3d1e;">🔥</div>
+              <div>
+                <div class="mock-card-title">Fire — Resolved</div>
+                <div class="mock-card-sub">Brgy. San Lucas · INC-20260621-0042</div>
+              </div>
+              <span class="mock-badge badge-green">Resolved</span>
+            </div>
+            <div style="font-size:10px;color:#94a3b8;margin:6px 0;">
+              <div>📋 Reported: 6:42 PM</div>
+              <div>🚀 Dispatched: 6:44 PM</div>
+              <div>📌 Arrived: 6:51 PM</div>
+              <div>✅ Resolved: 7:23 PM</div>
+            </div>
+            <div class="mock-card-actions">
+              <div class="mock-action-btn complete" style="flex:1;text-align:center;font-size:11px;">✓ Confirm & Close Case</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <!-- Staff view below -->
+      <div class="mockup-frame" style="margin-top:16px;">
+        <div class="mockup-header">
+          <div class="dot dot-r"></div><div class="dot dot-y"></div><div class="dot dot-g"></div>
+          <div class="url">rescue-portal.ph/staff-portal</div>
+        </div>
+        <div class="mockup-body" style="padding:12px;">
+          <div class="mock-role-header" style="margin:-12px -12px 10px -12px;">
+            <div class="role-icon" style="background:#334155;">📊</div>
+            <div class="role-name">Staff Portal</div>
+            <span class="role-badge" style="background:#334155;color:#94a3b8;">Read Only</span>
+          </div>
+          <div style="font-size:9px;color:#64748b;background:#0f172a;padding:6px 8px;border-radius:6px;border:1px solid #334155;">
+            👁️ Read-only view. You can monitor all incidents but cannot modify statuses.
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col">
+      <div class="note note-warn">
+        <div class="note-icon">⚠️</div>
+        <div><strong>Only Dispatch Ops can close cases.</strong> The "Confirm & Close Case" button is the FINAL step. Once closed, the incident is archived permanently.</div>
+      </div>
+      <div class="note note-info">
+        <div class="note-icon">⏱️</div>
+        <div><strong>Full timeline is shown:</strong> Reported → Dispatched → Arrived → Resolved timestamps. This is the audit trail for accountability and reporting.</div>
+      </div>
+      <div class="note note-success">
+        <div class="note-icon">✓</div>
+        <div><strong>After closing:</strong> Status → "closed." The case moves to the "Closed" tab as a historical log. All roles can see it in their respective dashboards.</div>
+      </div>
+      <div class="note note-info">
+        <div class="note-icon">📊</div>
+        <div><strong>Staff Portal</strong> (shown below) is purely observational — staff can see all incidents and their statuses but have NO action buttons. Used for monitoring/reporting.</div>
+      </div>
+      <div class="note note-danger">
+        <div class="note-icon">❗</div>
+        <div><strong>Do NOT close a case prematurely.</strong> Verify with the rescue team that the situation is fully resolved before clicking close. This prevents reopening issues later.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 10: Full Status Flow ==================== -->
+<section class="slide">
+  <div class="section-header">
+    <span class="step-num" style="background:#334155;color:#94a3b8;">REFERENCE</span>
+    <h2>Complete Status Lifecycle</h2>
+  </div>
+  <div style="max-width:800px;width:100%;">
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:20px;">
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:18px;margin-bottom:4px;">📨</div>
+        <div style="font-size:11px;font-weight:700;color:#fbbf24;">Submitted</div>
+        <div style="font-size:9px;color:#64748b;margin-top:2px;">Resident sends SOS</div>
+        <span class="mock-badge badge-amber" style="margin-top:6px;">Resident</span>
+      </div>
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:18px;margin-bottom:4px;">📥</div>
+        <div style="font-size:11px;font-weight:700;color:#60a5fa;">Received</div>
+        <div style="font-size:9px;color:#64748b;margin-top:2px;">System acknowledges</div>
+        <span class="mock-badge badge-blue" style="margin-top:6px;">System</span>
+      </div>
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:18px;margin-bottom:4px;">✓</div>
+        <div style="font-size:11px;font-weight:700;color:#c084fc;">Verified</div>
+        <div style="font-size:9px;color:#64748b;margin-top:2px;">Admin confirms real</div>
+        <span class="mock-badge" style="background:#3b1d5e;color:#c084fc;border:1px solid #6d28d9;margin-top:6px;">Admin</span>
+      </div>
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:18px;margin-bottom:4px;">🚀</div>
+        <div style="font-size:11px;font-weight:700;color:#38bdf8;">Dispatched</div>
+        <div style="font-size:9px;color:#64748b;margin-top:2px;">Mission sent</div>
+        <span class="mock-badge badge-cyan" style="margin-top:6px;">Dispatch</span>
+      </div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;">
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:18px;margin-bottom:4px;">👍</div>
+        <div style="font-size:11px;font-weight:700;color:#f87171;">Accepted</div>
+        <div style="font-size:9px;color:#64748b;margin-top:2px;">Team approves</div>
+        <span class="mock-badge badge-red" style="margin-top:6px;">Rescue</span>
+      </div>
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:18px;margin-bottom:4px;">🚗</div>
+        <div style="font-size:11px;font-weight:700;color:#fbbf24;">On the Way</div>
+        <div style="font-size:9px;color:#64748b;margin-top:2px;">En route</div>
+        <span class="mock-badge badge-red" style="margin-top:6px;">Rescue</span>
+      </div>
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:18px;margin-bottom:4px;">📌</div>
+        <div style="font-size:11px;font-weight:700;color:#60a5fa;">Arrived</div>
+        <div style="font-size:9px;color:#64748b;margin-top:2px;">On scene</div>
+        <span class="mock-badge badge-red" style="margin-top:6px;">Rescue</span>
+      </div>
+      <div style="background:#1e293b;border:1px solid #334155;border-radius:10px;padding:12px;text-align:center;">
+        <div style="font-size:18px;margin-bottom:4px;">✅</div>
+        <div style="font-size:11px;font-weight:700;color:#4ade80;">Resolved → Closed</div>
+        <div style="font-size:9px;color:#64748b;margin-top:2px;">Done & archived</div>
+        <span class="mock-badge badge-cyan" style="margin-top:6px;">Dispatch</span>
+      </div>
+    </div>
+    <!-- Key notes -->
+    <div style="margin-top:24px;">
+      <div class="note note-warn">
+        <div class="note-icon">⚠️</div>
+        <div><strong>Responsibility chain:</strong> Resident → Admin → Dispatch Ops → Rescue Team → Dispatch Ops (close). No single role handles the entire lifecycle alone.</div>
+      </div>
+      <div class="note note-info">
+        <div class="note-icon">🔄</div>
+        <div><strong>Real-time updates:</strong> All dashboards poll for changes (Rescue: 10s, Staff: 30s, Dispatch: 15s). Status changes are visible across all roles within seconds.</div>
+      </div>
+      <div class="note note-danger">
+        <div class="note-icon">🚫</div>
+        <div><strong>No skipping steps.</strong> You cannot jump from "submitted" to "on_the_way." Each status must flow in order. The system enforces this through API validation.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== SLIDE 11: Summary ==================== -->
+<section class="slide title-slide">
+  <h1>Key Reminders</h1>
+  <div class="summary-grid" style="margin-top:20px;">
+    <div class="summary-card">
+      <div class="emoji">🔐</div>
+      <h4>Staff Accounts</h4>
+      <p>Created by Super Admin only. Staff do NOT self-register.</p>
+    </div>
+    <div class="summary-card">
+      <div class="emoji">📍</div>
+      <h4>GPS Required</h4>
+      <p>Residents must enable location for accurate dispatch.</p>
+    </div>
+    <div class="summary-card">
+      <div class="emoji">✅</div>
+      <h4>Verify First</h4>
+      <p>Never dispatch without verifying. Call the reporter if unsure.</p>
+    </div>
+    <div class="summary-card">
+      <div class="emoji">🔒</div>
+      <h4>Role Guards</h4>
+      <p>Each dashboard is locked to its role. No unauthorized access.</p>
+    </div>
+    <div class="summary-card">
+      <div class="emoji">📊</div>
+      <h4>Full Audit Trail</h4>
+      <p>Every action logged with timestamp and user. No edits possible.</p>
+    </div>
+    <div class="summary-card">
+      <div class="emoji">🚫</div>
+      <h4>False Alerts</h4>
+      <p>Filing fake SOS = immediate suspension. Zero tolerance.</p>
+    </div>
+    <div class="summary-card">
+      <div class="emoji">📞</div>
+      <h4>Direct Calls</h4>
+      <p>Call buttons on Admin & Rescue dashboards for quick contact.</p>
+    </div>
+    <div class="summary-card">
+      <div class="emoji">🗺️</div>
+      <h4>Navigation</h4>
+      <p>One-tap Google Maps navigation for rescue teams.</p>
+    </div>
+  </div>
+  <div class="badge" style="margin-top:24px;">Municipality Rescue Portal © 2026 — End of Workflow Guide</div>
+</section>
+
+</div>
+
+<script>
+let current = 0;
+const slides = document.querySelectorAll('.slide');
+const total = slides.length;
+const dotsContainer = document.getElementById('navDots');
+const progressBar = document.getElementById('progressBar');
+
+for (let i = 0; i < total; i++) {
+  const dot = document.createElement('div');
+  dot.className = 'nav-dot' + (i === 0 ? ' active' : '');
+  dot.onclick = () => goTo(i);
+  dotsContainer.appendChild(dot);
+}
+
+function updateUI() {
+  slides.forEach((s, i) => s.classList.toggle('active', i === current));
+  document.querySelectorAll('.nav-dot').forEach((d, i) => d.classList.toggle('active', i === current));
+  document.getElementById('prevBtn').disabled = current === 0;
+  document.getElementById('nextBtn').disabled = current === total - 1;
+  progressBar.style.width = ((current / (total - 1)) * 100) + '%';
+}
+
+function goTo(i) { current = Math.max(0, Math.min(total - 1, i)); updateUI(); }
+function nextSlide() { goTo(current + 1); }
+function prevSlide() { goTo(current - 1); }
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'ArrowRight' || e.key === ' ') { e.preventDefault(); nextSlide(); }
+  if (e.key === 'ArrowLeft') { e.preventDefault(); prevSlide(); }
+});
+
+updateUI();
+</script>
+</body>
+</html>

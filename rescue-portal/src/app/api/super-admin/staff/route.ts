@@ -31,7 +31,7 @@ export async function GET(request: NextRequest) {
     .from('user_profiles')
     .select('id, user_id, full_name, role, is_active, created_at')
     .eq('organization_id', tenantId)
-    .in('role', ['admin', 'dispatcher', 'staff'])
+    .in('role', ['admin', 'dispatcher', 'staff', 'responder', 'team_leader'])
     .order('created_at', { ascending: true })
 
   if (error) return NextResponse.json({ message: error.message }, { status: 500 })
@@ -60,7 +60,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ message: 'tenantId, email, and password are required.' }, { status: 400 })
   }
 
-  const staffRole = ['admin', 'dispatcher', 'staff'].includes(role) ? role : 'staff'
+  const staffRole = ['admin', 'dispatcher', 'staff', 'responder', 'team_leader'].includes(role) ? role : 'staff'
 
   const admin = await createAdminClient() as any
 
@@ -69,7 +69,7 @@ export async function POST(request: Request) {
     .from('user_profiles')
     .select('id', { count: 'exact', head: true })
     .eq('organization_id', tenantId)
-    .in('role', ['admin', 'dispatcher', 'staff'])
+    .in('role', ['admin', 'dispatcher', 'staff', 'responder', 'team_leader'])
 
   if ((count ?? 0) >= MAX_STAFF_PER_TENANT) {
     return NextResponse.json({ message: `Maximum ${MAX_STAFF_PER_TENANT} staff accounts per tenant.` }, { status: 400 })
