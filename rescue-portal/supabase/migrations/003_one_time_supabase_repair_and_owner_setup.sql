@@ -23,7 +23,7 @@ DO $$ BEGIN CREATE EXTENSION IF NOT EXISTS "postgis"; EXCEPTION WHEN OTHERS THEN
 -- 2. ENUM TYPES (idempotent — skip if exists)
 -- ============================================================
 
-DO $$ BEGIN CREATE TYPE user_role AS ENUM ('super_admin','admin','dispatcher','team_leader','responder','verifier','resident'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
+DO $$ BEGIN CREATE TYPE user_role AS ENUM ('super_admin','admin','dispatcher','team_leader','responder','verifier','staff','resident'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE incident_status AS ENUM ('submitted','received','verification_pending','verified','assigned','accepted','preparing','dispatched','on_the_way','arrived','operation_in_progress','transporting','resolved','closed','duplicate','invalid','false_alert','cancelled','unable_to_contact','transferred'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE severity_level AS ENUM ('critical','high','medium','low','info'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;
 DO $$ BEGIN CREATE TYPE team_status AS ENUM ('available','assigned','preparing','dispatched','on_scene','returning','off_duty','unavailable'); EXCEPTION WHEN duplicate_object THEN NULL; END $$;

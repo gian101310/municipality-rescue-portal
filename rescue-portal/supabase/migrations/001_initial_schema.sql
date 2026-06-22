@@ -31,6 +31,7 @@ DO $$ BEGIN
     'team_leader',
     'responder',
     'verifier',
+    'staff',
     'resident'
   );
 EXCEPTION WHEN duplicate_object THEN NULL; END $$;

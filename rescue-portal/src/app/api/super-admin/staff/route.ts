@@ -63,6 +63,7 @@ export async function POST(request: Request) {
   const staffRole = ['admin', 'dispatcher', 'staff', 'responder', 'team_leader'].includes(role) ? role : 'staff'
 
   const admin = await createAdminClient() as any
+  let createdAuthUserId: string | null = null
 
   // Check staff count
   const { count } = await admin
@@ -82,7 +83,8 @@ export async function POST(request: Request) {
       password,
       email_confirm: true,
     })
-    if (authError) throw new Error(authError.message)
+    if (authError || !authUser.user?.id) throw new Error(authError?.message ?? 'Unable to create staff login.')
+    createdAuthUserId = authUser.user.id
 
     // Create profile
     const { error: profileError } = await admin.from('user_profiles').insert({
@@ -98,6 +100,10 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ message: 'Staff account created.' }, { status: 201 })
   } catch (error) {
+    if (createdAuthUserId) {
+      await admin.auth.admin.deleteUser(createdAuthUserId).catch(() => null)
+    }
+
     return NextResponse.json(
       { message: error instanceof Error ? error.message : 'Unable to create staff account.' },
       { status: 500 }

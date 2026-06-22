@@ -32,7 +32,7 @@ export type Database = {
     Views: Record<string, never>
     Functions: Record<string, never>
     Enums: {
-      user_role: 'super_admin' | 'admin' | 'dispatcher' | 'team_leader' | 'responder' | 'verifier' | 'resident'
+      user_role: 'super_admin' | 'admin' | 'dispatcher' | 'team_leader' | 'responder' | 'verifier' | 'staff' | 'resident'
       incident_status: 'submitted' | 'received' | 'verification_pending' | 'verified' | 'assigned' | 'accepted' | 'preparing' | 'dispatched' | 'on_the_way' | 'arrived' | 'operation_in_progress' | 'transporting' | 'resolved' | 'closed' | 'duplicate' | 'invalid' | 'false_alert' | 'cancelled' | 'unable_to_contact' | 'transferred'
       severity_level: 'critical' | 'high' | 'medium' | 'low' | 'info'
       team_status: 'available' | 'assigned' | 'preparing' | 'dispatched' | 'on_scene' | 'returning' | 'off_duty' | 'unavailable'

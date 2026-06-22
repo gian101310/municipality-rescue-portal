@@ -205,3 +205,27 @@ test('validateTenantPassword requires strong temporary passwords', () => {
   assert.equal(validateTenantPassword('weakpass'), 'Password must include uppercase, lowercase, number, and special character.')
   assert.equal(validateTenantPassword('Rescue!Portal2026#'), null)
 })
+
+test('the user role schema supports the Staff account type offered by super admin', () => {
+  const initialSchema = readFileSync(
+    new URL('../../supabase/migrations/001_initial_schema.sql', import.meta.url),
+    'utf8'
+  )
+  const generatedTypes = readFileSync(
+    new URL('./supabase/database.types.ts', import.meta.url),
+    'utf8'
+  )
+
+  assert.match(initialSchema, /'staff'/)
+  assert.match(generatedTypes, /user_role:.*'staff'/)
+})
+
+test('the staff account endpoint rolls back Auth when profile creation fails', () => {
+  const staffRoute = readFileSync(
+    new URL('../app/api/super-admin/staff/route.ts', import.meta.url),
+    'utf8'
+  )
+
+  assert.match(staffRoute, /let createdAuthUserId: string \| null = null/)
+  assert.match(staffRoute, /admin\.auth\.admin\.deleteUser\(createdAuthUserId\)/)
+})
