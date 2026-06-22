@@ -89,8 +89,10 @@ export async function POST(request: Request) {
       user_id: authUser.user.id,
       organization_id: tenantId,
       full_name: fullName || email.split('@')[0],
+      email: email,
       role: staffRole,
       is_active: true,
+      registration_status: 'approved',
     })
     if (profileError) throw new Error(profileError.message)
 
