@@ -85,7 +85,7 @@ export async function POST(request: Request) {
       type: 'magiclink',
       email: adminProfile.email,
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/admin`,
+        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.rescue-portal.ph'}/admin`,
       },
     })
 

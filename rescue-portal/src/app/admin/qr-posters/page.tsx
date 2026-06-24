@@ -93,7 +93,7 @@ export default function QRPostersPage() {
   const [municipalityName, setMunicipalityName] = useState(settings.municipalityName)
   const posterRef = useRef<HTMLDivElement>(null)
 
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://rescue-portal.vercel.app'
+  const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://www.rescue-portal.ph'
   const emergencyUrl = `${baseUrl}/auth/register`
 
   useEffect(() => { void (async () => {

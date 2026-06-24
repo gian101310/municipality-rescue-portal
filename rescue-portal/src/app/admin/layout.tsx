@@ -7,6 +7,7 @@ import {
   LayoutDashboard, AlertTriangle, Map, Users, UserCheck,
   ShieldCheck, BarChart3, ScrollText, Settings, Activity,
   Shield, Menu, ChevronLeft, LogOut, User, Clock, QrCode, TrendingUp, Phone,
+  Lock, Eye, EyeOff, Loader2,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -20,6 +21,9 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Sheet, SheetContent } from '@/components/ui/sheet'
 import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { toast } from 'sonner'
 import { NotificationCenter } from '@/components/notification-center'
 import { DemoBanner } from '@/components/demo-banner'
 import { PushNotificationToggle } from '@/components/push-notification-toggle'
@@ -224,12 +228,41 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [])
 
-  async function handleLogout() {
-    const supabase = createClient()
-    await supabase.auth.signOut()
-    sessionStorage.removeItem('demo_role')
-    sessionStorage.removeItem('demo_email')
-    router.push('/auth/login')
+  // Secure logout state
+  const [logoutModalOpen, setLogoutModalOpen] = useState(false)
+  const [logoutPassword, setLogoutPassword] = useState('')
+  const [showLogoutPassword, setShowLogoutPassword] = useState(false)
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  function openLogoutModal() {
+    setLogoutPassword('')
+    setShowLogoutPassword(false)
+    setLogoutModalOpen(true)
+  }
+
+  async function handleSecureLogout() {
+    if (!logoutPassword.trim()) {
+      toast.error('Enter your password to logout')
+      return
+    }
+    setLoggingOut(true)
+    try {
+      const res = await fetch('/api/admin/secure-logout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: logoutPassword }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message)
+
+      sessionStorage.removeItem('demo_role')
+      sessionStorage.removeItem('demo_email')
+      router.push('/auth/login')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Logout failed')
+    } finally {
+      setLoggingOut(false)
+    }
   }
 
   const initials = adminProfile?.full_name
@@ -327,11 +360,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   )}
                   <DropdownMenuSeparator className="bg-slate-700" />
                   <DropdownMenuItem
-                    onClick={handleLogout}
+                    onClick={openLogoutModal}
                     className="text-red-400 hover:text-red-300 cursor-pointer"
                   >
                     <LogOut className="w-4 h-4 mr-2" />
-                    Logout
+                    Secure Logout
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -345,6 +378,66 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </div>
       </div>
     </div>
+
+    {/* Secure Logout Modal */}
+    {logoutModalOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+        <div className="bg-slate-900 border border-slate-700 rounded-xl p-6 w-full max-w-sm mx-4 shadow-2xl">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-2 bg-red-600/20 rounded-lg">
+              <Lock className="w-5 h-5 text-red-400" />
+            </div>
+            <div>
+              <h3 className="text-white font-semibold text-sm">Confirm Logout</h3>
+              <p className="text-slate-400 text-xs">Enter your password to sign out</p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label className="text-slate-300 text-xs">Password</Label>
+              <div className="relative">
+                <Input
+                  type={showLogoutPassword ? 'text' : 'password'}
+                  value={logoutPassword}
+                  onChange={(e) => setLogoutPassword(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleSecureLogout() }}
+                  placeholder="Enter your password"
+                  className="bg-slate-800 border-slate-600 text-white pr-10"
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowLogoutPassword((v) => !v)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                >
+                  {showLogoutPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <Button
+                variant="ghost"
+                onClick={() => setLogoutModalOpen(false)}
+                className="flex-1 text-slate-400 hover:text-white"
+                disabled={loggingOut}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSecureLogout}
+                disabled={loggingOut || !logoutPassword.trim()}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+              >
+                {loggingOut ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <LogOut className="w-4 h-4 mr-1" />}
+                {loggingOut ? 'Signing out...' : 'Logout'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      </div>
+    )}
     </MasterKeyProvider>
   )
 }

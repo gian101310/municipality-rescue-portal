@@ -77,25 +77,47 @@ export async function POST(request: Request) {
   }
 
   try {
-    // Create auth user
+    // Create auth user with metadata so the trigger has context
     const { data: authUser, error: authError } = await admin.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
+      user_metadata: {
+        full_name: fullName || email.split('@')[0],
+        role: staffRole,
+        organization_id: tenantId,
+      },
     })
     if (authError || !authUser.user?.id) throw new Error(authError?.message ?? 'Unable to create staff login.')
     createdAuthUserId = authUser.user.id
 
-    // Create profile
-    const { error: profileError } = await admin.from('user_profiles').insert({
+    // Get the municipality for this tenant
+    const { data: municipality } = await admin
+      .from('municipalities')
+      .select('id, name, province')
+      .eq('organization_id', tenantId)
+      .limit(1)
+      .maybeSingle()
+
+    const now = new Date().toISOString()
+
+    // Use upsert because the handle_new_auth_user trigger may have already
+    // inserted a row for this user_id with default values.
+    const { error: profileError } = await admin.from('user_profiles').upsert({
       user_id: authUser.user.id,
       organization_id: tenantId,
+      municipality_id: municipality?.id ?? null,
       full_name: fullName || email.split('@')[0],
       email: email,
       role: staffRole,
+      municipality: municipality?.name ?? null,
+      province: municipality?.province ?? null,
       is_active: true,
       registration_status: 'approved',
-    })
+      verified_at: now,
+      created_at: now,
+      updated_at: now,
+    }, { onConflict: 'user_id' })
     if (profileError) throw new Error(profileError.message)
 
     return NextResponse.json({ message: 'Staff account created.' }, { status: 201 })

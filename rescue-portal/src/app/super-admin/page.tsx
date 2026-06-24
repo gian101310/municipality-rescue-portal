@@ -841,7 +841,7 @@ export default function SuperAdminPage() {
                 <div key={s.id} className="flex items-center justify-between gap-3 p-3 rounded-lg bg-slate-800/50 border border-slate-700/50">
                   <div>
                     <p className="text-white text-sm font-medium">{s.full_name || 'Unnamed'}</p>
-                    <p className="text-xs text-slate-500">{s.email} · {({ staff: 'Staff', dispatcher: 'Dispatch Ops', responder: 'Rescue Team', team_leader: 'Team Leader', admin: 'Admin' } as Record<string,string>)[s.role] ?? s.role} · {s.is_active ? 'Active' : 'Inactive'}</p>
+                    <p className="text-xs text-slate-500">{s.email} · {({ staff: 'Staff', dispatcher: 'Dispatch Unit Staff', responder: 'Rescue Team', team_leader: 'Team Leader', admin: 'Municipality Admin' } as Record<string,string>)[s.role] ?? s.role} · {s.is_active ? 'Active' : 'Inactive'}</p>
                   </div>
                   <div className="flex items-center gap-1">
                     <Button variant="ghost" size="sm" className="text-blue-300 hover:text-blue-200 h-7 w-7 p-0" title="Change password" onClick={() => handleStaffAction(s.id, 'change_password')}>
@@ -874,11 +874,11 @@ export default function SuperAdminPage() {
                     <div className="space-y-1">
                       <Label className="text-slate-300 text-xs">Role</Label>
                       <select value={newStaff.role} onChange={e => setNewStaff(p => ({ ...p, role: e.target.value }))} className="h-10 w-full rounded-md border border-slate-600 bg-slate-800 px-3 text-sm text-white">
-                        <option value="staff">Staff</option>
-                        <option value="dispatcher">Dispatch Ops</option>
-                        <option value="responder">Rescue Team</option>
+                        <option value="admin">Municipality Admin</option>
+                        <option value="dispatcher">Dispatch Unit Staff</option>
                         <option value="team_leader">Team Leader</option>
-                        <option value="admin">Admin</option>
+                        <option value="responder">Rescue Team</option>
+                        <option value="staff">Staff</option>
                       </select>
                     </div>
                   </div>

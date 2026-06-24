@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { User, Mail, Shield, Building2, Phone, Save } from 'lucide-react'
+import { User, Mail, Shield, Building2, Phone, Save, Lock, Clock, Eye, EyeOff, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -20,16 +20,43 @@ type ProfileData = {
   organization_name: string | null
 }
 
+const ROLE_LABELS: Record<string, string> = {
+  super_admin: 'Super Admin',
+  admin: 'Municipality Admin',
+  dispatcher: 'Dispatch Unit Staff',
+  team_leader: 'Team Leader',
+  responder: 'Rescue Team',
+  staff: 'Staff',
+}
+
 export default function AdminProfilePage() {
   const [profile, setProfile] = useState<ProfileData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [fullName, setFullName] = useState('')
   const [phone, setPhone] = useState('')
+  const [lastLogin, setLastLogin] = useState<string | null>(null)
+
+  // Change password state
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmNewPassword, setConfirmNewPassword] = useState('')
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
+  const [showNewPassword, setShowNewPassword] = useState(false)
+  const [changingPassword, setChangingPassword] = useState(false)
 
   useEffect(() => {
     async function load() {
       try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (user?.last_sign_in_at) {
+          setLastLogin(new Date(user.last_sign_in_at).toLocaleString('en-PH', {
+            dateStyle: 'medium',
+            timeStyle: 'short',
+          }))
+        }
+
         const res = await fetch('/api/admin/dashboard', { cache: 'no-store' })
         if (!res.ok) throw new Error('Failed to load profile')
         const data = await res.json()
@@ -70,6 +97,38 @@ export default function AdminProfilePage() {
     }
   }
 
+  async function handleChangePassword() {
+    if (newPassword !== confirmNewPassword) {
+      toast.error('New passwords do not match')
+      return
+    }
+    if (!currentPassword || !newPassword) {
+      toast.error('All fields are required')
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      const res = await fetch('/api/admin/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currentPassword, newPassword }),
+      })
+      const data = await res.json()
+
+      if (!res.ok) throw new Error(data.message)
+
+      toast.success('Password changed successfully')
+      setCurrentPassword('')
+      setNewPassword('')
+      setConfirmNewPassword('')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to change password')
+    } finally {
+      setChangingPassword(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="p-8 text-center">
@@ -92,25 +151,25 @@ export default function AdminProfilePage() {
     ? profile.full_name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase()
     : 'AD'
 
-  const roleLabel = profile.role === 'super_admin' ? 'Super Admin' : profile.role === 'admin' ? 'Admin' : profile.role === 'staff' ? 'Staff' : profile.role
+  const roleLabel = ROLE_LABELS[profile.role] ?? profile.role
 
   return (
     <div className="p-4 md:p-6 space-y-6 max-w-2xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold text-white">My Profile</h1>
-        <p className="text-slate-400 text-sm">Manage your account information</p>
+        <p className="text-slate-400 text-sm">Manage your account information and security</p>
       </div>
 
       {/* Profile Card */}
       <Card className="bg-slate-900 border-slate-700">
         <CardContent className="pt-6">
-          <div className="flex items-center gap-4 mb-6">
+          <div className="flex items-center gap-4 mb-4">
             <Avatar className="w-16 h-16">
               <AvatarFallback className="bg-blue-600 text-white text-xl font-bold">{initials}</AvatarFallback>
             </Avatar>
             <div>
               <h2 className="text-lg font-semibold text-white">{profile.full_name}</h2>
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <Badge className="bg-blue-600/20 text-blue-300 border border-blue-500/30 text-xs">
                   <Shield className="w-3 h-3 mr-1" />
                   {roleLabel}
@@ -124,13 +183,19 @@ export default function AdminProfilePage() {
               </div>
             </div>
           </div>
+          {lastLogin && (
+            <div className="flex items-center gap-2 text-xs text-slate-500 border-t border-slate-800 pt-3">
+              <Clock className="w-3.5 h-3.5" />
+              Last login: {lastLogin}
+            </div>
+          )}
         </CardContent>
       </Card>
 
-      {/* Edit Form */}
+      {/* Edit Profile */}
       <Card className="bg-slate-900 border-slate-700">
         <CardHeader>
-          <CardTitle className="text-white text-sm">Edit Profile</CardTitle>
+          <CardTitle className="text-white text-sm">Account Settings</CardTitle>
           <CardDescription className="text-slate-400">Update your name and contact details</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -174,8 +239,82 @@ export default function AdminProfilePage() {
             disabled={saving}
             className="bg-blue-600 hover:bg-blue-700 text-white"
           >
-            <Save className="w-4 h-4 mr-1" />
+            {saving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Save className="w-4 h-4 mr-1" />}
             {saving ? 'Saving...' : 'Save Changes'}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {/* Change Password */}
+      <Card className="bg-slate-900 border-slate-700">
+        <CardHeader>
+          <CardTitle className="text-white text-sm flex items-center gap-2">
+            <Lock className="w-4 h-4 text-amber-400" />
+            Change Password
+          </CardTitle>
+          <CardDescription className="text-slate-400">
+            Password must be at least 8 characters with uppercase, lowercase, number, and special character
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-1.5">
+            <Label className="text-slate-300 text-xs">Current Password</Label>
+            <div className="relative">
+              <Input
+                type={showCurrentPassword ? 'text' : 'password'}
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Enter current password"
+                className="bg-slate-800 border-slate-600 text-white pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowCurrentPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              >
+                {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-slate-300 text-xs">New Password</Label>
+            <div className="relative">
+              <Input
+                type={showNewPassword ? 'text' : 'password'}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Enter new password"
+                className="bg-slate-800 border-slate-600 text-white pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowNewPassword((v) => !v)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+              >
+                {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label className="text-slate-300 text-xs">Confirm New Password</Label>
+            <Input
+              type="password"
+              value={confirmNewPassword}
+              onChange={(e) => setConfirmNewPassword(e.target.value)}
+              placeholder="Re-enter new password"
+              className="bg-slate-800 border-slate-600 text-white"
+            />
+          </div>
+
+          <Button
+            onClick={handleChangePassword}
+            disabled={changingPassword || !currentPassword || !newPassword || !confirmNewPassword}
+            className="bg-amber-600 hover:bg-amber-700 text-white"
+          >
+            {changingPassword ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Lock className="w-4 h-4 mr-1" />}
+            {changingPassword ? 'Changing...' : 'Change Password'}
           </Button>
         </CardContent>
       </Card>
