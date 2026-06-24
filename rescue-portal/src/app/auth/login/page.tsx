@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Link from 'next/link'
-import { Shield, Eye, EyeOff, ArrowLeft, LogIn, QrCode, Info } from 'lucide-react'
+import { Shield, Eye, EyeOff, ArrowLeft, LogIn, QrCode, Info, Smartphone } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -14,6 +14,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
+import { createTrustedSession } from '@/lib/trusted-session'
 import type { RegistrationStatus, UserRole } from '@/lib/types'
 
 const loginSchema = z.object({
@@ -38,6 +39,7 @@ function LoginContent() {
   const [activeTab, setActiveTab] = useState<'resident' | 'staff'>(isResidentReturn ? 'resident' : 'staff')
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [trustDevice, setTrustDevice] = useState(true)
 
   const { register, handleSubmit, formState: { errors } } = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -105,6 +107,10 @@ function LoginContent() {
         toast.success('Welcome back, Boss!')
         router.push('/super-admin')
       } else if (profile.role === 'resident') {
+        // Create trusted session for residents if opted in
+        if (trustDevice) {
+          await createTrustedSession(supabase, authData.user.id)
+        }
         toast.success('Signed in successfully')
         router.push('/resident')
       } else if (profile.role === 'dispatcher') {
@@ -255,6 +261,18 @@ function LoginContent() {
                         </div>
                         {errors.password && <p className="text-xs text-red-400">{errors.password.message}</p>}
                       </div>
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={trustDevice}
+                          onChange={(e) => setTrustDevice(e.target.checked)}
+                          className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-red-600 focus:ring-red-500"
+                        />
+                        <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                          <Smartphone className="w-3.5 h-3.5" />
+                          Trust this device for 90 days (skip login next time)
+                        </span>
+                      </label>
                       <Button type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white" disabled={loading}>
                         {loading ? (
                           <span className="flex items-center gap-2">

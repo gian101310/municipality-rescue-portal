@@ -17,6 +17,7 @@ import { DEMO_NOTIFICATIONS } from '@/lib/demo-data'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { isOwnerTestMode, withOwnerTestMode } from '@/lib/owner-test-mode'
+import { validateTrustedSession, clearTrustedSession } from '@/lib/trusted-session'
 
 const NAV_ITEMS = [
   { href: '/resident', label: 'Home', icon: Home, exact: true },
@@ -46,8 +47,29 @@ function ResidentLayoutContent({ children }: { children: React.ReactNode }) {
 
     async function loadProfile() {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
-      if (!user || cancelled) return
+      let { data: { user } } = await supabase.auth.getUser()
+
+      // If no active Supabase session, try trusted session recovery
+      if (!user) {
+        const trusted = await validateTrustedSession(supabase)
+        if (trusted) {
+          // Trusted session exists — try to restore the Supabase session
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session) {
+            user = (await supabase.auth.getUser()).data.user
+          }
+        }
+        if (!user) {
+          // No session recoverable — redirect to login
+          if (!cancelled) {
+            clearTrustedSession()
+            router.push('/auth/login?role=resident')
+          }
+          return
+        }
+      }
+
+      if (cancelled) return
 
       const { data: profile } = await supabase
         .from('user_profiles')
@@ -70,6 +92,7 @@ function ResidentLayoutContent({ children }: { children: React.ReactNode }) {
 
   async function handleLogout() {
     const supabase = createClient()
+    clearTrustedSession()
     await supabase.auth.signOut()
     sessionStorage.removeItem('demo_role')
     sessionStorage.removeItem('demo_email')
