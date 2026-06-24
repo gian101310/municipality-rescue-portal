@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/server'
 import { isStrongPassword, isValidEmail, requiresBarangay } from '@/lib/auth-validation'
 import { PH_LOCALITIES } from '@/lib/philippines-geography'
 import { getCoverageLookupCandidates } from '@/lib/registration-organization'
+import { rateLimitRegistration, getClientIp } from '@/lib/server-rate-limiter'
 
 export const dynamic = 'force-dynamic'
 
@@ -145,6 +146,16 @@ async function findMunicipality(
 }
 
 export async function POST(request: Request) {
+  // Server-side rate limiting
+  const ip = getClientIp(request.headers)
+  const rl = rateLimitRegistration(ip)
+  if (!rl.success) {
+    return NextResponse.json(
+      { message: `Too many registration attempts. Try again in ${Math.ceil(rl.resetInSeconds / 60)} minutes.` },
+      { status: 429, headers: { 'Retry-After': String(rl.resetInSeconds) } }
+    )
+  }
+
   let createdAuthUserId: string | null = null
   let adminClient: Awaited<ReturnType<typeof createAdminClient>> | null = null
 

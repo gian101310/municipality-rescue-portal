@@ -8,6 +8,7 @@ import {
 } from '@/lib/incident-submission'
 import { attachEmergencyTypes } from '@/lib/incident-presentation'
 import { getResidentAccess, getTestReportMetadata } from '@/lib/owner-test-mode'
+import { rateLimitSos, getClientIp } from '@/lib/server-rate-limiter'
 import type { RegistrationStatus, UserRole } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -77,6 +78,22 @@ async function requireApprovedResident(request: Request) {
 }
 
 export async function POST(request: Request) {
+  // Server-side rate limiting
+  const ip = getClientIp(request.headers)
+  const rl = rateLimitSos(ip)
+  if (!rl.success) {
+    return NextResponse.json(
+      { message: `Too many SOS requests. Try again in ${rl.resetInSeconds} seconds.` },
+      {
+        status: 429,
+        headers: {
+          'Retry-After': String(rl.resetInSeconds),
+          'X-RateLimit-Remaining': '0',
+        },
+      }
+    )
+  }
+
   const auth = await requireApprovedResident(request)
   if ('error' in auth) return auth.error
 
