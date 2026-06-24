@@ -1,6 +1,6 @@
 'use client'
 
-import { Suspense, useEffect, useMemo, useState } from 'react'
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Shield, Phone, AlertTriangle, Clock, ChevronRight } from 'lucide-react'
@@ -33,6 +33,11 @@ function ResidentDashboardContent() {
   const [myIncidents, setMyIncidents] = useState<DemoIncident[]>([])
   const [loadingIncidents, setLoadingIncidents] = useState(true)
   const [sendingSos, setSendingSos] = useState(false)
+  const [holdProgress, setHoldProgress] = useState(0) // 0-100
+  const [holding, setHolding] = useState(false)
+  const holdTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const holdStartRef = useRef<number>(0)
+  const HOLD_DURATION_MS = 3000
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
   const activeIncident = useMemo(
@@ -79,6 +84,46 @@ function ResidentDashboardContent() {
 
     return () => window.clearTimeout(timer)
   }, [ownerTestMode])
+
+  const cancelHold = useCallback(() => {
+    setHolding(false)
+    setHoldProgress(0)
+    if (holdTimerRef.current) {
+      clearInterval(holdTimerRef.current)
+      holdTimerRef.current = null
+    }
+  }, [])
+
+  const startHold = useCallback(() => {
+    if (sendingSos) return
+    setHolding(true)
+    holdStartRef.current = Date.now()
+    // Haptic feedback on start
+    if (navigator.vibrate) navigator.vibrate(50)
+
+    holdTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - holdStartRef.current
+      const progress = Math.min((elapsed / HOLD_DURATION_MS) * 100, 100)
+      setHoldProgress(progress)
+
+      // Haptic pulse at 50%
+      if (progress >= 50 && progress < 55 && navigator.vibrate) {
+        navigator.vibrate(30)
+      }
+
+      if (progress >= 100) {
+        cancelHold()
+        // Strong haptic on trigger
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100])
+        sendSos()
+      }
+    }, 50)
+  }, [sendingSos, cancelHold])
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => { if (holdTimerRef.current) clearInterval(holdTimerRef.current) }
+  }, [])
 
   function sendSos() {
     if (!navigator.geolocation) {
@@ -130,17 +175,47 @@ function ResidentDashboardContent() {
       </div>
 
       <div className="flex flex-col items-center py-6">
-        <button type="button" onClick={sendSos} disabled={sendingSos} className="group disabled:cursor-wait disabled:opacity-70">
+        <button
+          type="button"
+          onPointerDown={startHold}
+          onPointerUp={cancelHold}
+          onPointerLeave={cancelHold}
+          onContextMenu={(e) => e.preventDefault()}
+          disabled={sendingSos}
+          className="group disabled:cursor-wait disabled:opacity-70 select-none touch-none"
+        >
           <div className="relative">
-            <div className="absolute inset-0 rounded-full bg-red-500/20 scale-125 group-hover:scale-150 transition-transform duration-700 animate-ping" />
-            <div className="absolute inset-0 rounded-full bg-red-500/10 scale-150 group-hover:scale-175 transition-transform duration-1000 animate-ping" style={{ animationDelay: '200ms' }} />
-            <span className="relative w-36 h-36 rounded-full bg-red-600 group-hover:bg-red-700 group-active:scale-95 transition-all shadow-2xl shadow-red-500/40 flex flex-col items-center justify-center text-white">
+            {!holding && !sendingSos && (
+              <>
+                <div className="absolute inset-0 rounded-full bg-red-500/20 scale-125 group-hover:scale-150 transition-transform duration-700 animate-ping" />
+                <div className="absolute inset-0 rounded-full bg-red-500/10 scale-150 group-hover:scale-175 transition-transform duration-1000 animate-ping" style={{ animationDelay: '200ms' }} />
+              </>
+            )}
+            <span className="relative w-36 h-36 rounded-full bg-red-600 group-hover:bg-red-700 group-active:scale-95 transition-all shadow-2xl shadow-red-500/40 flex flex-col items-center justify-center text-white overflow-hidden">
+              {/* Hold progress ring */}
+              {holding && (
+                <svg className="absolute inset-0 w-full h-full -rotate-90" viewBox="0 0 144 144">
+                  <circle cx="72" cy="72" r="68" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth="6" />
+                  <circle
+                    cx="72" cy="72" r="68" fill="none" stroke="white" strokeWidth="6"
+                    strokeDasharray={2 * Math.PI * 68}
+                    strokeDashoffset={2 * Math.PI * 68 * (1 - holdProgress / 100)}
+                    strokeLinecap="round"
+                    className="transition-none"
+                  />
+                </svg>
+              )}
               <Shield className="w-10 h-10 mb-1" />
-              <span className="text-xl font-black tracking-wide">{sendingSos ? 'SENDING' : 'SOS'}</span>
+              <span className="text-xl font-black tracking-wide">
+                {sendingSos ? 'SENDING' : holding ? `${Math.ceil((HOLD_DURATION_MS - (holdProgress / 100 * HOLD_DURATION_MS)) / 1000)}` : 'SOS'}
+              </span>
+              {holding && <span className="text-xs font-semibold opacity-80">HOLD</span>}
             </span>
           </div>
         </button>
-        <p className="text-slate-500 text-sm mt-4">{sendingSos ? 'Sending your location to dispatch…' : 'Hold SOS or choose below'}</p>
+        <p className="text-slate-500 text-sm mt-4">
+          {sendingSos ? 'Sending your location to dispatch…' : holding ? 'Keep holding to send SOS...' : 'Hold for 3 seconds to send SOS'}
+        </p>
 
         <div className="w-full grid grid-cols-1 gap-3 mt-5 max-w-sm">
           <Link href={withOwnerTestMode('/resident/emergency?role=victim', ownerTestMode)}>
