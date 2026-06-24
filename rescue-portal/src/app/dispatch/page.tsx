@@ -261,7 +261,8 @@ export default function DispatchPage() {
   const dispatched = incidents.filter(i => ['assigned', 'accepted', 'dispatched', 'on_the_way'].includes(i.status))
   const onScene = incidents.filter(i => ['arrived', 'operation_in_progress'].includes(i.status))
   const awaitingClosure = incidents.filter(i => i.status === 'resolved')
-  const closed = incidents.filter(i => i.status === 'closed').slice(0, 10)
+  const cancelled = incidents.filter(i => i.status === 'cancelled').slice(0, 10)
+  const closed = incidents.filter(i => ['closed', 'cancelled'].includes(i.status)).slice(0, 10)
 
   if (loading) {
     return (
@@ -432,6 +433,25 @@ export default function DispatchPage() {
               <Lock className="w-8 h-8 text-slate-500 mx-auto mb-2" />
               <p className="text-sm text-slate-400">Case closed.</p>
             </div>
+          )}
+
+          {inc.status === 'cancelled' && (
+            <div className="text-center py-4">
+              <XCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
+              <p className="text-sm text-red-300">Incident cancelled / false alarm.</p>
+            </div>
+          )}
+
+          {!['closed', 'cancelled', 'resolved'].includes(inc.status) && (
+            <Button
+              onClick={() => updateStatus(inc.id, 'cancelled')}
+              disabled={updatingId === inc.id}
+              variant="outline"
+              className="w-full h-10 border-red-600/50 text-red-400 hover:bg-red-900/20 hover:text-red-300 text-xs mt-2"
+            >
+              <XCircle className="w-3.5 h-3.5 mr-1" />
+              Cancel / False Alarm
+            </Button>
           )}
 
           {['arrived', 'operation_in_progress'].includes(inc.status) && (

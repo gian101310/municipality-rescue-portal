@@ -141,6 +141,7 @@ export async function PATCH(
     if (status === 'arrived') updatePayload.arrived_at = now
     if (status === 'resolved') updatePayload.resolved_at = now
     if (status === 'closed') updatePayload.closed_at = now
+    if (status === 'cancelled' || status === 'false_alert') updatePayload.cancelled_at = now
 
     const { data: updatedIncident, error: updateError } = await admin
       .from('incidents')
