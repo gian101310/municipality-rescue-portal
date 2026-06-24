@@ -7,3 +7,5 @@ node_modules
 next-env.d.ts
 .DS_Store
 pnpm-workspace.yaml
+_tmp_*
+tmp_extract/
