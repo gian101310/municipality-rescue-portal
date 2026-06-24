@@ -4,6 +4,7 @@ import { isStrongPassword, isValidEmail, requiresBarangay } from '@/lib/auth-val
 import { PH_LOCALITIES } from '@/lib/philippines-geography'
 import { getCoverageLookupCandidates } from '@/lib/registration-organization'
 import { rateLimitRegistration, getClientIp } from '@/lib/server-rate-limiter'
+import { sanitizeText } from '@/lib/sanitize'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,7 +57,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 }
 
 function clean(value: unknown) {
-  return String(value ?? '').trim()
+  return sanitizeText(String(value ?? ''))
 }
 
 function makeReferenceNumber() {

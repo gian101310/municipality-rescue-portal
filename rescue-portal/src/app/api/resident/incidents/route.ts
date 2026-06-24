@@ -11,6 +11,7 @@ import {
 import { attachEmergencyTypes } from '@/lib/incident-presentation'
 import { isEmergencyTypeAvailableToOrganization } from '@/lib/emergency-type-catalog'
 import { getResidentAccess, getTestReportMetadata } from '@/lib/owner-test-mode'
+import { sanitizeText } from '@/lib/sanitize'
 import type { RegistrationStatus, UserRole } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -84,7 +85,7 @@ async function requireApprovedResident(request: Request) {
 }
 
 function clean(value: unknown) {
-  return String(value ?? '').trim()
+  return sanitizeText(String(value ?? ''))
 }
 
 function normalizeHazards(hazards: unknown) {
