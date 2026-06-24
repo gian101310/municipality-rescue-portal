@@ -99,7 +99,8 @@ export async function createTrustedSession(
   const expiresAt = new Date()
   expiresAt.setDate(expiresAt.getDate() + TRUSTED_EXPIRY_DAYS)
 
-  const { error } = await supabase.from('trusted_sessions').insert({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- trusted_sessions not in generated types yet
+  const { error } = await (supabase.from('trusted_sessions') as any).insert({
     user_id: userId,
     session_token: token,
     device_fingerprint: getDeviceFingerprint(),
@@ -133,8 +134,9 @@ export async function validateTrustedSession(
   const stored = getStoredTrustedSession()
   if (!stored) return null
 
-  const { data, error } = await supabase
-    .from('trusted_sessions')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- trusted_sessions not in generated types yet
+  const tsTable = supabase.from('trusted_sessions') as any
+  const { data, error } = await tsTable
     .select('id, user_id, expires_at, is_revoked')
     .eq('session_token', stored.token)
     .eq('is_revoked', false)
@@ -145,7 +147,9 @@ export async function validateTrustedSession(
     return null
   }
 
-  if (new Date(data.expires_at) < new Date()) {
+  const row = data as { id: string; user_id: string; expires_at: string; is_revoked: boolean }
+
+  if (new Date(row.expires_at) < new Date()) {
     clearTrustedSession()
     return null
   }
@@ -154,13 +158,12 @@ export async function validateTrustedSession(
   const newExpiry = new Date()
   newExpiry.setDate(newExpiry.getDate() + TRUSTED_EXPIRY_DAYS)
 
-  await supabase
-    .from('trusted_sessions')
+  await tsTable
     .update({
       last_refreshed_at: new Date().toISOString(),
       expires_at: newExpiry.toISOString(),
     })
-    .eq('id', data.id)
+    .eq('id', row.id)
 
   // Update local storage with new expiry
   storeTrustedSession({
@@ -168,7 +171,7 @@ export async function validateTrustedSession(
     expiresAt: newExpiry.toISOString(),
   })
 
-  return { userId: data.user_id }
+  return { userId: row.user_id }
 }
 
 /**
@@ -178,8 +181,8 @@ export async function revokeTrustedSession(
   supabase: SupabaseBrowserClient,
   sessionId: string
 ): Promise<void> {
-  await supabase
-    .from('trusted_sessions')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase.from('trusted_sessions') as any)
     .update({ is_revoked: true, revoked_reason: 'user_revoked' })
     .eq('id', sessionId)
 }
@@ -191,8 +194,8 @@ export async function revokeAllTrustedSessions(
   supabase: SupabaseBrowserClient,
   userId: string
 ): Promise<void> {
-  await supabase
-    .from('trusted_sessions')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await (supabase.from('trusted_sessions') as any)
     .update({ is_revoked: true, revoked_reason: 'revoke_all' })
     .eq('user_id', userId)
     .eq('is_revoked', false)
@@ -207,8 +210,8 @@ export async function listTrustedSessions(
   supabase: SupabaseBrowserClient,
   userId: string
 ) {
-  const { data, error } = await supabase
-    .from('trusted_sessions')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.from('trusted_sessions') as any)
     .select('id, device_name, platform, last_refreshed_at, expires_at, created_at')
     .eq('user_id', userId)
     .eq('is_revoked', false)

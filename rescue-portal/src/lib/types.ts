@@ -307,28 +307,28 @@ export interface Incident {
   resolved_at: string | null;
   closed_at: string | null;
   resolution_notes: string | null;
-  // Offline SOS & delivery tracking
-  local_sos_id: string | null;
-  network_status_at_creation: string;
-  sync_attempt_count: number;
-  queued_offline_at: string | null;
-  synced_at: string | null;
-  delivery_status: DeliveryStatus;
-  delivery_delay_minutes: number;
+  // Offline SOS & delivery tracking (optional — absent on legacy incidents)
+  local_sos_id?: string | null;
+  network_status_at_creation?: string;
+  sync_attempt_count?: number;
+  queued_offline_at?: string | null;
+  synced_at?: string | null;
+  delivery_status?: DeliveryStatus;
+  delivery_delay_minutes?: number;
   // Dual location (original vs sent)
-  created_latitude: number | null;
-  created_longitude: number | null;
-  created_accuracy: number | null;
-  created_timestamp: string | null;
-  sent_latitude: number | null;
-  sent_longitude: number | null;
-  sent_accuracy: number | null;
-  sent_timestamp: string | null;
-  distance_moved_meters: number | null;
+  created_latitude?: number | null;
+  created_longitude?: number | null;
+  created_accuracy?: number | null;
+  created_timestamp?: string | null;
+  sent_latitude?: number | null;
+  sent_longitude?: number | null;
+  sent_accuracy?: number | null;
+  sent_timestamp?: string | null;
+  distance_moved_meters?: number | null;
   // Priority & SMS fallback
-  priority: IncidentPriority;
-  sms_fallback_triggered: boolean;
-  sms_fallback_at: string | null;
+  priority?: IncidentPriority;
+  sms_fallback_triggered?: boolean;
+  sms_fallback_at?: string | null;
   // Relations (optional, joined)
   status_history?: IncidentStatusHistory[];
   notes?: IncidentNote[];
@@ -569,7 +569,7 @@ export interface ResidentVerification {
 // DEMO DATA TYPES
 // ============================================================
 
-export interface DemoIncident extends Omit<Incident, 'emergency_type'> {
+export interface DemoIncident extends Omit<Incident, 'emergency_type' | 'timeline'> {
   emergency_type: Pick<EmergencyType, 'id' | 'name' | 'icon' | 'color'>;
   timeline: DemoTimelineEntry[];
 }

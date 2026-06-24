@@ -193,7 +193,11 @@ export async function POST(request: Request) {
     if (historyError) throw new Error(historyError.message ?? 'Unable to record SOS handoff.')
 
     // Insert timeline events
-    const timelineEvents = [
+    const timelineEvents: Array<{
+      incident_id: unknown; event_type: string; label: string; description: string;
+      actor_id: string; actor_name: string; actor_role: string;
+      metadata: Record<string, unknown>; occurred_at: string;
+    }> = [
       {
         incident_id: incident.id,
         event_type: 'sos_created',
