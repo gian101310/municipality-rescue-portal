@@ -19,6 +19,10 @@ import {
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
+import { DeliveryBadge } from '@/components/delivery-badge'
+import { PriorityBadge } from '@/components/priority-badge'
+import { DualLocationMap } from '@/components/dual-location-map'
+import { IncidentTimeline } from '@/components/incident-timeline'
 import { MapView } from '@/components/map-view'
 // Real data fetched from API — no demo imports
 import { formatDateTime, formatRelativeTime, getStatusLabel } from '@/lib/utils'
@@ -211,6 +215,8 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
               </div>
               <SeverityBadge severity={incident.severity} />
               <IncidentStatusBadge status={incident.status} />
+              {incident.delivery_status && <DeliveryBadge status={incident.delivery_status} delayMinutes={incident.delivery_delay_minutes} />}
+              {incident.priority && <PriorityBadge priority={incident.priority} />}
               {incident.intake_state === 'incoming' && <Badge className="border-red-500/40 bg-red-500/15 text-xs text-red-300 animate-pulse">Incoming SOS · details pending</Badge>}
             </div>
           </div>
@@ -318,6 +324,21 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
                   <ExternalLink className="w-3.5 h-3.5 mr-1" /> Open reporter pin in Google Maps
                 </Button>
               )}
+
+              {/* Dual Location — Original vs Sent (only for offline-synced SOS) */}
+              {incident.created_latitude != null && incident.created_longitude != null && (
+                <div className="pt-3 border-t border-slate-800">
+                  <p className="text-xs text-slate-500 mb-2 font-medium">Original vs Sent Location</p>
+                  <DualLocationMap
+                    originalLat={incident.created_latitude}
+                    originalLng={incident.created_longitude}
+                    sentLat={incident.sent_latitude}
+                    sentLng={incident.sent_longitude}
+                    distanceMeters={incident.distance_moved_meters}
+                    delayMinutes={incident.delivery_delay_minutes}
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -363,32 +384,40 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
           <Card className="bg-slate-900 border-slate-700">
             <CardHeader className="pb-3">
               <CardTitle className="text-white text-sm flex items-center gap-2">
-                <Clock className="w-4 h-4 text-slate-400" /> Status Timeline
+                <Clock className="w-4 h-4 text-slate-400" /> Incident Timeline
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-0">
-                {(incident.timeline || []).map((entry, idx) => (
-                  <div key={entry.id} className="flex gap-3">
-                    <div className="flex flex-col items-center">
-                      <div className={cn('w-7 h-7 rounded-full flex items-center justify-center border-2 shrink-0', idx === 0 ? 'bg-blue-600 border-blue-500' : 'bg-slate-800 border-slate-600')}>
-                        <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+              {/* New enhanced timeline for incidents with event_type entries */}
+              {(incident.timeline || []).length > 0 && 'event_type' in (incident.timeline![0] as unknown as Record<string, unknown>) ? (
+                <IncidentTimeline
+                  events={(incident.timeline as unknown as import('@/lib/types').IncidentTimelineEntry[]) ?? []}
+                />
+              ) : (
+                /* Legacy timeline format */
+                <div className="space-y-0">
+                  {(incident.timeline || []).map((entry, idx) => (
+                    <div key={entry.id} className="flex gap-3">
+                      <div className="flex flex-col items-center">
+                        <div className={cn('w-7 h-7 rounded-full flex items-center justify-center border-2 shrink-0', idx === 0 ? 'bg-blue-600 border-blue-500' : 'bg-slate-800 border-slate-600')}>
+                          <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                        </div>
+                        {idx < (incident.timeline || []).length - 1 && (
+                          <div className="w-0.5 flex-1 bg-slate-700 my-1" />
+                        )}
                       </div>
-                      {idx < (incident.timeline || []).length - 1 && (
-                        <div className="w-0.5 flex-1 bg-slate-700 my-1" />
-                      )}
-                    </div>
-                    <div className="pb-4 flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="font-medium text-sm text-white">{entry.label}</p>
-                        <span className="text-xs text-slate-500 shrink-0">{formatRelativeTime(entry.created_at)}</span>
+                      <div className="pb-4 flex-1 min-w-0">
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-medium text-sm text-white">{entry.label}</p>
+                          <span className="text-xs text-slate-500 shrink-0">{formatRelativeTime(entry.created_at)}</span>
+                        </div>
+                        <p className="text-xs text-slate-400">{entry.actor_name} · {entry.actor_role}</p>
+                        {entry.note && <p className="text-xs text-slate-400 mt-1 bg-slate-800 rounded px-2 py-1">{entry.note}</p>}
                       </div>
-                      <p className="text-xs text-slate-400">{entry.actor_name} · {entry.actor_role}</p>
-                      {entry.note && <p className="text-xs text-slate-400 mt-1 bg-slate-800 rounded px-2 py-1">{entry.note}</p>}
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 

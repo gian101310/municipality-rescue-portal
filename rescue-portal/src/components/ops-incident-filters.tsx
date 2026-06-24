@@ -65,14 +65,14 @@ export function OpsIncidentFilters({
               'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium transition-colors border',
               isActive
                 ? cn(config.activeColor, 'border-transparent')
-                : cn('bg-white border-slate-200', config.color, 'hover:bg-slate-50')
+                : cn('bg-slate-800 border-slate-700', config.color, 'hover:bg-slate-700')
             )}
           >
             {config.label}
             {count != null && (
               <span className={cn(
                 'inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold',
-                isActive ? 'bg-white/20' : 'bg-slate-100 text-slate-600'
+                isActive ? 'bg-white/20' : 'bg-slate-700 text-slate-400'
               )}>
                 {count}
               </span>

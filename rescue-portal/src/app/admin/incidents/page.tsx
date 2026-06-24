@@ -17,6 +17,9 @@ import {
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
+import { DeliveryBadge } from '@/components/delivery-badge'
+import { PriorityBadge } from '@/components/priority-badge'
+import { OpsIncidentFilters, filterIncidents as applyDeliveryFilter, countByFilter, type OpsFilterKey } from '@/components/ops-incident-filters'
 import { formatRelativeTime, cn } from '@/lib/utils'
 import type { DemoIncident, EmergencyType, IncidentStatus, SeverityLevel } from '@/lib/types'
 import { toast } from 'sonner'
@@ -40,6 +43,7 @@ export default function IncidentsPage() {
   const [search, setSearch] = useState('')
   const [typeFilter, setTypeFilter] = useState('all')
   const [severityFilter, setSeverityFilter] = useState<SeverityLevel | 'all'>('all')
+  const [deliveryFilter, setDeliveryFilter] = useState<OpsFilterKey>('all')
   const [page, setPage] = useState(1)
   const [incidents, setIncidents] = useState<DemoIncident[]>([])
   const [loading, setLoading] = useState(true)
@@ -116,7 +120,7 @@ export default function IncidentsPage() {
   }, [])
 
   const filtered = useMemo(() => {
-    return incidents.filter((inc) => {
+    let result = incidents.filter((inc) => {
       if (tab === 'active' && !ACTIVE_STATUSES.includes(inc.status)) return false
       if (tab === 'resolved' && !RESOLVED_STATUSES.includes(inc.status)) return false
       if (tab === 'closed' && !CLOSED_STATUSES.includes(inc.status)) return false
@@ -131,7 +135,14 @@ export default function IncidentsPage() {
       }
       return true
     })
-  }, [incidents, tab, search, typeFilter, severityFilter])
+    // Apply delivery/ops filter
+    if (deliveryFilter !== 'all') {
+      result = applyDeliveryFilter(result, deliveryFilter)
+    }
+    return result
+  }, [incidents, tab, search, typeFilter, severityFilter, deliveryFilter])
+
+  const deliveryCounts = useMemo(() => countByFilter(filtered), [filtered])
 
   // Extract unique emergency types from loaded incidents
   const uniqueTypes = useMemo(() => {
@@ -205,6 +216,14 @@ export default function IncidentsPage() {
         </CardContent>
       </Card>
 
+      {/* Delivery / Ops Filters */}
+      <OpsIncidentFilters
+        activeFilter={deliveryFilter}
+        onFilterChange={(f) => { setDeliveryFilter(f); setPage(1) }}
+        counts={deliveryCounts}
+        className="px-1"
+      />
+
       {/* Table */}
       <Card className="bg-slate-900 border-slate-700">
         <CardContent className="p-0">
@@ -212,7 +231,7 @@ export default function IncidentsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-slate-800">
-                  {['Reference', 'Type', 'Severity', 'Reporter', 'Location', 'Status', 'Unit', 'Time', ''].map((h) => (
+                  {['Reference', 'Type', 'Severity', 'Delivery', 'Priority', 'Reporter', 'Location', 'Status', 'Unit', 'Time', ''].map((h) => (
                     <th key={h} className="text-left px-4 py-3 text-xs text-slate-500 font-medium uppercase tracking-wider whitespace-nowrap">{h}</th>
                   ))}
                 </tr>
@@ -220,11 +239,11 @@ export default function IncidentsPage() {
               <tbody>
                 {loading ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-12 text-slate-500">Loading incidents...</td>
+                    <td colSpan={11} className="text-center py-12 text-slate-500">Loading incidents...</td>
                   </tr>
                 ) : paged.length === 0 ? (
                   <tr>
-                    <td colSpan={9} className="text-center py-12 text-slate-500">No incidents found</td>
+                    <td colSpan={11} className="text-center py-12 text-slate-500">No incidents found</td>
                   </tr>
                 ) : paged.map((inc) => (
                   <tr key={inc.id} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
@@ -254,6 +273,20 @@ export default function IncidentsPage() {
                       </div>
                     </td>
                     <td className="px-4 py-3"><SeverityBadge severity={inc.severity} /></td>
+                    <td className="px-4 py-3">
+                      {inc.delivery_status ? (
+                        <DeliveryBadge status={inc.delivery_status} delayMinutes={inc.delivery_delay_minutes} compact />
+                      ) : (
+                        <span className="text-xs text-slate-600">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {inc.priority ? (
+                        <PriorityBadge priority={inc.priority} compact />
+                      ) : (
+                        <span className="text-xs text-slate-600">—</span>
+                      )}
+                    </td>
                     <td className="px-4 py-3">
                       <span className="text-xs text-slate-300">{inc.reporter_name || '—'}</span>
                       {inc.is_anonymous && <span className="text-xs text-slate-600 ml-1">(anon)</span>}
