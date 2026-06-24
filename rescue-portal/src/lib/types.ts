@@ -36,6 +36,12 @@ export type IncidentStatus =
 
 export type SeverityLevel = 'critical' | 'high' | 'medium' | 'low' | 'info';
 
+export type DeliveryStatus = 'live' | 'delayed' | 'late_request' | 'sms_fallback';
+
+export type IncidentPriority = 'critical' | 'high' | 'medium' | 'low';
+
+export type OfflineSosStatus = 'pending' | 'queued_offline' | 'syncing' | 'synced' | 'failed';
+
 export type ReporterRole = 'victim' | 'passerby';
 
 export type IncidentIntakeState = 'incoming' | 'details_received';
@@ -301,11 +307,34 @@ export interface Incident {
   resolved_at: string | null;
   closed_at: string | null;
   resolution_notes: string | null;
+  // Offline SOS & delivery tracking
+  local_sos_id: string | null;
+  network_status_at_creation: string;
+  sync_attempt_count: number;
+  queued_offline_at: string | null;
+  synced_at: string | null;
+  delivery_status: DeliveryStatus;
+  delivery_delay_minutes: number;
+  // Dual location (original vs sent)
+  created_latitude: number | null;
+  created_longitude: number | null;
+  created_accuracy: number | null;
+  created_timestamp: string | null;
+  sent_latitude: number | null;
+  sent_longitude: number | null;
+  sent_accuracy: number | null;
+  sent_timestamp: string | null;
+  distance_moved_meters: number | null;
+  // Priority & SMS fallback
+  priority: IncidentPriority;
+  sms_fallback_triggered: boolean;
+  sms_fallback_at: string | null;
   // Relations (optional, joined)
   status_history?: IncidentStatusHistory[];
   notes?: IncidentNote[];
   assignments?: IncidentAssignment[];
   attachments?: IncidentAttachment[];
+  timeline?: IncidentTimelineEntry[];
 }
 
 export interface IncidentLocation {
@@ -621,6 +650,88 @@ export interface EmergencyReportForm {
 export interface IncidentAssignForm {
   rescue_unit_id: string;
   notes: string;
+}
+
+// ============================================================
+// INCIDENT TIMELINE (per-incident event log)
+// ============================================================
+
+export type TimelineEventType =
+  | 'sos_created'
+  | 'gps_captured'
+  | 'online_submission_attempted'
+  | 'internet_unavailable'
+  | 'queued_offline'
+  | 'sms_fallback_triggered'
+  | 'internet_restored'
+  | 'sos_synced'
+  | 'ops_received'
+  | 'ops_called_resident'
+  | 'resident_verified'
+  | 'responder_assigned'
+  | 'on_the_way'
+  | 'on_scene'
+  | 'resolved'
+  | 'false_alarm'
+  | 'closed'
+  | 'status_change'
+  | 'note_added'
+  | 'assignment_change';
+
+export interface IncidentTimelineEntry {
+  id: string;
+  incident_id: string;
+  event_type: TimelineEventType;
+  label: string;
+  description: string | null;
+  actor_id: string | null;
+  actor_name: string | null;
+  actor_role: string | null;
+  metadata: Record<string, unknown>;
+  occurred_at: string;
+  created_at: string;
+}
+
+// ============================================================
+// TRUSTED SESSION
+// ============================================================
+
+export interface TrustedSession {
+  id: string;
+  user_id: string;
+  session_token: string;
+  device_fingerprint: string | null;
+  device_name: string | null;
+  platform: 'web' | 'ios' | 'android';
+  ip_address: string | null;
+  user_agent: string | null;
+  expires_at: string;
+  last_refreshed_at: string;
+  is_revoked: boolean;
+  revoked_reason: string | null;
+  created_at: string;
+}
+
+// ============================================================
+// OFFLINE SOS (client-side queue record)
+// ============================================================
+
+export interface OfflineSosRecord {
+  local_sos_id: string;
+  resident_id: string;
+  resident_name: string;
+  phone: string | null;
+  emergency_type: string;
+  created_latitude: number;
+  created_longitude: number;
+  created_accuracy: number | null;
+  created_timestamp: string;
+  network_status_at_creation: 'online' | 'offline';
+  sync_status: OfflineSosStatus;
+  sync_attempt_count: number;
+  last_sync_attempt: string | null;
+  server_incident_id: string | null;
+  sms_fallback_triggered: boolean;
 }
 
 export interface IncidentStatusUpdateForm {
