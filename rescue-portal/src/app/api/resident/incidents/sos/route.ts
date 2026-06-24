@@ -87,6 +87,11 @@ export async function POST(request: Request) {
     const gpsAccuracy = Number.isFinite(Number(body?.gps_accuracy)) ? Number(body.gps_accuracy) : null
     const validation = validateIncomingSosLocation({ latitude, longitude })
 
+    // Offline SOS fields
+    const localSosId = typeof body?.local_sos_id === 'string' ? body.local_sos_id : null
+    const createdTimestamp = typeof body?.created_timestamp === 'string' ? body.created_timestamp : null
+    const networkStatus = body?.network_status === 'offline' ? 'offline' : 'online'
+
     if (!validation.ok) {
       return NextResponse.json({ message: validation.message }, { status: 400 })
     }
@@ -118,6 +123,15 @@ export async function POST(request: Request) {
       }
     )
 
+    // Calculate delivery delay and status
+    const serverNow = new Date()
+    const originalCreatedAt = createdTimestamp ? new Date(createdTimestamp) : serverNow
+    const delayMs = serverNow.getTime() - originalCreatedAt.getTime()
+    const delayMinutes = Math.max(0, delayMs / 60000)
+    let deliveryStatus: 'live' | 'delayed' | 'late_request' = 'live'
+    if (delayMinutes > 10) deliveryStatus = 'late_request'
+    else if (delayMinutes > 2) deliveryStatus = 'delayed'
+
     const { data: incident, error: incidentError } = await admin
       .from('incidents')
       .insert({
@@ -126,6 +140,23 @@ export async function POST(request: Request) {
         barangay: auth.profile.barangay,
         municipality: auth.profile.municipality,
         is_drill: reportMetadata.is_drill,
+        // Offline SOS tracking
+        local_sos_id: localSosId,
+        network_status_at_creation: networkStatus,
+        delivery_status: deliveryStatus,
+        delivery_delay_minutes: Math.round(delayMinutes * 100) / 100,
+        // Original location (when SOS was first created)
+        created_latitude: latitude,
+        created_longitude: longitude,
+        created_accuracy: gpsAccuracy,
+        created_timestamp: originalCreatedAt.toISOString(),
+        // Sent location (current GPS at time of submission)
+        sent_latitude: latitude,
+        sent_longitude: longitude,
+        sent_accuracy: gpsAccuracy,
+        sent_timestamp: serverNow.toISOString(),
+        // Priority
+        priority: 'critical',
       })
       .select('*')
       .single<Record<string, unknown>>()
@@ -160,6 +191,60 @@ export async function POST(request: Request) {
       })
 
     if (historyError) throw new Error(historyError.message ?? 'Unable to record SOS handoff.')
+
+    // Insert timeline events
+    const timelineEvents = [
+      {
+        incident_id: incident.id,
+        event_type: 'sos_created',
+        label: 'SOS Created',
+        description: `Emergency SOS sent by ${auth.profile.full_name}`,
+        actor_id: auth.profile.user_id,
+        actor_name: auth.profile.full_name,
+        actor_role: 'resident',
+        metadata: { gps_accuracy: gpsAccuracy, network_status: networkStatus },
+        occurred_at: originalCreatedAt.toISOString(),
+      },
+      {
+        incident_id: incident.id,
+        event_type: 'gps_captured',
+        label: 'GPS Location Captured',
+        description: `Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
+        actor_id: auth.profile.user_id,
+        actor_name: auth.profile.full_name,
+        actor_role: 'resident',
+        metadata: { latitude, longitude, accuracy: gpsAccuracy },
+        occurred_at: originalCreatedAt.toISOString(),
+      },
+    ]
+
+    // Add offline-specific events
+    if (networkStatus === 'offline') {
+      timelineEvents.push({
+        incident_id: incident.id as string,
+        event_type: 'queued_offline',
+        label: 'Queued Offline',
+        description: 'SOS was created while device was offline',
+        actor_id: auth.profile.user_id,
+        actor_name: auth.profile.full_name,
+        actor_role: 'resident',
+        metadata: { local_sos_id: localSosId },
+        occurred_at: originalCreatedAt.toISOString(),
+      })
+      timelineEvents.push({
+        incident_id: incident.id as string,
+        event_type: 'sos_synced',
+        label: `SOS Synced (${deliveryStatus.replace('_', ' ')})`,
+        description: `Delivered after ${Math.round(delayMinutes)} minute${Math.round(delayMinutes) !== 1 ? 's' : ''} delay`,
+        actor_id: auth.profile.user_id,
+        actor_name: auth.profile.full_name,
+        actor_role: 'system',
+        metadata: { delay_minutes: delayMinutes, delivery_status: deliveryStatus },
+        occurred_at: serverNow.toISOString(),
+      })
+    }
+
+    await admin.from('incident_timeline').insert(timelineEvents)
 
     return NextResponse.json({
       incident: attachEmergencyTypes([incident], [emergencyType])[0],

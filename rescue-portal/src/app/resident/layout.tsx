@@ -18,6 +18,8 @@ import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { isOwnerTestMode, withOwnerTestMode } from '@/lib/owner-test-mode'
 import { validateTrustedSession, clearTrustedSession } from '@/lib/trusted-session'
+import { useOfflineSos } from '@/hooks/use-offline-sos'
+import { OfflineSosBanner } from '@/components/offline-sos-banner'
 
 const NAV_ITEMS = [
   { href: '/resident', label: 'Home', icon: Home, exact: true },
@@ -41,6 +43,7 @@ function ResidentLayoutContent({ children }: { children: React.ReactNode }) {
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const ownerTestMode = isOwnerTestMode(searchParams) && isSuperAdmin
   const unread = DEMO_NOTIFICATIONS.filter((n) => !n.is_read && n.user_id === 'uid-res-001').length
+  const { online, pendingCount, smsFallbackRecord, dismissSmsFallback } = useOfflineSos()
 
   useEffect(() => {
     let cancelled = false
@@ -102,6 +105,12 @@ function ResidentLayoutContent({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
       <DemoBanner />
+      <OfflineSosBanner
+        online={online}
+        pendingCount={pendingCount}
+        smsFallbackRecord={smsFallbackRecord}
+        onDismissSmsFallback={dismissSmsFallback}
+      />
       {ownerTestMode && (
         <div className="bg-amber-100 px-4 py-2 text-center text-xs font-semibold text-amber-900">
           Owner Test Mode — reports from this portal are saved as drills.
