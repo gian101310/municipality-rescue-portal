@@ -54,12 +54,28 @@ function ResidentLayoutContent({ children }: { children: React.ReactNode }) {
 
       // If no active Supabase session, try trusted session recovery
       if (!user) {
-        const trusted = await validateTrustedSession(supabase)
-        if (trusted) {
-          // Trusted session exists — try to restore the Supabase session
-          const { data: { session } } = await supabase.auth.getSession()
-          if (session) {
-            user = (await supabase.auth.getUser()).data.user
+        const stored = (await import('@/lib/trusted-session')).getStoredTrustedSession()
+        if (stored) {
+          try {
+            // Call server to validate token and get a magic link token
+            const res = await fetch('/api/auth/trusted-session-refresh', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: stored.token }),
+            })
+            if (res.ok) {
+              const payload = await res.json()
+              // Use verifyOtp to establish a fresh Supabase session
+              const { error: verifyError } = await supabase.auth.verifyOtp({
+                token_hash: payload.token_hash,
+                type: 'magiclink',
+              })
+              if (!verifyError) {
+                user = (await supabase.auth.getUser()).data.user
+              }
+            }
+          } catch {
+            // Silent — fall through to redirect
           }
         }
         if (!user) {
