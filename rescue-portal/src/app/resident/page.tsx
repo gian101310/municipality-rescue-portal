@@ -140,7 +140,38 @@ function ResidentDashboardContent() {
             </span>
           </div>
         </button>
-        <p className="text-slate-500 text-sm mt-4">{sendingSos ? 'Sending your location to dispatch…' : 'Tap to send your location to dispatch'}</p>
+        <p className="text-slate-500 text-sm mt-4">{sendingSos ? 'Sending your location to dispatch…' : 'Hold SOS or choose below'}</p>
+
+        <div className="w-full grid grid-cols-1 gap-3 mt-5 max-w-sm">
+          <Link href={withOwnerTestMode('/resident/emergency?role=victim', ownerTestMode)}>
+            <Card className="border-2 border-red-500 bg-red-50 hover:bg-red-100 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-600 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-white" />
+                </div>
+                <div>
+                  <p className="font-bold text-red-700 text-sm">I AM INVOLVED</p>
+                  <p className="text-xs text-red-600/70">I need help right now</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-red-400 ml-auto" />
+              </CardContent>
+            </Card>
+          </Link>
+          <Link href={withOwnerTestMode('/resident/emergency?role=passerby', ownerTestMode)}>
+            <Card className="border border-slate-300 bg-white hover:bg-slate-50 transition-colors cursor-pointer">
+              <CardContent className="p-4 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                  <Phone className="w-5 h-5 text-blue-600" />
+                </div>
+                <div>
+                  <p className="font-bold text-slate-800 text-sm">REPORTING FOR SOMEONE ELSE</p>
+                  <p className="text-xs text-slate-500">I witnessed an emergency</p>
+                </div>
+                <ChevronRight className="w-5 h-5 text-slate-400 ml-auto" />
+              </CardContent>
+            </Card>
+          </Link>
+        </div>
       </div>
 
       {activeIncident && (

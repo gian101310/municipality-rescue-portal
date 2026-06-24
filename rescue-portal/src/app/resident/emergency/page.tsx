@@ -88,7 +88,10 @@ function EmergencyPageContent() {
   const [location, setLocation] = useState<{ lat: number; lng: number; accuracy: number | null } | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [refNumber, setRefNumber] = useState(incomingReference ?? '')
-  const [reporterRole, setReporterRole] = useState<ReporterRole | null>(null)
+  const roleParam = searchParams.get('role')
+  const [reporterRole, setReporterRole] = useState<ReporterRole | null>(
+    roleParam === 'victim' || roleParam === 'passerby' ? roleParam : null
+  )
   const [emergencyTypes, setEmergencyTypes] = useState<EmergencyType[]>([])
   const [photos, setPhotos] = useState<File[]>([])
   const [photoPreviews, setPhotoPreviews] = useState<string[]>([])
@@ -191,7 +194,7 @@ function EmergencyPageContent() {
 
   async function handleSubmit() {
     if (!selectedType) { toast.error('Please choose an emergency type'); return }
-    if (isIncomingSos && !reporterRole) { toast.error('Please choose whether you are the victim or a passerby'); return }
+    if (!reporterRole) { toast.error('Please choose whether you are involved or reporting for someone else'); return }
     if (!isIncomingSos && !description.trim()) { toast.error('Please describe the emergency'); return }
     if (!isIncomingSos && (!locationGranted || !location)) { toast.error('Please share your location first'); return }
 
@@ -413,29 +416,27 @@ function EmergencyPageContent() {
               </div>
             </div>
 
-            {isIncomingSos && (
-              <div>
-                <Label className="text-slate-700 font-semibold mb-2 block">Are you the victim or reporting for someone else?</Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <Button
-                    type="button"
-                    variant={reporterRole === 'victim' ? 'default' : 'outline'}
-                    className={reporterRole === 'victim' ? 'bg-red-600 hover:bg-red-700 text-white' : 'border-slate-300 text-slate-700'}
-                    onClick={() => setReporterRole('victim')}
-                  >
-                    I am the victim
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={reporterRole === 'passerby' ? 'default' : 'outline'}
-                    className={reporterRole === 'passerby' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-slate-300 text-slate-700'}
-                    onClick={() => setReporterRole('passerby')}
-                  >
-                    I am a passerby
-                  </Button>
-                </div>
+            <div>
+              <Label className="text-slate-700 font-semibold mb-2 block">Are you involved or reporting for someone else?</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  type="button"
+                  variant={reporterRole === 'victim' ? 'default' : 'outline'}
+                  className={reporterRole === 'victim' ? 'bg-red-600 hover:bg-red-700 text-white' : 'border-slate-300 text-slate-700'}
+                  onClick={() => setReporterRole('victim')}
+                >
+                  I AM INVOLVED
+                </Button>
+                <Button
+                  type="button"
+                  variant={reporterRole === 'passerby' ? 'default' : 'outline'}
+                  className={reporterRole === 'passerby' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'border-slate-300 text-slate-700'}
+                  onClick={() => setReporterRole('passerby')}
+                >
+                  REPORTING FOR OTHERS
+                </Button>
               </div>
-            )}
+            </div>
 
             {/* Location */}
             <div>
@@ -568,7 +569,7 @@ function EmergencyPageContent() {
             <Button
               onClick={() => setStep('confirm')}
               className="w-full bg-red-600 hover:bg-red-700 text-white h-12 font-semibold"
-              disabled={isIncomingSos ? !reporterRole : !description.trim() || !locationGranted}
+              disabled={!reporterRole || (!isIncomingSos && (!description.trim() || !locationGranted))}
             >
               Continue to Confirm
               <ChevronRight className="w-4 h-4 ml-1" />
@@ -602,7 +603,7 @@ function EmergencyPageContent() {
                   <p className="text-xs text-slate-500">Description</p>
                   <p className="text-sm text-slate-800">{description || 'No description provided'}</p>
                 </div>
-                {isIncomingSos && reporterRole && (
+                {reporterRole && (
                   <div>
                     <p className="text-xs text-slate-500">Reporting as</p>
                     <p className="text-sm text-slate-800 font-medium">{reporterRole === 'victim' ? 'Victim' : 'Passerby'}</p>
