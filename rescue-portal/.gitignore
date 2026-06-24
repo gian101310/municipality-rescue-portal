@@ -36,6 +36,12 @@ yarn-error.log*
 # vercel
 .vercel
 
+# capacitor android build artifacts
+/android/app/build/
+/android/.gradle/
+/android/build/
+*.apk
+
 # Supabase CLI local project connection metadata
 supabase/.temp/
 
