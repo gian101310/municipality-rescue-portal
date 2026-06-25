@@ -36,14 +36,14 @@ const nextConfig: NextConfig = {
             "default-src 'self'",
             // Scripts: self + inline (Next.js requires it) + eval for dev
             "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-            // Styles: self + inline (Tailwind/styled-jsx)
-            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+            // Styles: self + inline (Tailwind/styled-jsx) + Leaflet CSS
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
             // Fonts
             "font-src 'self' https://fonts.gstatic.com data:",
-            // Images: self + Supabase storage + OpenStreetMap tiles + data URIs
-            "img-src 'self' data: blob: https://*.supabase.co https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://unpkg.com",
-            // Connect: self + Supabase (REST, Realtime WS, Auth)
-            "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://tile.openstreetmap.org https://*.tile.openstreetmap.org",
+            // Images: self + Supabase storage + map tiles + Leaflet icons + data URIs
+            "img-src 'self' data: blob: https://*.supabase.co https://*.tile.openstreetmap.org https://tile.openstreetmap.org https://*.basemaps.cartocdn.com https://cdnjs.cloudflare.com https://unpkg.com",
+            // Connect: self + Supabase (REST, Realtime WS, Auth) + map tiles
+            "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://tile.openstreetmap.org https://*.tile.openstreetmap.org https://*.basemaps.cartocdn.com",
             // Workers for service worker
             "worker-src 'self' blob:",
             // Frame: deny embedding
