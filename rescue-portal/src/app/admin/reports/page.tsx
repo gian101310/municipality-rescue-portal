@@ -245,7 +245,7 @@ export default function ReportsPage() {
 
       {/* Filters */}
       <div className="flex flex-wrap gap-3 items-center">
-        <Select value={dateRange} onValueChange={setDateRange}>
+        <Select value={dateRange} onValueChange={(v) => setDateRange(v ?? '7d')}>
           <SelectTrigger className="w-32 bg-slate-800 border-slate-600 text-white text-sm">
             <SelectValue />
           </SelectTrigger>
@@ -256,7 +256,7 @@ export default function ReportsPage() {
             <SelectItem value="365d">Last year</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={statusFilter} onValueChange={setStatusFilter}>
+        <Select value={statusFilter} onValueChange={(v) => setStatusFilter(v ?? 'all')}>
           <SelectTrigger className="w-36 bg-slate-800 border-slate-600 text-white text-sm">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
@@ -271,7 +271,7 @@ export default function ReportsPage() {
             <SelectItem value="cancelled">Cancelled</SelectItem>
           </SelectContent>
         </Select>
-        <Select value={severityFilter} onValueChange={setSeverityFilter}>
+        <Select value={severityFilter} onValueChange={(v) => setSeverityFilter(v ?? 'all')}>
           <SelectTrigger className="w-32 bg-slate-800 border-slate-600 text-white text-sm">
             <SelectValue placeholder="Severity" />
           </SelectTrigger>
