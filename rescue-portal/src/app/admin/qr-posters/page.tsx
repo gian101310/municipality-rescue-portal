@@ -94,14 +94,14 @@ export default function QRPostersPage() {
   const posterRef = useRef<HTMLDivElement>(null)
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://www.rescue-portal.ph'
-  const emergencyUrl = `${baseUrl}/auth/register`
+  const emergencyUrl = `${baseUrl}/scan`
 
   useEffect(() => { void (async () => {
     const response = await fetch('/api/admin/qr-context')
     const payload = await response.json().catch(() => ({}))
     if (response.ok) {
       setMunicipalityName(payload.organization?.name ?? municipalityName)
-      const url = `${baseUrl}/auth/register?municipality=${encodeURIComponent(payload.organizationId)}`
+      const url = `${baseUrl}/scan?municipality=${encodeURIComponent(payload.organizationId)}`
       setQrImage(await QRCode.toDataURL(url, { width: 600, margin: 2 }))
       const names = (payload.barangays ?? []).map((b: { name: string }) => b.name)
       setBarangayList(names)

@@ -84,9 +84,12 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl)
   }
 
-  // If authenticated and on the login page, redirect to appropriate dashboard
+  // If authenticated and on the login or register page, redirect to appropriate dashboard
   if (user && (pathname === '/auth/login' || pathname === '/auth/register')) {
     const dashUrl = request.nextUrl.clone()
+    // Residents go to /resident, staff/admin go to /admin
+    // We can't easily check role here without a DB call, so default to /admin
+    // The /scan page handles smart routing with role detection client-side
     dashUrl.pathname = '/admin'
     return NextResponse.redirect(dashUrl)
   }

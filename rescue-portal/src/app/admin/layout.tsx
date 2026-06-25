@@ -51,8 +51,12 @@ type AdminProfile = {
   avatar_url: string | null
 }
 
-function buildNavItems(stats: DashboardStats | null) {
-  return [
+// Admin-only nav items — hidden from dispatcher, team_leader, staff, responder
+const ADMIN_ONLY_ROUTES = new Set(['/admin/settings', '/admin/audit', '/admin/health'])
+const ADMIN_ROLES = new Set(['super_admin', 'admin'])
+
+function buildNavItems(stats: DashboardStats | null, role?: string) {
+  const allItems = [
     { href: '/admin', label: 'Command Center', icon: LayoutDashboard, exact: true },
     { href: '/admin/incidents', label: 'Incidents', icon: AlertTriangle, badge: stats?.active_incidents },
     { href: '/admin/map', label: 'Live Map', icon: Map },
@@ -67,6 +71,11 @@ function buildNavItems(stats: DashboardStats | null) {
     { href: '/admin/settings', label: 'Settings', icon: Settings },
     { href: '/admin/health', label: 'System Health', icon: Activity },
   ]
+  // Non-admin roles: hide settings, audit logs, system health
+  if (role && !ADMIN_ROLES.has(role)) {
+    return allItems.filter((item) => !ADMIN_ONLY_ROUTES.has(item.href))
+  }
+  return allItems
 }
 
 type NavItem = {
@@ -184,7 +193,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     ? [buyerDetails.provinceName, buyerDetails.regionName].filter(Boolean).join(', ') || buyerDetails.locationName
     : ''
 
-  const navItems = buildNavItems(dashStats)
+  const isAdmin = ADMIN_ROLES.has(adminProfile?.role ?? '')
+  const navItems = buildNavItems(dashStats, adminProfile?.role)
 
   // Fetch admin profile and stats
   useEffect(() => {
@@ -350,13 +360,15 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <User className="w-4 h-4 mr-2" />
                     Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="text-slate-300 hover:text-white cursor-pointer"
-                    onClick={() => router.push('/admin/settings')}
-                  >
-                    <Settings className="w-4 h-4 mr-2" />
-                    Settings
-                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem
+                      className="text-slate-300 hover:text-white cursor-pointer"
+                      onClick={() => router.push('/admin/settings')}
+                    >
+                      <Settings className="w-4 h-4 mr-2" />
+                      Settings
+                    </DropdownMenuItem>
+                  )}
                   {adminProfile?.role === 'super_admin' && (
                     <DropdownMenuItem
                       className="text-amber-300 hover:text-amber-200 cursor-pointer"
@@ -366,14 +378,18 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       Return to Super Admin
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuSeparator className="bg-slate-700" />
-                  <DropdownMenuItem
-                    onClick={openLogoutModal}
-                    className="text-red-400 hover:text-red-300 cursor-pointer"
-                  >
-                    <LogOut className="w-4 h-4 mr-2" />
-                    Secure Logout
-                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <>
+                      <DropdownMenuSeparator className="bg-slate-700" />
+                      <DropdownMenuItem
+                        onClick={openLogoutModal}
+                        className="text-red-400 hover:text-red-300 cursor-pointer"
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Secure Logout
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>

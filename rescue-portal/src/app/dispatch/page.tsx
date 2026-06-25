@@ -5,7 +5,7 @@ import {
   AlertTriangle, MapPin, Phone, CheckCircle2, Truck,
   Loader2, Clock, Siren, Send, XCircle, ChevronRight,
   ShieldCheck, Radio, Eye, Lock, Flag, Navigation,
-  ClipboardCheck, Bell, ArrowRightLeft, Building2, Search,
+  ClipboardCheck, Bell, ArrowRightLeft, Building2, Search, Users,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -73,6 +73,13 @@ export default function DispatchPage() {
   const [transferSearch, setTransferSearch] = useState('')
   const [transferring, setTransferring] = useState(false)
 
+  // Team dispatch selection
+  const [showTeamPicker, setShowTeamPicker] = useState(false)
+  const [teamPickerIncidentId, setTeamPickerIncidentId] = useState<string | null>(null)
+  const [availableTeams, setAvailableTeams] = useState<Array<{ id: string; name: string; status: string; team_leader_name?: string; contact_number?: string }>>([])
+  const [loadingTeams, setLoadingTeams] = useState(false)
+  const [assigningTeamId, setAssigningTeamId] = useState<string | null>(null)
+
   const fetchIncidents = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/incidents', { cache: 'no-store' })
@@ -105,6 +112,53 @@ export default function DispatchPage() {
       toast.error(err instanceof Error ? err.message : 'Update failed')
     } finally {
       setUpdatingId(null)
+    }
+  }
+
+  async function openTeamPicker(incidentId: string) {
+    setTeamPickerIncidentId(incidentId)
+    setShowTeamPicker(true)
+    setLoadingTeams(true)
+    try {
+      const res = await fetch('/api/admin/teams')
+      const data = await res.json().catch(() => ({}))
+      setAvailableTeams(data.teams ?? [])
+    } catch {
+      toast.error('Unable to load rescue teams')
+    } finally {
+      setLoadingTeams(false)
+    }
+  }
+
+  async function dispatchWithTeam(teamId: string) {
+    if (!teamPickerIncidentId) return
+    setAssigningTeamId(teamId)
+    try {
+      // First assign the team
+      const assignRes = await fetch(`/api/admin/incidents/${teamPickerIncidentId}/assignments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rescueUnitId: teamId }),
+      })
+      if (!assignRes.ok) {
+        const d = await assignRes.json().catch(() => ({}))
+        throw new Error(d.message ?? 'Failed to assign team')
+      }
+      // Then update status to dispatched
+      await fetch(`/api/admin/incidents/${teamPickerIncidentId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'dispatched' }),
+      })
+      const team = availableTeams.find(t => t.id === teamId)
+      toast.success(`Dispatched ${team?.name ?? 'rescue team'}`)
+      setShowTeamPicker(false)
+      setTeamPickerIncidentId(null)
+      await fetchIncidents()
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Dispatch failed')
+    } finally {
+      setAssigningTeamId(null)
     }
   }
 
@@ -264,12 +318,12 @@ export default function DispatchPage() {
           {['submitted', 'received', 'verified'].includes(inc.status) && (
             <>
               <Button
-                onClick={() => updateStatus(inc.id, 'dispatched')}
+                onClick={() => openTeamPicker(inc.id)}
                 disabled={updatingId === inc.id}
                 className="w-full h-14 bg-blue-600 hover:bg-blue-700 text-white font-semibold"
               >
-                {updatingId === inc.id ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Send className="w-5 h-5 mr-2" />}
-                Dispatch Mission
+                <Users className="w-5 h-5 mr-2" />
+                Select Team & Dispatch
               </Button>
               <Button
                 onClick={() => setShowTransferModal(true)}
@@ -347,6 +401,77 @@ export default function DispatchPage() {
             </div>
           )}
         </div>
+
+        {/* Team Selection Modal (Detail View) */}
+        {showTeamPicker && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+            <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden">
+              <div className="p-4 border-b border-slate-700 bg-slate-800">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-blue-400" />
+                    <h3 className="text-white font-bold text-sm">Select Rescue Team</h3>
+                  </div>
+                  <button onClick={() => { setShowTeamPicker(false); setTeamPickerIncidentId(null) }} className="text-slate-400 hover:text-white text-lg">&times;</button>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">Choose a team to dispatch for this incident</p>
+              </div>
+              <div className="max-h-[350px] overflow-y-auto p-2 space-y-1">
+                {loadingTeams ? (
+                  <div className="text-center py-8">
+                    <Loader2 className="w-6 h-6 text-blue-500 animate-spin mx-auto mb-2" />
+                    <p className="text-sm text-slate-400">Loading rescue teams...</p>
+                  </div>
+                ) : availableTeams.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Users className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                    <p className="text-sm text-slate-400">No rescue teams found</p>
+                    <p className="text-xs text-slate-500 mt-1">Add teams in the Rescue Teams section</p>
+                  </div>
+                ) : (
+                  availableTeams.map(team => {
+                    const isAvailable = team.status === 'available'
+                    return (
+                      <button
+                        key={team.id}
+                        onClick={() => dispatchWithTeam(team.id)}
+                        disabled={assigningTeamId !== null || !isAvailable}
+                        className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left ${
+                          isAvailable
+                            ? 'hover:bg-slate-800 cursor-pointer border border-slate-700 hover:border-blue-500'
+                            : 'opacity-50 cursor-not-allowed border border-slate-800'
+                        } ${assigningTeamId === team.id ? 'border-blue-500 bg-blue-900/20' : ''}`}
+                      >
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${isAvailable ? 'bg-green-900/30' : 'bg-slate-800'}`}>
+                          <Users className={`w-4 h-4 ${isAvailable ? 'text-green-400' : 'text-slate-500'}`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm text-white font-medium truncate">{team.name}</p>
+                          {team.team_leader_name && (
+                            <p className="text-xs text-slate-400">Leader: {team.team_leader_name}</p>
+                          )}
+                          {team.contact_number && (
+                            <p className="text-xs text-slate-500">{team.contact_number}</p>
+                          )}
+                        </div>
+                        <Badge className={`text-[10px] border ${
+                          isAvailable
+                            ? 'bg-green-900/30 text-green-400 border-green-500/30'
+                            : 'bg-amber-900/30 text-amber-400 border-amber-500/30'
+                        }`}>
+                          {team.status}
+                        </Badge>
+                        {assigningTeamId === team.id && (
+                          <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+                        )}
+                      </button>
+                    )
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Transfer Modal */}
         {showTransferModal && (
@@ -496,12 +621,12 @@ export default function DispatchPage() {
                   </div>
                   <Button
                     size="sm"
-                    onClick={() => updateStatus(inc.id, 'dispatched')}
+                    onClick={() => openTeamPicker(inc.id)}
                     disabled={updatingId === inc.id}
                     className="w-full mt-3 bg-blue-600 hover:bg-blue-700 text-white text-xs h-9"
                   >
-                    {updatingId === inc.id ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Send className="w-3.5 h-3.5 mr-1" />}
-                    Dispatch Now
+                    <Users className="w-3.5 h-3.5 mr-1" />
+                    Select Team & Dispatch
                   </Button>
                 </CardContent>
               </Card>
@@ -612,6 +737,77 @@ export default function DispatchPage() {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Team Selection Modal */}
+      {showTeamPicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden">
+            <div className="p-4 border-b border-slate-700 bg-slate-800">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Users className="w-5 h-5 text-blue-400" />
+                  <h3 className="text-white font-bold text-sm">Select Rescue Team</h3>
+                </div>
+                <button onClick={() => { setShowTeamPicker(false); setTeamPickerIncidentId(null) }} className="text-slate-400 hover:text-white text-lg">&times;</button>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">Choose a team to dispatch for this incident</p>
+            </div>
+            <div className="max-h-[350px] overflow-y-auto p-2 space-y-1">
+              {loadingTeams ? (
+                <div className="text-center py-8">
+                  <Loader2 className="w-6 h-6 text-blue-500 animate-spin mx-auto mb-2" />
+                  <p className="text-sm text-slate-400">Loading rescue teams...</p>
+                </div>
+              ) : availableTeams.length === 0 ? (
+                <div className="text-center py-8">
+                  <Users className="w-8 h-8 text-slate-600 mx-auto mb-2" />
+                  <p className="text-sm text-slate-400">No rescue teams found</p>
+                  <p className="text-xs text-slate-500 mt-1">Add teams in the Rescue Teams section</p>
+                </div>
+              ) : (
+                availableTeams.map(team => {
+                  const isAvailable = team.status === 'available'
+                  return (
+                    <button
+                      key={team.id}
+                      onClick={() => dispatchWithTeam(team.id)}
+                      disabled={assigningTeamId !== null || !isAvailable}
+                      className={`w-full flex items-center gap-3 p-3 rounded-lg transition-colors text-left ${
+                        isAvailable
+                          ? 'hover:bg-slate-800 cursor-pointer border border-slate-700 hover:border-blue-500'
+                          : 'opacity-50 cursor-not-allowed border border-slate-800'
+                      } ${assigningTeamId === team.id ? 'border-blue-500 bg-blue-900/20' : ''}`}
+                    >
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${isAvailable ? 'bg-green-900/30' : 'bg-slate-800'}`}>
+                        <Users className={`w-4 h-4 ${isAvailable ? 'text-green-400' : 'text-slate-500'}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm text-white font-medium truncate">{team.name}</p>
+                        {team.team_leader_name && (
+                          <p className="text-xs text-slate-400">Leader: {team.team_leader_name}</p>
+                        )}
+                        {team.contact_number && (
+                          <p className="text-xs text-slate-500">{team.contact_number}</p>
+                        )}
+                      </div>
+                      <Badge className={`text-[10px] border ${
+                        isAvailable
+                          ? 'bg-green-900/30 text-green-400 border-green-500/30'
+                          : 'bg-amber-900/30 text-amber-400 border-amber-500/30'
+                      }`}>
+                        {team.status}
+                      </Badge>
+                      {assigningTeamId === team.id && (
+                        <Loader2 className="w-4 h-4 text-blue-400 animate-spin shrink-0" />
+                      )}
+                    </button>
+                  )
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
