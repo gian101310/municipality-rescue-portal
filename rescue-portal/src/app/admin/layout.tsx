@@ -15,7 +15,6 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
@@ -339,10 +338,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                   </Avatar>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-48 bg-slate-800 border-slate-700">
-                  <DropdownMenuLabel className="text-slate-300 text-xs">
+                  <div className="px-1.5 py-1 text-xs font-medium text-slate-300">
                     <div>{adminProfile?.full_name ?? 'Admin'}</div>
                     <div className="text-slate-500 font-normal">{adminProfile?.email ?? '...'}</div>
-                  </DropdownMenuLabel>
+                  </div>
                   <DropdownMenuSeparator className="bg-slate-700" />
                   <DropdownMenuItem
                     className="text-slate-300 hover:text-white cursor-pointer"
