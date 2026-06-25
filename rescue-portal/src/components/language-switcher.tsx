@@ -32,7 +32,7 @@ export function LanguageSwitcher({ variant = 'default' }: { variant?: 'default' 
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="ghost" size="sm" className="gap-1.5 text-slate-300 hover:text-white" />}>
+      <DropdownMenuTrigger className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm text-slate-300 hover:text-white hover:bg-slate-700 focus:outline-none">
         <Globe className="w-4 h-4" />
         <span className="text-xs">{current.flag} {current.label}</span>
       </DropdownMenuTrigger>

@@ -73,7 +73,7 @@ export function NotificationCenter({ userId }: NotificationCenterProps) {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="relative text-slate-300 hover:text-white hover:bg-slate-700" />}>
+      <DropdownMenuTrigger className="relative inline-flex items-center justify-center w-9 h-9 rounded-md text-slate-300 hover:text-white hover:bg-slate-700 focus:outline-none">
           <Bell className="w-5 h-5" />
           {unreadCount > 0 && (
             <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-red-500 text-white border-0">

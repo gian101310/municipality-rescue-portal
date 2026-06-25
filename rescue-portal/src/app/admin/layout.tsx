@@ -333,7 +333,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               <AdminSoundToggle />
               <NotificationCenter />
               <DropdownMenu>
-                <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="rounded-full" />}>
+                <DropdownMenuTrigger className="rounded-full focus:outline-none">
                   <Avatar className="w-8 h-8">
                     <AvatarFallback className="bg-blue-600 text-white text-xs font-bold">{initials}</AvatarFallback>
                   </Avatar>
@@ -344,16 +344,25 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                     <div className="text-slate-500 font-normal">{adminProfile?.email ?? '...'}</div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator className="bg-slate-700" />
-                  <DropdownMenuItem className="text-slate-300 hover:text-white cursor-pointer" render={<Link href="/admin/profile" />}>
+                  <DropdownMenuItem
+                    className="text-slate-300 hover:text-white cursor-pointer"
+                    onClick={() => router.push('/admin/profile')}
+                  >
                     <User className="w-4 h-4 mr-2" />
                     Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="text-slate-300 hover:text-white cursor-pointer" render={<Link href="/admin/settings" />}>
+                  <DropdownMenuItem
+                    className="text-slate-300 hover:text-white cursor-pointer"
+                    onClick={() => router.push('/admin/settings')}
+                  >
                     <Settings className="w-4 h-4 mr-2" />
                     Settings
                   </DropdownMenuItem>
                   {adminProfile?.role === 'super_admin' && (
-                    <DropdownMenuItem className="text-amber-300 hover:text-amber-200 cursor-pointer" render={<Link href="/super-admin" />}>
+                    <DropdownMenuItem
+                      className="text-amber-300 hover:text-amber-200 cursor-pointer"
+                      onClick={() => router.push('/super-admin')}
+                    >
                       <Shield className="w-4 h-4 mr-2" />
                       Return to Super Admin
                     </DropdownMenuItem>

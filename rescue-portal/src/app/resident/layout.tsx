@@ -150,17 +150,17 @@ function ResidentLayoutContent({ children }: { children: React.ReactNode }) {
               )}
             </Button>
             <DropdownMenu>
-              <DropdownMenuTrigger render={<Button variant="ghost" size="icon" className="rounded-full" />}>
+              <DropdownMenuTrigger className="rounded-full focus:outline-none">
                 <Avatar className="w-8 h-8">
                   <AvatarFallback className="bg-blue-600 text-white text-xs font-bold">MC</AvatarFallback>
                 </Avatar>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-44">
-                <DropdownMenuItem render={<Link href={residentHref('/resident/profile')} />}>
+                <DropdownMenuItem onClick={() => router.push(residentHref('/resident/profile'))}>
                   <User className="w-4 h-4 mr-2" />Profile
                 </DropdownMenuItem>
                 {isSuperAdmin && (
-                  <DropdownMenuItem className="text-amber-700" render={<Link href="/super-admin" />}>
+                  <DropdownMenuItem className="text-amber-700" onClick={() => router.push('/super-admin')}>
                     <Shield className="w-4 h-4 mr-2" />Return to Super Admin
                   </DropdownMenuItem>
                 )}
