@@ -76,12 +76,19 @@ export async function proxy(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // If not authenticated and trying to access a protected route, redirect to login
+  // If not authenticated and trying to access a protected route, redirect to login.
+  // Exception: /resident/* routes with a trusted session cookie — let the client-side
+  // layout recover the session via the trusted-session-refresh API.
   if (!user && isProtectedRoute(pathname)) {
-    const loginUrl = request.nextUrl.clone()
-    loginUrl.pathname = '/auth/login'
-    loginUrl.searchParams.set('redirect', pathname)
-    return NextResponse.redirect(loginUrl)
+    const hasTrustedCookie = request.cookies.get('rp_ts')?.value === '1'
+    const isResidentRoute = pathname.startsWith('/resident')
+
+    if (!(isResidentRoute && hasTrustedCookie)) {
+      const loginUrl = request.nextUrl.clone()
+      loginUrl.pathname = '/auth/login'
+      loginUrl.searchParams.set('redirect', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
   }
 
   // If authenticated and on the login or register page, redirect to appropriate dashboard

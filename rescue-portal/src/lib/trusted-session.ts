@@ -22,6 +22,22 @@ interface StoredTrustedSession {
   expiresAt: string
 }
 
+// ── Cookie flag helpers ────────────────────────────────────
+// A lightweight cookie tells proxy.ts that a trusted session exists.
+// The actual token stays in localStorage (not exposed to the server).
+const TRUSTED_COOKIE_FLAG = 'rp_ts'
+
+function setTrustedCookieFlag(expiresAt: Date) {
+  if (typeof document === 'undefined') return
+  const maxAge = Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000))
+  document.cookie = `${TRUSTED_COOKIE_FLAG}=1; path=/; max-age=${maxAge}; SameSite=Lax; Secure`
+}
+
+function clearTrustedCookieFlag() {
+  if (typeof document === 'undefined') return
+  document.cookie = `${TRUSTED_COOKIE_FLAG}=; path=/; max-age=0; SameSite=Lax; Secure`
+}
+
 // ── Local storage helpers ──────────────────────────────────
 
 export function getStoredTrustedSession(): StoredTrustedSession | null {
@@ -32,11 +48,13 @@ export function getStoredTrustedSession(): StoredTrustedSession | null {
     const parsed = JSON.parse(raw) as StoredTrustedSession
     if (new Date(parsed.expiresAt) < new Date()) {
       localStorage.removeItem(TRUSTED_TOKEN_KEY)
+      clearTrustedCookieFlag()
       return null
     }
     return parsed
   } catch {
     localStorage.removeItem(TRUSTED_TOKEN_KEY)
+    clearTrustedCookieFlag()
     return null
   }
 }
@@ -44,11 +62,13 @@ export function getStoredTrustedSession(): StoredTrustedSession | null {
 function storeTrustedSession(session: StoredTrustedSession) {
   if (typeof window === 'undefined') return
   localStorage.setItem(TRUSTED_TOKEN_KEY, JSON.stringify(session))
+  setTrustedCookieFlag(new Date(session.expiresAt))
 }
 
 export function clearTrustedSession() {
   if (typeof window === 'undefined') return
   localStorage.removeItem(TRUSTED_TOKEN_KEY)
+  clearTrustedCookieFlag()
 }
 
 // ── Device fingerprint (lightweight, non-invasive) ─────────

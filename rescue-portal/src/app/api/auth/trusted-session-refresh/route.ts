@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
  * without the user entering credentials.
  *
  * Body: { token: string }
- * Returns: { access_token, refresh_token } on success
+ * Returns: { token_hash, email, type } on success
  */
 export async function POST(request: Request) {
   try {
@@ -50,22 +50,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ message: 'Account is not eligible for session recovery.' }, { status: 403 })
     }
 
-    // Generate a magic link token for this user (generates a session)
-    const { data: linkData, error: linkError } = await (admin as any).auth.admin.generateLink({
-      type: 'magiclink',
-      email: '', // We'll get email from the user record
-    })
-
-    // Alternative: use admin.auth.admin.generateLink won't work without email
-    // Instead, get the user's email, then use it
+    // Get the user's email for magic link generation
     const { data: { user: authUser }, error: userError } = await (admin as any).auth.admin.getUserById(session.user_id)
     if (userError || !authUser?.email) {
       return NextResponse.json({ message: 'Unable to recover session.' }, { status: 500 })
     }
 
-    // Use custom session generation approach:
-    // Create a short-lived custom token by signing in as admin on behalf of user
-    // Supabase doesn't have direct "createSessionForUser" — use generateLink instead
+    // Generate a magic link token — the client will call verifyOtp to establish a session
     const { data: link, error: genError } = await (admin as any).auth.admin.generateLink({
       type: 'magiclink',
       email: authUser.email,
