@@ -72,7 +72,7 @@ export async function GET() {
       return NextResponse.json({ message: 'Profile not found.' }, { status: 403 })
     }
 
-    if (!['super_admin', 'admin', 'dispatcher', 'team_leader', 'staff'].includes(profile.role)) {
+    if (!['super_admin', 'admin', 'dispatcher', 'team_leader', 'staff', 'responder'].includes(profile.role)) {
       return NextResponse.json({ message: 'Admin access required.' }, { status: 403 })
     }
 
