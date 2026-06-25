@@ -6,7 +6,7 @@ import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import Link from 'next/link'
-import { Shield, Eye, EyeOff, ArrowLeft, LogIn, QrCode, Info, Smartphone } from 'lucide-react'
+import { Shield, Eye, EyeOff, ArrowLeft, LogIn, QrCode, Smartphone } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -224,95 +224,81 @@ function LoginContent() {
 
               {activeTab === 'resident' && (
                 <div className="space-y-4">
-                  {isResidentReturn ? (
-                    /* Returning resident after registration — show login form */
-                    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                  {/* Resident login form — always visible so returning residents can sign in without QR */}
+                  <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+                    {isResidentReturn && (
                       <div className="rounded-lg border border-green-500/20 bg-green-500/10 p-3">
                         <p className="text-xs font-semibold text-green-300">Registration submitted — sign in below once approved.</p>
                       </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="email" className="text-slate-300">Email</Label>
-                        <Input
-                          id="email"
-                          type="email"
-                          placeholder="your@email.com"
-                          className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
-                          {...register('email')}
-                        />
-                        {errors.email && <p className="text-xs text-red-400">{errors.email.message}</p>}
-                      </div>
-                      <div className="space-y-1.5">
-                        <Label htmlFor="password" className="text-slate-300">Password</Label>
-                        <div className="relative">
-                          <Input
-                            id="password"
-                            type={showPassword ? 'text' : 'password'}
-                            placeholder="••••••••"
-                            className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 pr-10"
-                            {...register('password')}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                          >
-                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
-                        </div>
-                        {errors.password && <p className="text-xs text-red-400">{errors.password.message}</p>}
-                      </div>
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={trustDevice}
-                          onChange={(e) => setTrustDevice(e.target.checked)}
-                          className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-red-600 focus:ring-red-500"
-                        />
-                        <span className="text-xs text-slate-400 flex items-center gap-1.5">
-                          <Smartphone className="w-3.5 h-3.5" />
-                          Trust this device for 90 days (skip login next time)
-                        </span>
-                      </label>
-                      <Button type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white" disabled={loading}>
-                        {loading ? (
-                          <span className="flex items-center gap-2">
-                            <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                            Signing in...
-                          </span>
-                        ) : (
-                          <span className="flex items-center gap-2">
-                            <LogIn className="w-4 h-4" />
-                            Resident Sign In
-                          </span>
-                        )}
-                      </Button>
-                    </form>
-                  ) : (
-                    /* First-time visitor — show QR code instructions */
-                    <div className="space-y-4 py-2">
-                      <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-4 text-center">
-                        <QrCode className="w-10 h-10 text-amber-400 mx-auto mb-3" />
-                        <h3 className="text-sm font-bold text-amber-200">Resident registration is through your municipality</h3>
-                        <p className="mt-2 text-xs text-amber-100/70 leading-relaxed">
-                          To register or sign in as a resident, scan the official QR code provided by your municipal hall,
-                          barangay office, or local MDRRMO. Each municipality has a unique link that connects you to the correct rescue portal.
-                        </p>
-                      </div>
-                      <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-4">
-                        <div className="flex items-start gap-3">
-                          <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-                          <div className="text-xs text-slate-400 leading-relaxed">
-                            <p className="font-semibold text-slate-300 mb-1">Where to get the QR code:</p>
-                            <p>Visit your municipal hall, barangay office, or contact your local DRRMO.
-                            The QR code will take you directly to your municipality&apos;s registration form with the location already set.</p>
-                          </div>
-                        </div>
-                      </div>
-                      <p className="text-center text-xs text-slate-500">
-                        Already registered and approved? Switch to the <button onClick={() => setActiveTab('staff')} className="text-blue-400 underline">Staff / Admin</button> tab — the same login form works for all approved accounts.
-                      </p>
+                    )}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="email" className="text-slate-300">Email</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="your@email.com"
+                        className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500"
+                        {...register('email')}
+                      />
+                      {errors.email && <p className="text-xs text-red-400">{errors.email.message}</p>}
                     </div>
-                  )}
+                    <div className="space-y-1.5">
+                      <Label htmlFor="password" className="text-slate-300">Password</Label>
+                      <div className="relative">
+                        <Input
+                          id="password"
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="••••••••"
+                          className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 pr-10"
+                          {...register('password')}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                      {errors.password && <p className="text-xs text-red-400">{errors.password.message}</p>}
+                    </div>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={trustDevice}
+                        onChange={(e) => setTrustDevice(e.target.checked)}
+                        className="w-4 h-4 rounded border-slate-600 bg-slate-800 text-red-600 focus:ring-red-500"
+                      />
+                      <span className="text-xs text-slate-400 flex items-center gap-1.5">
+                        <Smartphone className="w-3.5 h-3.5" />
+                        Trust this device for 90 days (skip login next time)
+                      </span>
+                    </label>
+                    <Button type="submit" className="w-full bg-red-600 hover:bg-red-700 text-white" disabled={loading}>
+                      {loading ? (
+                        <span className="flex items-center gap-2">
+                          <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                          Signing in...
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-2">
+                          <LogIn className="w-4 h-4" />
+                          Resident Sign In
+                        </span>
+                      )}
+                    </Button>
+                  </form>
+
+                  {/* Registration info for new residents */}
+                  <div className="rounded-lg border border-slate-700 bg-slate-800/50 p-3">
+                    <div className="flex items-start gap-3">
+                      <QrCode className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                      <div className="text-xs text-slate-400 leading-relaxed">
+                        <p className="font-semibold text-slate-300 mb-1">New resident? Register first</p>
+                        <p>Visit your municipal hall, barangay office, or contact your local DRRMO to get the official QR code for registration.</p>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
             </CardContent>

@@ -562,55 +562,88 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
         </div>
       </div>
 
-      {/* Team Selection Dialog */}
+      {/* Team Selection Dialog — large, clear layout */}
       <Dialog open={showTeamDialog} onOpenChange={setShowTeamDialog}>
-        <DialogContent className="bg-slate-900 border-slate-700 max-w-md">
+        <DialogContent className="bg-slate-900 border-slate-700 max-w-2xl w-[95vw]">
           <DialogHeader>
-            <DialogTitle className="text-white">Select Rescue Team</DialogTitle>
-            <DialogDescription className="text-slate-400">Choose a team to dispatch for this incident.</DialogDescription>
+            <DialogTitle className="text-white text-lg">Assign Rescue Team</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Select a rescue team to dispatch for <span className="text-white font-mono">{incident.reference_number}</span>.
+              {incident.assigned_unit_id && <span className="text-amber-400 ml-1">(Currently assigned — selecting a new team will reassign.)</span>}
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2 max-h-80 overflow-y-auto">
+          <div className="space-y-3 max-h-[60vh] overflow-y-auto pr-1">
             {loadingTeams ? (
-              <p className="text-center text-slate-500 py-6">Loading teams...</p>
+              <div className="flex flex-col items-center justify-center py-12">
+                <div className="w-8 h-8 border-2 border-blue-500/30 border-t-blue-500 rounded-full animate-spin mb-3" />
+                <p className="text-slate-400">Loading rescue teams...</p>
+              </div>
             ) : availableTeams.length === 0 ? (
-              <p className="text-center text-slate-500 py-6">No rescue teams found. Add teams in the Rescue Teams section.</p>
+              <div className="text-center py-12">
+                <Users className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+                <p className="text-slate-400 font-medium">No rescue teams found</p>
+                <p className="text-slate-500 text-sm mt-1">Add teams in the Rescue Teams section first.</p>
+              </div>
             ) : (
               availableTeams.map((team) => {
                 const isAvailable = team.status === 'available'
+                const isCurrentlyAssigned = incident.assigned_unit_id === team.id
+                const statusColors: Record<string, string> = {
+                  available: 'bg-green-600/20 text-green-400 border-green-500/30',
+                  assigned: 'bg-blue-600/20 text-blue-400 border-blue-500/30',
+                  dispatched: 'bg-amber-600/20 text-amber-400 border-amber-500/30',
+                  on_scene: 'bg-purple-600/20 text-purple-400 border-purple-500/30',
+                  returning: 'bg-teal-600/20 text-teal-400 border-teal-500/30',
+                  off_duty: 'bg-slate-600/20 text-slate-400 border-slate-500/30',
+                  unavailable: 'bg-red-600/20 text-red-400 border-red-500/30',
+                }
                 return (
                   <button
                     key={team.id}
                     onClick={() => void confirmAssignTeam(team.id)}
-                    disabled={assigningTeamId !== null || !isAvailable}
+                    disabled={assigningTeamId !== null || isCurrentlyAssigned}
                     className={cn(
-                      'w-full p-3 rounded-lg border text-left transition-colors',
-                      isAvailable
-                        ? 'border-slate-700 hover:border-blue-500 hover:bg-slate-800 cursor-pointer'
-                        : 'border-slate-800 opacity-50 cursor-not-allowed',
-                      assigningTeamId === team.id && 'border-blue-500 bg-blue-900/20'
+                      'w-full p-4 rounded-xl border-2 text-left transition-all',
+                      isCurrentlyAssigned
+                        ? 'border-blue-500 bg-blue-950/40 cursor-not-allowed'
+                        : isAvailable
+                          ? 'border-slate-700 hover:border-green-500 hover:bg-green-950/20 cursor-pointer'
+                          : 'border-slate-700 hover:border-amber-500 hover:bg-amber-950/10 cursor-pointer',
+                      assigningTeamId === team.id && 'border-blue-500 bg-blue-900/20 animate-pulse'
                     )}
                   >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-medium text-white text-sm">{team.name}</p>
-                        {team.team_leader_name && (
-                          <p className="text-xs text-slate-400">Leader: {team.team_leader_name}</p>
-                        )}
-                        {team.contact_number && (
-                          <p className="text-xs text-slate-500">{team.contact_number}</p>
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <div className={cn(
+                          'w-10 h-10 rounded-lg flex items-center justify-center shrink-0',
+                          isAvailable ? 'bg-green-600/20' : 'bg-slate-800'
+                        )}>
+                          <Users className={cn('w-5 h-5', isAvailable ? 'text-green-400' : 'text-slate-500')} />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="font-semibold text-white text-base truncate">{team.name}</p>
+                          {team.team_leader_name && (
+                            <p className="text-sm text-slate-400">Leader: {team.team_leader_name}</p>
+                          )}
+                          {team.contact_number && (
+                            <p className="text-sm text-slate-500">{team.contact_number}</p>
+                          )}
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1.5 shrink-0">
+                        <Badge className={cn('text-xs border px-2.5 py-1', statusColors[team.status] || 'bg-slate-600/20 text-slate-400 border-slate-500/30')}>
+                          {team.status.replace('_', ' ')}
+                        </Badge>
+                        {isCurrentlyAssigned && (
+                          <span className="text-xs text-blue-400 font-medium">Currently Assigned</span>
                         )}
                       </div>
-                      <Badge className={cn(
-                        'text-xs border',
-                        isAvailable
-                          ? 'bg-green-600/20 text-green-400 border-green-500/30'
-                          : 'bg-amber-600/20 text-amber-400 border-amber-500/30'
-                      )}>
-                        {team.status}
-                      </Badge>
                     </div>
                     {assigningTeamId === team.id && (
-                      <p className="text-xs text-blue-400 mt-1">Assigning...</p>
+                      <div className="flex items-center gap-2 mt-2 text-blue-400">
+                        <div className="w-4 h-4 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />
+                        <span className="text-sm">Assigning team...</span>
+                      </div>
                     )}
                   </button>
                 )

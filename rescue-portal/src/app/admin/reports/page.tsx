@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { Download, TrendingUp, Clock, CheckCircle2, AlertTriangle, Filter, FileJson, Loader2, Search } from 'lucide-react'
+import { Download, TrendingUp, Clock, CheckCircle2, AlertTriangle, Filter, FileJson, Loader2, Search, Lock } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -20,6 +20,7 @@ import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
 import { formatRelativeTime } from '@/lib/utils'
 import type { IncidentStatus, SeverityLevel } from '@/lib/types'
 import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
 
 type Incident = {
   id: string
@@ -46,6 +47,7 @@ type Incident = {
 }
 
 const COLORS = ['#dc2626', '#ea580c', '#0284c7', '#ca8a04', '#7c3aed', '#be123c', '#15803d', '#92400e', '#6b7280']
+const ADMIN_ROLES = new Set(['super_admin', 'admin'])
 
 export default function ReportsPage() {
   const [incidents, setIncidents] = useState<Incident[]>([])
@@ -54,6 +56,22 @@ export default function ReportsPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [severityFilter, setSeverityFilter] = useState('all')
   const [dateRange, setDateRange] = useState('30d')
+  const [userRole, setUserRole] = useState<string>('')
+
+  useEffect(() => {
+    async function loadRole() {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const { data: profile } = await supabase.from('user_profiles').select('role').eq('user_id', user.id).single() as { data: { role: string } | null; error: unknown }
+        if (profile) setUserRole(profile.role)
+      } catch { /* silent */ }
+    }
+    loadRole()
+  }, [])
+
+  const isAdmin = ADMIN_ROLES.has(userRole)
 
   useEffect(() => {
     async function load() {
@@ -234,12 +252,20 @@ export default function ReportsPage() {
           <p className="text-slate-400 text-sm">Live incident data — {totalIncidents} incidents in selected range</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-800" onClick={exportCSV}>
-            <Download className="w-4 h-4 mr-1" /> CSV
-          </Button>
-          <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-800" onClick={exportJSON}>
-            <FileJson className="w-4 h-4 mr-1" /> JSON
-          </Button>
+          {isAdmin ? (
+            <>
+              <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-800" onClick={exportCSV}>
+                <Download className="w-4 h-4 mr-1" /> CSV
+              </Button>
+              <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-800" onClick={exportJSON}>
+                <FileJson className="w-4 h-4 mr-1" /> JSON
+              </Button>
+            </>
+          ) : (
+            <div className="flex items-center gap-1.5 text-xs text-slate-500">
+              <Lock className="w-3.5 h-3.5" /> Admin-only export
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { ChevronDown, ChevronRight, Filter } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { ChevronDown, ChevronRight, Filter, Download, Lock } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -10,6 +10,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DEMO_AUDIT_LOGS } from '@/lib/demo-data'
 import { formatDateTime } from '@/lib/utils'
 import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import { createClient } from '@/lib/supabase/client'
 import type { AuditAction } from '@/lib/types'
 
 const ACTION_COLORS: Record<AuditAction, string> = {
@@ -39,10 +41,43 @@ const ROLE_COLORS: Record<string, string> = {
   system: 'text-slate-500',
 }
 
+const ADMIN_ROLES = new Set(['super_admin', 'admin'])
+
 export default function AuditPage() {
   const [search, setSearch] = useState('')
   const [actionFilter, setActionFilter] = useState('all')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [userRole, setUserRole] = useState<string>('')
+
+  useEffect(() => {
+    async function loadRole() {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return
+        const { data: profile } = await supabase.from('user_profiles').select('role').eq('user_id', user.id).single() as { data: { role: string } | null; error: unknown }
+        if (profile) setUserRole(profile.role)
+      } catch { /* silent */ }
+    }
+    loadRole()
+  }, [])
+
+  const isAdmin = ADMIN_ROLES.has(userRole)
+
+  function exportAuditCSV() {
+    if (!isAdmin) { toast.error('Only admins can download audit logs.'); return }
+    const headers = ['Timestamp', 'Actor', 'Role', 'Action', 'Entity Type', 'Entity ID', 'IP Address']
+    const rows = filtered.map((log) => [
+      log.created_at, log.actor_name, log.actor_role, log.action, log.entity_type, log.entity_id || '', log.ip_address || ''
+    ])
+    const csv = [headers, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `audit-logs-${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    toast.success(`Exported ${filtered.length} audit log entries`)
+  }
 
   const filtered = DEMO_AUDIT_LOGS.filter((log) => {
     if (actionFilter !== 'all' && log.action !== actionFilter) return false
@@ -57,9 +92,20 @@ export default function AuditPage() {
 
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-screen-xl mx-auto">
-      <div>
-        <h1 className="text-2xl font-bold text-white">Audit Logs</h1>
-        <p className="text-slate-400 text-sm">Read-only system activity log</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-white">Audit Logs</h1>
+          <p className="text-slate-400 text-sm">Read-only system activity log</p>
+        </div>
+        {isAdmin ? (
+          <Button variant="outline" size="sm" className="border-slate-600 text-slate-300 hover:bg-slate-800" onClick={exportAuditCSV}>
+            <Download className="w-4 h-4 mr-1.5" /> Download CSV
+          </Button>
+        ) : (
+          <div className="flex items-center gap-1.5 text-xs text-slate-500">
+            <Lock className="w-3.5 h-3.5" /> Admin-only download
+          </div>
+        )}
       </div>
 
       <Card className="bg-slate-900 border-slate-700">

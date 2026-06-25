@@ -158,7 +158,7 @@ export default function LiveMapPage() {
   }
 
   return (
-    <div className="p-6 space-y-4">
+    <div className="p-3 md:p-4 space-y-3">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -213,11 +213,11 @@ export default function LiveMapPage() {
         </Badge>
       </div>
 
-      {/* Map + Sidebar layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        {/* Map */}
-        <div className="lg:col-span-2">
-          <Card className="bg-slate-900 border-slate-700 overflow-hidden">
+      {/* Map + Sidebar layout — map takes most of the screen */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4" style={{ minHeight: 'calc(100vh - 220px)' }}>
+        {/* Map — 3/4 width, near full-screen height */}
+        <div className="lg:col-span-3 flex flex-col">
+          <Card className="bg-slate-900 border-slate-700 overflow-hidden flex-1">
             <MapView
               center={mapCenter}
               zoom={mapZoom}
@@ -227,13 +227,14 @@ export default function LiveMapPage() {
                 const inc = filteredIncidents.find((i) => i.id === id)
                 setSelectedIncident(inc ?? null)
               }}
-              height="520px"
+              height="100%"
               className="w-full"
+              style={{ minHeight: 'calc(100vh - 260px)' }}
             />
           </Card>
 
           {/* Legend */}
-          <div className="flex items-center gap-4 mt-3 px-1">
+          <div className="flex items-center gap-4 mt-2 px-1">
             {[
               { color: '#ef4444', label: 'Critical' },
               { color: '#f97316', label: 'High' },
@@ -248,8 +249,8 @@ export default function LiveMapPage() {
           </div>
         </div>
 
-        {/* Incident list sidebar */}
-        <div className="space-y-3">
+        {/* Incident list sidebar — 1/4 width */}
+        <div className="space-y-3 overflow-y-auto" style={{ maxHeight: 'calc(100vh - 220px)' }}>
           {/* Selected incident detail */}
           {selectedIncident && (
             <Card className="bg-blue-950/50 border-blue-500/40">

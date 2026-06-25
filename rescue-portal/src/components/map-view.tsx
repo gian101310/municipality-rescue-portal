@@ -22,6 +22,7 @@ interface MapViewProps {
   onMarkerClick?: (id: string) => void
   className?: string
   height?: string
+  style?: React.CSSProperties
 }
 
 export function MapView({
@@ -32,6 +33,7 @@ export function MapView({
   onMarkerClick,
   className = '',
   height = '400px',
+  style,
 }: MapViewProps) {
   const mapContainerRef = useRef<HTMLDivElement>(null)
   const mapRef = useRef<L.Map | null>(null)
@@ -183,7 +185,7 @@ export function MapView({
   }, [selectedMarkerId, markers])
 
   return (
-    <div className={`relative rounded-lg overflow-hidden border border-slate-700 ${className}`} style={{ height }}>
+    <div className={`relative rounded-lg overflow-hidden border border-slate-700 ${className}`} style={{ height, ...style }}>
       {/* Leaflet CSS */}
       <link
         rel="stylesheet"
