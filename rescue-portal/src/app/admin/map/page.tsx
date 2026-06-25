@@ -227,9 +227,8 @@ export default function LiveMapPage() {
                 const inc = filteredIncidents.find((i) => i.id === id)
                 setSelectedIncident(inc ?? null)
               }}
-              height="100%"
+              height="calc(100vh - 260px)"
               className="w-full"
-              style={{ minHeight: 'calc(100vh - 260px)' }}
             />
           </Card>
 
