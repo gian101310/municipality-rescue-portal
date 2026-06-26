@@ -149,6 +149,22 @@ export default function TeamsPage() {
     } finally { setDispatching(false) }
   }
 
+  async function handleReleaseTeam(team: any) {
+    try {
+      const response = await fetch(`/api/admin/teams/${team.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'available' }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) return toast.error(payload.message ?? 'Unable to release team.')
+      toast.success(`${team.name} released back to available.`)
+      void loadTeams()
+    } catch {
+      toast.error('Failed to release team.')
+    }
+  }
+
   return (
     <div className="p-4 md:p-6 space-y-5 max-w-screen-xl mx-auto">
       <div className="flex items-center justify-between">
@@ -311,9 +327,15 @@ export default function TeamsPage() {
                   <Button size="sm" variant="outline" className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-800 text-xs" onClick={() => { setEditTeamData({ id: unit.id, name: unit.name, code: unit.code, contact_number: unit.contact_number ?? '', status: unit.status, vehicle_type: unit.vehicle_info?.type ?? '', plate_number: unit.vehicle_info?.plate_number ?? '', vehicle_model: unit.vehicle_info?.model ?? '', equipment: unit.equipment ?? [] }); setEditOpen(true) }}>
                     <Edit2 className="w-3 h-3 mr-1" /> Edit
                   </Button>
-                  <Button size="sm" variant="outline" className="border-amber-700/50 text-amber-400 hover:bg-amber-900/20 text-xs" disabled={unit.status !== 'available'} onClick={() => void openDispatch(unit)}>
-                    <Send className="w-3 h-3 mr-1" /> Dispatch
-                  </Button>
+                  {unit.status !== 'available' && unit.status !== 'off_duty' ? (
+                    <Button size="sm" variant="outline" className="border-green-700/50 text-green-400 hover:bg-green-900/20 text-xs" onClick={() => void handleReleaseTeam(unit)}>
+                      <Check className="w-3 h-3 mr-1" /> Release
+                    </Button>
+                  ) : (
+                    <Button size="sm" variant="outline" className="border-amber-700/50 text-amber-400 hover:bg-amber-900/20 text-xs" disabled={unit.status !== 'available'} onClick={() => void openDispatch(unit)}>
+                      <Send className="w-3 h-3 mr-1" /> Dispatch
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

@@ -113,8 +113,8 @@ export function MapView({
       const isSelected = marker.id === selectedMarkerId
       const radius = isSelected ? 12 : 9
 
-      // Pulse ring for selected/critical/pulse
-      if (isSelected || marker.severity === 'critical' || marker.pulse) {
+      // Pulse ring for all incident markers (anything with severity or explicit pulse)
+      if (isSelected || marker.severity || marker.pulse) {
         const pulseRing = L.circleMarker([marker.lat, marker.lng], {
           radius: radius + 8,
           color: color,
@@ -125,6 +125,20 @@ export function MapView({
           className: 'pulse-marker',
         }).addTo(map)
         markersRef.current.push(pulseRing)
+
+        // Second wider ring for critical
+        if (marker.severity === 'critical' || isSelected) {
+          const outerRing = L.circleMarker([marker.lat, marker.lng], {
+            radius: radius + 16,
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.08,
+            weight: 1,
+            opacity: 0.25,
+            className: 'pulse-marker-outer',
+          }).addTo(map)
+          markersRef.current.push(outerRing)
+        }
       }
 
       // Main marker
@@ -137,7 +151,7 @@ export function MapView({
         opacity: 1,
       }).addTo(map)
 
-      // Popup
+      // Popup with details
       if (marker.label) {
         const severityLabel = marker.severity
           ? `<span style="color:${color};font-weight:600;text-transform:uppercase;">${marker.severity}</span>`
@@ -157,30 +171,32 @@ export function MapView({
         )
       }
 
-      // Tooltip (always visible for selected)
+      // Permanent tooltip showing report ID for all incident markers
       if (marker.label) {
         circleMarker.bindTooltip(marker.label, {
-          permanent: isSelected,
+          permanent: isSelected || !!marker.severity,
           direction: 'top',
           offset: [0, -radius - 4],
-          className: 'dark-tooltip',
+          className: isSelected ? 'dark-tooltip dark-tooltip-selected' : 'dark-tooltip',
         })
       }
 
       circleMarker.on('click', () => {
         onMarkerClick?.(marker.id)
+        // Zoom to marker location on click
+        map.flyTo([marker.lat, marker.lng], Math.max(map.getZoom(), 15), { animate: true, duration: 0.8 })
       })
 
       markersRef.current.push(circleMarker)
     })
   }, [markers, selectedMarkerId, onMarkerClick, leafletLoaded])
 
-  // Pan to selected marker
+  // Fly to selected marker with zoom
   useEffect(() => {
     if (!mapRef.current || !selectedMarkerId) return
     const marker = markers.find((m) => m.id === selectedMarkerId)
     if (marker) {
-      mapRef.current.panTo([marker.lat, marker.lng], { animate: true })
+      mapRef.current.flyTo([marker.lat, marker.lng], Math.max(mapRef.current.getZoom(), 15), { animate: true, duration: 0.8 })
     }
   }, [selectedMarkerId, markers])
 
@@ -223,10 +239,23 @@ export function MapView({
         .pulse-marker {
           animation: pulse-ring 2s ease-out infinite;
         }
+        .pulse-marker-outer {
+          animation: pulse-ring-outer 2.5s ease-out infinite;
+        }
         @keyframes pulse-ring {
-          0% { opacity: 0.6; }
-          50% { opacity: 0.2; }
-          100% { opacity: 0.6; }
+          0% { opacity: 0.6; transform: scale(1); }
+          50% { opacity: 0.15; transform: scale(1.1); }
+          100% { opacity: 0.6; transform: scale(1); }
+        }
+        @keyframes pulse-ring-outer {
+          0% { opacity: 0.4; }
+          50% { opacity: 0.05; }
+          100% { opacity: 0.4; }
+        }
+        .dark-tooltip-selected {
+          background: #1d4ed8 !important;
+          border-color: #3b82f6 !important;
+          font-weight: 700 !important;
         }
         .leaflet-control-zoom a {
           background: #1e293b !important;

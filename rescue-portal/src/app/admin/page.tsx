@@ -149,6 +149,7 @@ export default function CommandCenterPage() {
     return true
   })
 
+  const [selectedMapIncident, setSelectedMapIncident] = useState<string | null>(null)
   const dashboardMapMarkers = useMemo(() => buildDashboardIncidentMarkers(incidents), [incidents])
   const dashboardMapCenter = dashboardMapMarkers[0]
     ? { lat: dashboardMapMarkers[0].lat, lng: dashboardMapMarkers[0].lng }
@@ -347,6 +348,8 @@ export default function CommandCenterPage() {
             center={dashboardMapCenter}
             zoom={dashboardMapMarkers.length ? 15 : 12}
             markers={dashboardMapMarkers}
+            selectedMarkerId={selectedMapIncident}
+            onMarkerClick={(id) => setSelectedMapIncident(id === selectedMapIncident ? null : id)}
             height="360px"
           />
         </CardContent>
