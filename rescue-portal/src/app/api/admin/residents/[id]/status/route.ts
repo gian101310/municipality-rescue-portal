@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { writeAuditLog, auditRequestMeta } from '@/lib/audit-logger'
 import type { RegistrationStatus, UserRole } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -170,6 +171,24 @@ export async function PATCH(
           ...verificationUpdate,
         })
     }
+
+    // Audit log for resident status changes (approve/reject/suspend)
+    const auditAction = status === 'approved' ? 'approve' as const
+      : status === 'rejected' ? 'reject' as const
+      : 'status_change' as const
+    const meta = auditRequestMeta(request.headers)
+    writeAuditLog({
+      actorId: auth.profile.user_id,
+      actorName: (auth.profile as unknown as { full_name?: string }).full_name ?? 'staff',
+      actorRole: auth.profile.role,
+      action: auditAction,
+      entityType: 'resident',
+      entityId: id,
+      previousValues: { registration_status: resident.role === 'resident' ? 'pending' : null },
+      newValues: { registration_status: status, note: note || null },
+      organizationId: auth.profile.organization_id,
+      ...meta,
+    })
 
     return NextResponse.json({ resident: updatedResident })
   } catch (error) {

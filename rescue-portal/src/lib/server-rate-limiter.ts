@@ -1,37 +1,15 @@
 /**
- * Server-side in-memory rate limiter for API routes.
+ * Server-side rate limiter for API routes.
  *
- * Uses a sliding-window counter per IP address.
- * Resets automatically — no cleanup cron needed because entries are
- * lazily evicted on the next request after the window expires.
+ * Uses a Supabase-backed Postgres function for atomic, persistent rate limiting.
+ * Unlike in-memory Maps, this survives Vercel cold starts and works across
+ * all serverless function instances.
  *
- * NOTE: This is per-instance. On Vercel Serverless each function cold-start
- * gets its own memory, so the effective limit is PER FUNCTION INSTANCE.
- * For a stricter global limit, swap to Upstash Redis Rate Limit later.
- * Even per-instance, this catches rapid-fire abuse (10 SOS/sec from one IP).
+ * Falls back to a permissive response if the DB call fails — we never block
+ * a legitimate SOS because of a rate-limiter outage.
  */
 
-interface WindowEntry {
-  count: number
-  windowStart: number
-}
-
-const store = new Map<string, WindowEntry>()
-
-// Evict stale entries every 5 minutes to prevent memory leak
-const EVICT_INTERVAL = 5 * 60 * 1000
-let lastEvict = Date.now()
-
-function evictStale(windowMs: number) {
-  const now = Date.now()
-  if (now - lastEvict < EVICT_INTERVAL) return
-  lastEvict = now
-  for (const [key, entry] of store) {
-    if (now - entry.windowStart > windowMs * 2) {
-      store.delete(key)
-    }
-  }
-}
+import { createAdminClient } from '@/lib/supabase/server'
 
 export interface RateLimitResult {
   success: boolean
@@ -42,37 +20,38 @@ export interface RateLimitResult {
 /**
  * Check and consume one request from the rate limit bucket.
  *
- * @param identifier  Unique key (usually IP + route prefix, e.g. "1.2.3.4:/api/resident/incidents/sos")
+ * @param identifier  Unique key (e.g. "sos:1.2.3.4")
  * @param limit       Max requests allowed in the window
- * @param windowMs    Window duration in milliseconds
+ * @param windowSeconds  Window duration in seconds
  */
-export function rateLimit(
+export async function rateLimit(
   identifier: string,
   limit: number,
-  windowMs: number
-): RateLimitResult {
-  evictStale(windowMs)
+  windowSeconds: number
+): Promise<RateLimitResult> {
+  try {
+    const admin = await createAdminClient()
+    const { data, error } = await admin.rpc('check_rate_limit', {
+      p_identifier: identifier,
+      p_limit: limit,
+      p_window_seconds: windowSeconds,
+    })
 
-  const now = Date.now()
-  const entry = store.get(identifier)
+    if (error || !data) {
+      console.error('Rate limit check failed:', error?.message)
+      // Fail open — don't block real emergencies because the limiter is down
+      return { success: true, remaining: limit, resetInSeconds: 0 }
+    }
 
-  // No existing entry or window expired — start fresh
-  if (!entry || now - entry.windowStart > windowMs) {
-    store.set(identifier, { count: 1, windowStart: now })
-    return { success: true, remaining: limit - 1, resetInSeconds: Math.ceil(windowMs / 1000) }
-  }
-
-  // Within window — check count
-  if (entry.count >= limit) {
-    const resetInSeconds = Math.ceil((windowMs - (now - entry.windowStart)) / 1000)
-    return { success: false, remaining: 0, resetInSeconds }
-  }
-
-  entry.count++
-  return {
-    success: true,
-    remaining: limit - entry.count,
-    resetInSeconds: Math.ceil((windowMs - (now - entry.windowStart)) / 1000),
+    const result = data as { success: boolean; remaining: number; reset_in_seconds: number }
+    return {
+      success: result.success,
+      remaining: result.remaining,
+      resetInSeconds: result.reset_in_seconds,
+    }
+  } catch (err) {
+    console.error('Rate limit error:', err)
+    return { success: true, remaining: limit, resetInSeconds: 0 }
   }
 }
 
@@ -92,21 +71,21 @@ export function getClientIp(headers: Headers): string {
 // ─── Preset configurations ────────────────────────────────────
 
 /** SOS endpoint: 5 requests per 15 minutes per IP */
-export function rateLimitSos(ip: string): RateLimitResult {
-  return rateLimit(`sos:${ip}`, 5, 15 * 60 * 1000)
+export function rateLimitSos(ip: string): Promise<RateLimitResult> {
+  return rateLimit(`sos:${ip}`, 5, 15 * 60)
 }
 
 /** Registration endpoint: 3 requests per hour per IP */
-export function rateLimitRegistration(ip: string): RateLimitResult {
-  return rateLimit(`register:${ip}`, 3, 60 * 60 * 1000)
+export function rateLimitRegistration(ip: string): Promise<RateLimitResult> {
+  return rateLimit(`register:${ip}`, 3, 60 * 60)
 }
 
 /** Login endpoint: 10 requests per 15 minutes per IP */
-export function rateLimitLogin(ip: string): RateLimitResult {
-  return rateLimit(`login:${ip}`, 10, 15 * 60 * 1000)
+export function rateLimitLogin(ip: string): Promise<RateLimitResult> {
+  return rateLimit(`login:${ip}`, 10, 15 * 60)
 }
 
 /** General API: 60 requests per minute per IP */
-export function rateLimitGeneral(ip: string): RateLimitResult {
-  return rateLimit(`api:${ip}`, 60, 60 * 1000)
+export function rateLimitGeneral(ip: string): Promise<RateLimitResult> {
+  return rateLimit(`api:${ip}`, 60, 60)
 }

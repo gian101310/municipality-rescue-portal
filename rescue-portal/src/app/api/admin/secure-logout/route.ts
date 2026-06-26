@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { writeAuditLog, auditRequestMeta } from '@/lib/audit-logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,8 +27,31 @@ export async function POST(request: Request) {
     })
 
     if (signInError) {
+      // Log failed logout attempt
+      const meta = auditRequestMeta(request.headers)
+      writeAuditLog({
+        actorId: user.id,
+        actorName: user.email ?? 'unknown',
+        actorRole: 'unknown',
+        action: 'logout',
+        entityType: 'session',
+        newValues: { success: false, reason: 'incorrect_password' },
+        ...meta,
+      })
       return NextResponse.json({ message: 'Incorrect password. Logout cancelled.' }, { status: 403 })
     }
+
+    // Log successful logout
+    const meta = auditRequestMeta(request.headers)
+    writeAuditLog({
+      actorId: user.id,
+      actorName: user.email ?? 'unknown',
+      actorRole: 'unknown',
+      action: 'logout',
+      entityType: 'session',
+      newValues: { success: true },
+      ...meta,
+    })
 
     // Sign out
     await supabase.auth.signOut()

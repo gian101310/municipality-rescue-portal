@@ -149,7 +149,7 @@ async function findMunicipality(
 export async function POST(request: Request) {
   // Server-side rate limiting
   const ip = getClientIp(request.headers)
-  const rl = rateLimitRegistration(ip)
+  const rl = await rateLimitRegistration(ip)
   if (!rl.success) {
     return NextResponse.json(
       { message: `Too many registration attempts. Try again in ${Math.ceil(rl.resetInSeconds / 60)} minutes.` },

@@ -80,7 +80,7 @@ async function requireApprovedResident(request: Request) {
 export async function POST(request: Request) {
   // Server-side rate limiting
   const ip = getClientIp(request.headers)
-  const rl = rateLimitSos(ip)
+  const rl = await rateLimitSos(ip)
   if (!rl.success) {
     return NextResponse.json(
       { message: `Too many SOS requests. Try again in ${rl.resetInSeconds} seconds.` },
@@ -211,12 +211,13 @@ export async function POST(request: Request) {
 
     // Insert timeline events
     const timelineEvents: Array<{
-      incident_id: unknown; event_type: string; label: string; description: string;
-      actor_id: string; actor_name: string; actor_role: string;
+      incident_id: unknown; action: string; event_type: string; label: string;
+      description: string; actor_id: string; actor_name: string; actor_role: string;
       metadata: Record<string, unknown>; occurred_at: string;
     }> = [
       {
         incident_id: incident.id,
+        action: 'sos_created',
         event_type: 'sos_created',
         label: 'SOS Created',
         description: `Emergency SOS sent by ${auth.profile.full_name}`,
@@ -228,6 +229,7 @@ export async function POST(request: Request) {
       },
       {
         incident_id: incident.id,
+        action: 'gps_captured',
         event_type: 'gps_captured',
         label: 'GPS Location Captured',
         description: `Location: ${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
@@ -243,6 +245,7 @@ export async function POST(request: Request) {
     if (networkStatus === 'offline') {
       timelineEvents.push({
         incident_id: incident.id as string,
+        action: 'queued_offline',
         event_type: 'queued_offline',
         label: 'Queued Offline',
         description: 'SOS was created while device was offline',
@@ -254,6 +257,7 @@ export async function POST(request: Request) {
       })
       timelineEvents.push({
         incident_id: incident.id as string,
+        action: 'sos_synced',
         event_type: 'sos_synced',
         label: `SOS Synced (${deliveryStatus.replace('_', ' ')})`,
         description: `Delivered after ${Math.round(delayMinutes)} minute${Math.round(delayMinutes) !== 1 ? 's' : ''} delay`,
@@ -265,7 +269,10 @@ export async function POST(request: Request) {
       })
     }
 
-    await admin.from('incident_timeline').insert(timelineEvents)
+    const { error: timelineError } = await admin.from('incident_timeline').insert(timelineEvents)
+    if (timelineError) {
+      console.error('Timeline insert failed:', timelineError.message)
+    }
 
     return NextResponse.json({
       incident: attachEmergencyTypes([incident], [emergencyType])[0],

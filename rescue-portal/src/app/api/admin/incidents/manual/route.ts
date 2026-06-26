@@ -75,15 +75,19 @@ export async function POST(request: Request) {
     if (error) throw new Error(error.message)
 
     // Add timeline entry
-    await admin.from('incident_timeline').insert({
+    const { error: timelineError } = await admin.from('incident_timeline').insert({
       incident_id: incident.id,
-      status: 'received',
+      action: 'manual_created',
+      event_type: 'manual_created',
       label: 'Manual alert created',
+      description: `Created manually by ${profile.full_name} via command center`,
       actor_id: profile.id,
       actor_name: profile.full_name,
       actor_role: profile.role,
-      note: `Created manually by ${profile.full_name} via command center`,
     })
+    if (timelineError) {
+      console.error('Timeline insert failed:', timelineError.message)
+    }
 
     return NextResponse.json({
       id: incident.id,

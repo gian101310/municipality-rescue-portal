@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { attachEmergencyTypes } from '@/lib/incident-presentation'
 import { selectHistoryActorId } from '@/lib/incident-submission'
+import { writeAuditLog, auditRequestMeta } from '@/lib/audit-logger'
 import type { IncidentStatus, RegistrationStatus, UserRole } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -176,6 +177,21 @@ export async function PATCH(
         .update({ status: 'available', updated_at: now })
         .eq('id', updatedIncident.assigned_unit_id as string)
     }
+
+    // Audit log for status changes
+    const meta = auditRequestMeta(request.headers)
+    writeAuditLog({
+      actorId: auth.profile.user_id,
+      actorName: auth.profile.full_name,
+      actorRole: auth.profile.role,
+      action: 'status_change',
+      entityType: 'incident',
+      entityId: id,
+      previousValues: { status: existingIncident.status },
+      newValues: { status, reason: reason || null },
+      organizationId: auth.profile.organization_id,
+      ...meta,
+    })
 
     const { data: emergencyTypes } = await admin
       .from('emergency_types')
