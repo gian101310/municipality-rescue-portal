@@ -41,7 +41,9 @@ export interface AuditEntry {
  */
 export async function writeAuditLog(entry: AuditEntry): Promise<void> {
   try {
-    const admin = await createAdminClient()
+    const admin = await createAdminClient() as unknown as {
+      from(table: string): { insert(values: Record<string, unknown>): Promise<{ error: { message: string } | null }> }
+    }
     const { error } = await admin.from('audit_logs').insert({
       actor_id: entry.actorId,
       actor_name: entry.actorName,
