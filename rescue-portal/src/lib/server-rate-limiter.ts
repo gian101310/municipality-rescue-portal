@@ -30,7 +30,9 @@ export async function rateLimit(
   windowSeconds: number
 ): Promise<RateLimitResult> {
   try {
-    const admin = await createAdminClient()
+    const admin = await createAdminClient() as unknown as {
+      rpc(fn: string, args: Record<string, unknown>): Promise<{ data: unknown; error: { message: string } | null }>
+    }
     const { data, error } = await admin.rpc('check_rate_limit', {
       p_identifier: identifier,
       p_limit: limit,
