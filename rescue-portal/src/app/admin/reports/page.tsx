@@ -5,7 +5,6 @@ import { Download, TrendingUp, Clock, CheckCircle2, AlertTriangle, Filter, FileJ
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
-import { Badge } from '@/components/ui/badge'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -57,6 +56,7 @@ export default function ReportsPage() {
   const [severityFilter, setSeverityFilter] = useState('all')
   const [dateRange, setDateRange] = useState('30d')
   const [userRole, setUserRole] = useState<string>('')
+  const [loadedAt] = useState(() => Date.now())
 
   useEffect(() => {
     async function loadRole() {
@@ -91,11 +91,10 @@ export default function ReportsPage() {
 
   // Filter incidents by date range
   const dateFiltered = useMemo(() => {
-    const now = Date.now()
     const days = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : dateRange === '90d' ? 90 : 365
-    const cutoff = now - days * 86400000
+    const cutoff = loadedAt - days * 86400000
     return incidents.filter(i => new Date(i.created_at).getTime() >= cutoff)
-  }, [incidents, dateRange])
+  }, [incidents, dateRange, loadedAt])
 
   // Apply search + filters
   const filtered = useMemo(() => {
@@ -295,6 +294,7 @@ export default function ReportsPage() {
             <SelectItem value="resolved">Resolved</SelectItem>
             <SelectItem value="closed">Closed</SelectItem>
             <SelectItem value="cancelled">Cancelled</SelectItem>
+            <SelectItem value="false_alert">False Alarm</SelectItem>
           </SelectContent>
         </Select>
         <Select value={severityFilter} onValueChange={(v) => setSeverityFilter(v ?? 'all')}>

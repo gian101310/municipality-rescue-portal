@@ -8,6 +8,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { IncidentProgressTracker } from '@/components/incident-progress-tracker'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
+import { RescueTrackingMap } from '@/components/rescue-tracking-map'
 import { formatRelativeTime } from '@/lib/utils'
 import { useSettings } from '@/lib/settings-context'
 import { createClient } from '@/lib/supabase/client'
@@ -250,39 +251,50 @@ function ResidentDashboardContent() {
       </div>
 
       {activeIncident && (
-        <Link href={withOwnerTestMode('/resident/history', ownerTestMode)}>
-          <Card className="border-2 border-amber-400/50 bg-amber-50">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-                  <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Active Incident</span>
+        <>
+          <Link href={withOwnerTestMode('/resident/history', ownerTestMode)}>
+            <Card className="border-2 border-amber-400/50 bg-amber-50">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                    <span className="text-xs font-semibold text-amber-700 uppercase tracking-wide">Active Incident</span>
+                  </div>
+                  <IncidentStatusBadge status={activeIncident.status} />
                 </div>
-                <IncidentStatusBadge status={activeIncident.status} />
-              </div>
-              <div className="flex items-center gap-2">
-                <EmergencyTypeIcon
-                  iconName={activeIncident.emergency_type.icon}
-                  className="w-4 h-4"
-                  style={{ color: activeIncident.emergency_type.color }}
+                <div className="flex items-center gap-2">
+                  <EmergencyTypeIcon
+                    iconName={activeIncident.emergency_type.icon}
+                    className="w-4 h-4"
+                    style={{ color: activeIncident.emergency_type.color }}
+                  />
+                  <span className="font-medium text-slate-900 text-sm">{activeIncident.emergency_type.name}</span>
+                </div>
+                <p className="text-xs text-slate-600 mt-1 font-mono">{activeIncident.reference_number}</p>
+                <p className="text-xs text-slate-500 mt-1">{formatRelativeTime(activeIncident.created_at)}</p>
+                {activeIncident.assigned_unit_name && (
+                  <p className="text-xs text-green-700 mt-1 font-medium">
+                    {activeIncident.assigned_unit_name} is responding
+                  </p>
+                )}
+                <IncidentProgressTracker
+                  status={activeIncident.status}
+                  assignedUnitName={activeIncident.assigned_unit_name}
+                  className="mt-4 pt-3 border-t border-amber-200"
                 />
-                <span className="font-medium text-slate-900 text-sm">{activeIncident.emergency_type.name}</span>
-              </div>
-              <p className="text-xs text-slate-600 mt-1 font-mono">{activeIncident.reference_number}</p>
-              <p className="text-xs text-slate-500 mt-1">{formatRelativeTime(activeIncident.created_at)}</p>
-              {activeIncident.assigned_unit_name && (
-                <p className="text-xs text-green-700 mt-1 font-medium">
-                  {activeIncident.assigned_unit_name} is responding
-                </p>
-              )}
-              <IncidentProgressTracker
-                status={activeIncident.status}
-                assignedUnitName={activeIncident.assigned_unit_name}
-                className="mt-4 pt-3 border-t border-amber-200"
-              />
-            </CardContent>
-          </Card>
-        </Link>
+              </CardContent>
+            </Card>
+          </Link>
+
+          {/* Live Rescuer Tracking — shows distance & ETA to resident */}
+          {['dispatched', 'on_the_way', 'arrived'].includes(activeIncident.status) && (
+            <RescueTrackingMap
+              incidentId={activeIncident.id}
+              variant="compact"
+              pollInterval={10000}
+            />
+          )}
+        </>
       )}
 
       <Card className="bg-slate-800 border-slate-700">

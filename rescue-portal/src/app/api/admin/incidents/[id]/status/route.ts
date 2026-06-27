@@ -3,6 +3,7 @@ import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { attachEmergencyTypes } from '@/lib/incident-presentation'
 import { selectHistoryActorId } from '@/lib/incident-submission'
 import { writeAuditLog, auditRequestMeta } from '@/lib/audit-logger'
+import { normalizeIncidentStatus } from '@/lib/incident-status-actions'
 import type { IncidentStatus, RegistrationStatus, UserRole } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
@@ -32,6 +33,7 @@ type StaffProfile = {
   organization_id: string
   is_active: boolean
   registration_status: RegistrationStatus | null
+  rescue_unit_id: string | null
 }
 
 type IncidentRow = {
@@ -39,6 +41,7 @@ type IncidentRow = {
   organization_id: string
   emergency_type_id: string
   status: IncidentStatus
+  assigned_unit_id: string | null
 }
 
 type EmergencyTypeRow = {
@@ -50,6 +53,7 @@ type EmergencyTypeRow = {
 }
 
 const incidentUpdateRoles: UserRole[] = ['super_admin', 'admin', 'dispatcher', 'team_leader', 'responder', 'verifier', 'staff']
+const responderAccessRoles: UserRole[] = ['team_leader', 'responder']
 const allowedStatuses: IncidentStatus[] = [
   'received',
   'verification_pending',
@@ -82,7 +86,7 @@ async function requireIncidentUpdater() {
 
   const { data: profile, error: profileError } = await supabase
     .from('user_profiles')
-    .select('id, user_id, role, full_name, organization_id, is_active, registration_status')
+    .select('id, user_id, role, full_name, organization_id, is_active, registration_status, rescue_unit_id')
     .eq('user_id', user.id)
     .single() as QueryResult<StaffProfile>
 
@@ -109,7 +113,8 @@ export async function PATCH(
   try {
     const { id } = await context.params
     const body = await request.json()
-    const status = String(body?.status ?? '') as IncidentStatus
+    const requestedStatus = String(body?.status ?? '') as IncidentStatus | 'false_alarm'
+    const status = normalizeIncidentStatus(requestedStatus)
     const reason = String(body?.reason ?? '').trim()
 
     if (!allowedStatuses.includes(status)) {
@@ -119,7 +124,7 @@ export async function PATCH(
     const admin = await createAdminClient() as unknown as SupabaseDataClient
     const { data: existingIncident, error: existingError } = await admin
       .from('incidents')
-      .select('id, organization_id, emergency_type_id, status')
+      .select('id, organization_id, emergency_type_id, status, assigned_unit_id')
       .eq('id', id)
       .single<IncidentRow>()
 
@@ -129,6 +134,22 @@ export async function PATCH(
 
     if (auth.profile.role !== 'super_admin' && existingIncident.organization_id !== auth.profile.organization_id) {
       return NextResponse.json({ message: 'Incident belongs to another organization.' }, { status: 403 })
+    }
+
+    if (responderAccessRoles.includes(auth.profile.role)) {
+      const { data: memberships } = await admin
+        .from('rescue_unit_members')
+        .select('unit_id')
+        .eq('user_id', auth.profile.id)
+        .eq('is_active', true) as QueryResult<Array<{ unit_id: string }>>
+      const unitIds = new Set([
+        ...(auth.profile.rescue_unit_id ? [auth.profile.rescue_unit_id] : []),
+        ...(memberships ?? []).map((membership) => membership.unit_id),
+      ])
+
+      if (!existingIncident.assigned_unit_id || !unitIds.has(existingIncident.assigned_unit_id)) {
+        return NextResponse.json({ message: 'This mission is not assigned to your rescue unit.' }, { status: 403 })
+      }
     }
 
     const now = new Date().toISOString()
@@ -165,7 +186,7 @@ export async function PATCH(
         changed_by_name: auth.profile.full_name,
         changed_by_role: auth.profile.role,
         reason: reason || null,
-        metadata: null,
+        metadata: { emergency_type_id: existingIncident.emergency_type_id },
         created_at: now,
       })
 
@@ -188,7 +209,7 @@ export async function PATCH(
       entityType: 'incident',
       entityId: id,
       previousValues: { status: existingIncident.status },
-      newValues: { status, reason: reason || null },
+      newValues: { status, reason: reason || null, emergencyTypeId: existingIncident.emergency_type_id },
       organizationId: auth.profile.organization_id,
       ...meta,
     })

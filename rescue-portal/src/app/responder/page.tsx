@@ -13,6 +13,7 @@ import { SeverityBadge } from '@/components/severity-badge'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import type { IncidentStatus, SeverityLevel } from '@/lib/types'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
+import { RescueTrackingMap } from '@/components/rescue-tracking-map'
 import { toast } from 'sonner'
 
 const RESPONDER_STATUSES = ['assigned', 'accepted', 'dispatched', 'on_the_way', 'arrived', 'operation_in_progress']
@@ -46,7 +47,7 @@ export default function ResponderPage() {
 
   const fetchIncidents = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/incidents', { cache: 'no-store' })
+      const res = await fetch('/api/responder/incidents', { cache: 'no-store' })
       if (!res.ok) return
       const data = await res.json()
       const list = (data.incidents ?? data ?? []) as Incident[]
@@ -57,13 +58,19 @@ export default function ResponderPage() {
   }, [])
 
   useEffect(() => {
-    fetchIncidents()
+    const initialFetch = setTimeout(fetchIncidents, 0)
     const interval = setInterval(fetchIncidents, 15000)
-    return () => clearInterval(interval)
+    return () => {
+      clearTimeout(initialFetch)
+      clearInterval(interval)
+    }
   }, [fetchIncidents])
 
   // Find the active assigned incident
   const activeIncident = incidents.find(i => RESPONDER_STATUSES.includes(i.status))
+
+  const missionActive = onMission || !!activeIncident
+  const gpsActive = gpsTracking || !!activeIncident
 
   async function updateStatus(newStatus: string) {
     if (!activeIncident) return
@@ -84,26 +91,41 @@ export default function ResponderPage() {
     }
   }
 
-  // GPS tracking
+  // GPS tracking — POST location to API every 10s
   useEffect(() => {
-    if (gpsTracking) {
+    const incidentId = activeIncident?.id
+    if (gpsActive && incidentId) {
       function sendLocation() {
         navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            // In production: POST to /api/responder/location
-            console.log('GPS update:', pos.coords.latitude, pos.coords.longitude)
+          async (pos) => {
+            try {
+              await fetch('/api/responder/location', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  latitude: pos.coords.latitude,
+                  longitude: pos.coords.longitude,
+                  accuracy: pos.coords.accuracy,
+                  heading: pos.coords.heading,
+                  speed: pos.coords.speed,
+                  incident_id: incidentId,
+                }),
+              })
+            } catch {
+              // Silent — GPS will retry on next interval
+            }
           },
           () => { /* silent */ },
           { enableHighAccuracy: true }
         )
       }
       sendLocation()
-      gpsIntervalRef.current = setInterval(sendLocation, 30000)
+      gpsIntervalRef.current = setInterval(sendLocation, 10000)
     }
     return () => {
       if (gpsIntervalRef.current) clearInterval(gpsIntervalRef.current)
     }
-  }, [gpsTracking])
+  }, [gpsActive, activeIncident?.id])
 
   if (loading) {
     return (
@@ -123,14 +145,14 @@ export default function ResponderPage() {
         <CardContent className="p-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`w-3 h-3 rounded-full ${onMission ? 'bg-amber-500 animate-pulse' : 'bg-green-500'}`} />
+              <div className={`w-3 h-3 rounded-full ${missionActive ? 'bg-amber-500 animate-pulse' : 'bg-green-500'}`} />
               <div>
-                <p className="font-semibold text-white text-sm">{onMission ? 'On Mission' : 'Available'}</p>
-                <p className="text-xs text-slate-400">{onMission ? 'Responding to incident' : 'Ready for dispatch'}</p>
+                <p className="font-semibold text-white text-sm">{missionActive ? 'On Mission' : 'Available'}</p>
+                <p className="text-xs text-slate-400">{missionActive ? 'Responding to incident' : 'Ready for dispatch'}</p>
               </div>
             </div>
             <Switch
-              checked={onMission}
+              checked={missionActive}
               onCheckedChange={setOnMission}
             />
           </div>
@@ -145,11 +167,11 @@ export default function ResponderPage() {
               <Navigation className="w-5 h-5 text-blue-400" />
               <div>
                 <p className="font-semibold text-white text-sm">GPS Tracking</p>
-                <p className="text-xs text-slate-400">{gpsTracking ? 'Broadcasting location every 30s' : 'Enable to share your location'}</p>
+                <p className="text-xs text-slate-400">{gpsActive ? 'Broadcasting location every 10s' : 'Enable to share your location'}</p>
               </div>
             </div>
             <Switch
-              checked={gpsTracking}
+              checked={gpsActive}
               onCheckedChange={setGpsTracking}
             />
           </div>
@@ -234,6 +256,16 @@ export default function ResponderPage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Live Tracking Map — see your position relative to SOS */}
+          {['dispatched', 'on_the_way', 'arrived', 'operation_in_progress'].includes(activeIncident.status) && (
+            <RescueTrackingMap
+              incidentId={activeIncident.id}
+              variant="full"
+              dark={true}
+              pollInterval={10000}
+            />
+          )}
 
           {/* Status Update Buttons */}
           <div className="space-y-2">

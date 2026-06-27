@@ -2,10 +2,10 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import {
-  AlertTriangle, MapPin, Phone, CheckCircle2, Truck,
-  Loader2, Clock, Siren, Send, XCircle, ChevronRight,
-  ShieldCheck, Radio, Eye, Lock, Flag, Navigation,
-  ClipboardCheck, Bell, ArrowRightLeft, Building2, Search, Users,
+  MapPin, Phone, CheckCircle2, Truck,
+  Loader2, Siren, XCircle, ChevronRight,
+  Radio, Lock, Flag, Navigation,
+  ClipboardCheck, ArrowRightLeft, Building2, Search, Users,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -14,8 +14,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SeverityBadge } from '@/components/severity-badge'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
+import { RescueTrackingMap } from '@/components/rescue-tracking-map'
 import type { IncidentStatus, SeverityLevel } from '@/lib/types'
-import { MUNICIPALITY_REGISTRY, type Municipality } from '@/lib/lgu-directory'
+import { buildStatusUpdateRequest } from '@/lib/incident-status-actions'
+import { MUNICIPALITY_REGISTRY } from '@/lib/lgu-directory'
 import { toast } from 'sonner'
 
 type Incident = {
@@ -92,20 +94,25 @@ export default function DispatchPage() {
   }, [])
 
   useEffect(() => {
-    fetchIncidents()
+    const initialFetch = setTimeout(fetchIncidents, 0)
     const interval = setInterval(fetchIncidents, 10000)
-    return () => clearInterval(interval)
+    return () => {
+      clearTimeout(initialFetch)
+      clearInterval(interval)
+    }
   }, [fetchIncidents])
 
-  async function updateStatus(incidentId: string, newStatus: string) {
+  async function updateStatus(incidentId: string, newStatus: IncidentStatus | 'false_alarm') {
     setUpdatingId(incidentId)
     try {
+      const statusUpdate = buildStatusUpdateRequest(newStatus)
       const res = await fetch(`/api/admin/incidents/${incidentId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify(statusUpdate),
       })
-      if (!res.ok) throw new Error('Failed to update')
+      const payload = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(payload.message ?? 'Failed to update')
       toast.success(`Status → ${newStatus.replace(/_/g, ' ')}`)
       await fetchIncidents()
     } catch (err) {
@@ -145,11 +152,15 @@ export default function DispatchPage() {
         throw new Error(d.message ?? 'Failed to assign team')
       }
       // Then update status to dispatched
-      await fetch(`/api/admin/incidents/${teamPickerIncidentId}/status`, {
+      const statusRes = await fetch(`/api/admin/incidents/${teamPickerIncidentId}/status`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: 'dispatched' }),
       })
+      if (!statusRes.ok) {
+        const data = await statusRes.json().catch(() => ({}))
+        throw new Error(data.message ?? 'Team assigned, but dispatch status could not be confirmed')
+      }
       const team = availableTeams.find(t => t.id === teamId)
       toast.success(`Dispatched ${team?.name ?? 'rescue team'}`)
       setShowTeamPicker(false)
@@ -200,8 +211,7 @@ export default function DispatchPage() {
   const dispatched = incidents.filter(i => ['assigned', 'accepted', 'dispatched', 'on_the_way'].includes(i.status))
   const onScene = incidents.filter(i => ['arrived', 'operation_in_progress'].includes(i.status))
   const awaitingClosure = incidents.filter(i => i.status === 'resolved')
-  const cancelled = incidents.filter(i => i.status === 'cancelled').slice(0, 10)
-  const closed = incidents.filter(i => ['closed', 'cancelled'].includes(i.status)).slice(0, 10)
+  const closed = incidents.filter(i => ['closed', 'cancelled', 'false_alert'].includes(i.status)).slice(0, 10)
 
   if (loading) {
     return (
@@ -289,6 +299,16 @@ export default function DispatchPage() {
               )}
             </div>
 
+            {/* Live Tracking Map — shown when dispatched */}
+            {['assigned', 'accepted', 'dispatched', 'on_the_way', 'arrived', 'operation_in_progress'].includes(inc.status) && (
+              <RescueTrackingMap
+                incidentId={inc.id}
+                variant="full"
+                dark={true}
+                pollInterval={10000}
+              />
+            )}
+
             {/* Timeline */}
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="p-2 bg-slate-800/50 rounded">
@@ -374,23 +394,36 @@ export default function DispatchPage() {
             </div>
           )}
 
-          {inc.status === 'cancelled' && (
+          {['cancelled', 'false_alert'].includes(inc.status) && (
             <div className="text-center py-4">
               <XCircle className="w-8 h-8 text-red-500 mx-auto mb-2" />
-              <p className="text-sm text-red-300">Incident cancelled / false alarm.</p>
+              <p className="text-sm text-red-300">
+                {inc.status === 'false_alert' ? 'Incident marked as a false alarm.' : 'Incident cancelled.'}
+              </p>
             </div>
           )}
 
-          {!['closed', 'cancelled', 'resolved'].includes(inc.status) && (
-            <Button
-              onClick={() => updateStatus(inc.id, 'cancelled')}
-              disabled={updatingId === inc.id}
-              variant="outline"
-              className="w-full h-10 border-red-600/50 text-red-400 hover:bg-red-900/20 hover:text-red-300 text-xs mt-2"
-            >
-              <XCircle className="w-3.5 h-3.5 mr-1" />
-              Cancel / False Alarm
-            </Button>
+          {!['closed', 'cancelled', 'false_alert', 'resolved'].includes(inc.status) && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-2">
+              <Button
+                onClick={() => updateStatus(inc.id, 'cancelled')}
+                disabled={updatingId === inc.id}
+                variant="outline"
+                className="w-full min-h-11 border-red-600/50 text-red-400 hover:bg-red-900/20 hover:text-red-300 text-xs"
+              >
+                <XCircle className="w-3.5 h-3.5 mr-1" />
+                Cancel Incident
+              </Button>
+              <Button
+                onClick={() => updateStatus(inc.id, 'false_alarm')}
+                disabled={updatingId === inc.id}
+                variant="outline"
+                className="w-full min-h-11 border-slate-600 text-slate-300 hover:bg-slate-800 text-xs"
+              >
+                <Flag className="w-3.5 h-3.5 mr-1" />
+                Mark False Alarm
+              </Button>
+            </div>
           )}
 
           {['arrived', 'operation_in_progress'].includes(inc.status) && (

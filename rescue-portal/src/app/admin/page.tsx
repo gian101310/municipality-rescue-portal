@@ -27,8 +27,6 @@ import { EscalationMonitor } from '@/components/escalation-monitor'
 import { MapView } from '@/components/map-view'
 import { buildDashboardIncidentMarkers } from '@/lib/dashboard-live-map'
 
-const ACTIVE_STATUSES = ['submitted', 'received', 'verification_pending', 'verified', 'assigned', 'dispatched', 'on_the_way', 'arrived', 'operation_in_progress']
-
 type DashboardStats = {
   total_incidents_today: number
   active_incidents: number
@@ -105,10 +103,13 @@ export default function CommandCenterPage() {
   }, [])
 
   useEffect(() => {
-    fetchDashboard()
+    const initialFetch = setTimeout(fetchDashboard, 0)
     // Auto-refresh every 15 seconds
     const interval = setInterval(() => fetchDashboard(), 15000)
-    return () => clearInterval(interval)
+    return () => {
+      clearTimeout(initialFetch)
+      clearInterval(interval)
+    }
   }, [fetchDashboard])
 
   // Realtime subscription for instant updates
@@ -446,7 +447,7 @@ export default function CommandCenterPage() {
                                   style={{ color: incident.emergency_type?.color ?? '#6b7280' }}
                                 />
                               </span>
-                              <span className="text-xs text-slate-300 hidden sm:block truncate max-w-[80px]">{incident.emergency_type?.name ?? 'Unknown'}</span>
+                              <span className="text-xs text-slate-300 truncate max-w-[80px]">{incident.emergency_type?.name ?? 'Unknown'}</span>
                             </div>
                           </td>
                           <td className="px-4 py-3 hidden sm:table-cell">

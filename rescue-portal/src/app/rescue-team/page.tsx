@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import {
   AlertTriangle, MapPin, Phone, Navigation, CheckCircle2,
-  Truck, Eye, XCircle, Loader2, Radio, Clock, Siren,
-  ShieldCheck, Flag, Users, ChevronRight, Bell,
+  Truck, XCircle, Loader2, Radio, Clock, Siren,
+  ShieldCheck, Flag, ChevronRight, Bell,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -12,6 +12,7 @@ import { Badge } from '@/components/ui/badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
+import { RescueTrackingMap } from '@/components/rescue-tracking-map'
 import type { IncidentStatus, SeverityLevel } from '@/lib/types'
 import { toast } from 'sonner'
 
@@ -38,7 +39,7 @@ type Incident = {
 }
 
 const ACTIVE_STATUSES = ['assigned', 'accepted', 'dispatched', 'on_the_way', 'arrived', 'operation_in_progress']
-const INCOMING_STATUSES = ['submitted', 'received', 'verified', 'assigned']
+const INCOMING_STATUSES = ['assigned']
 
 function timeAgo(dateStr: string) {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -56,14 +57,18 @@ export default function RescueTeamPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
   const [prevIncomingCount, setPrevIncomingCount] = useState(0)
+  const [gpsStatus, setGpsStatus] = useState<'idle' | 'sharing' | 'denied' | 'unsupported'>('idle')
+  const [unitConfigured, setUnitConfigured] = useState<boolean | null>(null)
+  const gpsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchIncidents = useCallback(async () => {
     try {
-      const res = await fetch('/api/admin/incidents', { cache: 'no-store' })
+      const res = await fetch('/api/responder/incidents', { cache: 'no-store' })
       if (!res.ok) return
       const data = await res.json()
       const list = (data.incidents ?? data ?? []) as Incident[]
       setIncidents(list)
+      setUnitConfigured(data.unitConfigured !== false)
 
       // Notify on new incoming SOS
       const incomingCount = list.filter(i => INCOMING_STATUSES.includes(i.status)).length
@@ -83,10 +88,63 @@ export default function RescueTeamPage() {
   }, [prevIncomingCount])
 
   useEffect(() => {
-    fetchIncidents()
+    const initialFetch = setTimeout(fetchIncidents, 0)
     const interval = setInterval(fetchIncidents, 10000) // Poll every 10s
-    return () => clearInterval(interval)
+    return () => {
+      clearTimeout(initialFetch)
+      clearInterval(interval)
+    }
   }, [fetchIncidents])
+
+  const activeIncident = incidents.find((incident) => ACTIVE_STATUSES.includes(incident.status))
+  const activeIncidentId = activeIncident?.id
+
+  useEffect(() => {
+    if (!activeIncidentId) return
+    if (!navigator.geolocation) {
+      const unsupportedTimer = setTimeout(() => setGpsStatus('unsupported'), 0)
+      return () => clearTimeout(unsupportedTimer)
+    }
+
+    let stopped = false
+    const sendLocation = () => {
+      navigator.geolocation.getCurrentPosition(
+        async (position) => {
+          if (stopped) return
+          try {
+            const response = await fetch('/api/responder/location', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                latitude: position.coords.latitude,
+                longitude: position.coords.longitude,
+                accuracy: position.coords.accuracy,
+                heading: position.coords.heading,
+                speed: position.coords.speed,
+                incident_id: activeIncidentId,
+              }),
+            })
+            if (!response.ok) throw new Error('Location update failed')
+            setGpsStatus('sharing')
+          } catch {
+            if (!stopped) setGpsStatus('idle')
+          }
+        },
+        (error) => {
+          if (!stopped) setGpsStatus(error.code === error.PERMISSION_DENIED ? 'denied' : 'idle')
+        },
+        { enableHighAccuracy: true, timeout: 15000, maximumAge: 5000 }
+      )
+    }
+
+    sendLocation()
+    gpsIntervalRef.current = setInterval(sendLocation, 10000)
+    return () => {
+      stopped = true
+      if (gpsIntervalRef.current) clearInterval(gpsIntervalRef.current)
+      gpsIntervalRef.current = null
+    }
+  }, [activeIncidentId])
 
   async function updateStatus(incidentId: string, newStatus: string) {
     setUpdatingId(incidentId)
@@ -220,6 +278,10 @@ export default function RescueTeamPage() {
               )}
             </div>
 
+            {ACTIVE_STATUSES.includes(inc.status) && (
+              <RescueTrackingMap incidentId={inc.id} variant="full" dark pollInterval={10000} />
+            )}
+
             {/* Time */}
             <div className="flex items-center gap-2 text-xs text-slate-500">
               <Clock className="w-3.5 h-3.5" />
@@ -322,6 +384,34 @@ export default function RescueTeamPage() {
           </CardContent>
         </Card>
       </div>
+
+      {activeIncident && (
+        <div className={`rounded-lg border px-3 py-2 text-xs flex items-center gap-2 ${
+          gpsStatus === 'sharing'
+            ? 'border-green-700/40 bg-green-900/20 text-green-300'
+            : 'border-amber-700/40 bg-amber-900/20 text-amber-300'
+        }`}>
+          <Navigation className="w-4 h-4 shrink-0" />
+          {gpsStatus === 'sharing' && 'Live GPS is sharing with dispatch and the resident.'}
+          {gpsStatus === 'denied' && 'Location permission is blocked. Enable GPS permission to share live distance and ETA.'}
+          {gpsStatus === 'unsupported' && 'This device does not support browser GPS tracking.'}
+          {gpsStatus === 'idle' && 'Connecting live GPS for this mission...'}
+        </div>
+      )}
+
+      {unitConfigured === false && (
+        <Card className="bg-amber-950/30 border-amber-600/50">
+          <CardContent className="p-4 flex gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" />
+            <div>
+              <p className="text-sm font-semibold text-amber-300">Rescue unit setup required</p>
+              <p className="text-xs text-amber-100/70 mt-1">
+                This responder account is not linked to a rescue unit. Ask an administrator to add it under Admin → Teams before missions can be received.
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Incoming SOS Alerts */}
       {incomingSOS.length > 0 && (
