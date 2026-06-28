@@ -37,3 +37,25 @@ test('production schema includes the cancelled timestamp written by terminal sta
 
   assert.match(migration, /ADD COLUMN IF NOT EXISTS cancelled_at TIMESTAMPTZ/)
 })
+
+test('audit logs use the user_profiles primary key required by the actor foreign key', () => {
+  const incidentStatus = readFileSync(
+    new URL('../app/api/admin/incidents/[id]/status/route.ts', import.meta.url),
+    'utf8'
+  )
+  const residentStatus = readFileSync(
+    new URL('../app/api/admin/residents/[id]/status/route.ts', import.meta.url),
+    'utf8'
+  )
+  const secureLogout = readFileSync(
+    new URL('../app/api/admin/secure-logout/route.ts', import.meta.url),
+    'utf8'
+  )
+
+  assert.match(incidentStatus, /actorId: auth\.profile\.id/)
+  assert.match(residentStatus, /actorId: auth\.profile\.id/)
+  assert.match(secureLogout, /actorId: profile\?\.id \?\? null/)
+  assert.doesNotMatch(incidentStatus, /actorId: auth\.profile\.user_id/)
+  assert.doesNotMatch(residentStatus, /actorId: auth\.profile\.user_id/)
+  assert.doesNotMatch(secureLogout, /actorId: user\.id/)
+})

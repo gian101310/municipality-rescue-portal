@@ -202,7 +202,7 @@ export async function PATCH(
     // Audit log for status changes
     const meta = auditRequestMeta(request.headers)
     writeAuditLog({
-      actorId: auth.profile.user_id,
+      actorId: auth.profile.id,
       actorName: auth.profile.full_name,
       actorRole: auth.profile.role,
       action: 'status_change',
