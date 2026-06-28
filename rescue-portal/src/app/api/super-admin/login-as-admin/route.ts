@@ -94,8 +94,11 @@ export async function POST(request: Request) {
       throw new Error(linkError?.message ?? 'Unable to generate admin login link.')
     }
 
+    const tokenHash = linkData.properties?.hashed_token
+    if (!tokenHash) throw new Error('Unable to generate a one-time admin access token.')
+
     return NextResponse.json({
-      loginUrl: linkData.properties?.action_link ?? null,
+      loginUrl: `${getCanonicalAppUrl()}/auth/admin-access?token_hash=${encodeURIComponent(tokenHash)}`,
       adminEmail: adminProfile.email,
     })
   } catch (error) {
