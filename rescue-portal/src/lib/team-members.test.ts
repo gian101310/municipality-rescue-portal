@@ -32,3 +32,11 @@ test('team member picker has an authenticated organization-scoped users endpoint
   assert.match(route, /registration_status/)
   assert.match(route, /NextResponse\.json\(\{ users:/)
 })
+
+test('select popups layer above dialogs', () => {
+  const select = readFileSync(new URL('../components/ui/select.tsx', import.meta.url), 'utf8')
+  const dialog = readFileSync(new URL('../components/ui/dialog.tsx', import.meta.url), 'utf8')
+
+  assert.match(dialog, /z-\[10000\]/)
+  assert.match(select, /z-\[10001\]/)
+})

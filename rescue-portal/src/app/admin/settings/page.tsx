@@ -39,6 +39,7 @@ import { useSettings } from '@/lib/settings-context'
 import { createClient } from '@/lib/supabase/client'
 import { useMasterKey } from '@/components/master-key-provider'
 import { toast } from 'sonner'
+import { OperationsStaffSettings } from '@/components/admin/operations-staff-settings'
 
 const SCOPE_LEVEL_LABELS: Record<GeoScopeLevel, string> = {
   country: 'Entire Philippines',
@@ -363,6 +364,10 @@ export default function SettingsPage() {
               </Button>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="operations_staff" className="mt-4">
+          <OperationsStaffSettings />
         </TabsContent>
 
         {/* Coverage Lock */}

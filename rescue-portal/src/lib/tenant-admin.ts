@@ -31,7 +31,7 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && Boolean(value.trim())
 }
 
-export type SettingsTabValue = 'general' | 'coverage_lock' | 'emergency_types' | 'barangays' | 'telegram' | 'notifications'
+export type SettingsTabValue = 'general' | 'operations_staff' | 'coverage_lock' | 'emergency_types' | 'barangays' | 'telegram' | 'notifications'
 
 export type SettingsTab = {
   label: string
@@ -41,6 +41,7 @@ export type SettingsTab = {
 
 export const SETTINGS_TABS: SettingsTab[] = [
   { label: 'General', value: 'general' },
+  { label: 'Operations Staff', value: 'operations_staff' },
   { label: 'Coverage Lock', value: 'coverage_lock', platformOnly: true },
   { label: 'Emergency Types', value: 'emergency_types' },
   { label: 'Barangay Captains', value: 'barangays' },

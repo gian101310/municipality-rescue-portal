@@ -185,11 +185,16 @@ test('buildTenantBranding updates tenant status while preserving existing brandi
 test('getSettingsTabsForRole hides coverage lock from municipality admins', () => {
   assert.deepEqual(getSettingsTabsForRole('admin').map((tab) => tab.value), [
     'general',
+    'operations_staff',
     'emergency_types',
     'barangays',
     'telegram',
     'notifications',
   ])
+})
+
+test('getSettingsTabsForRole exposes Operations Staff to tenant admins', () => {
+  assert.ok(getSettingsTabsForRole('admin').some((tab) => tab.value === 'operations_staff'))
 })
 
 test('getSettingsTabsForRole keeps coverage lock visible for super admins', () => {

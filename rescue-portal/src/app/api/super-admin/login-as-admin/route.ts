@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
+import { getCanonicalAppUrl } from '@/lib/app-url'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
       type: 'magiclink',
       email: adminProfile.email,
       options: {
-        redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://www.rescue-portal.ph'}/admin`,
+        redirectTo: `${getCanonicalAppUrl()}/admin`,
       },
     })
 
