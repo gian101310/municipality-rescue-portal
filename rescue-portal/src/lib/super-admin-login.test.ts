@@ -12,6 +12,8 @@ test('super admin access uses a public one-time token handoff before protected a
   assert.doesNotMatch(route, /properties\?\.action_link/)
 
   const handoff = readFileSync(handoffUrl, 'utf8')
+  assert.match(handoff, /useSearchParams/)
+  assert.doesNotMatch(handoff, /typeof window/)
   assert.match(handoff, /verifyOtp\(/)
   assert.match(handoff, /type: 'magiclink'/)
   assert.match(handoff, /window\.location\.replace\('\/admin'\)/)

@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { Loader2, ShieldAlert } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -12,7 +13,8 @@ export default function AdminAccessPage() {
 }
 
 function AdminAccessContent() {
-  const [tokenHash] = useState(() => typeof window === 'undefined' ? '' : new URLSearchParams(window.location.search).get('token_hash') ?? '')
+  const searchParams = useSearchParams()
+  const tokenHash = searchParams.get('token_hash') ?? ''
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
