@@ -41,3 +41,10 @@ test('tracking table does not expose every responder location to every authentic
   assert.match(migration, /GRANT ALL ON public\.responder_locations TO service_role/)
   assert.match(migration, /REVOKE ALL ON public\.responder_locations FROM anon, authenticated/)
 })
+
+test('the reporting resident is authorized with the auth user id stored on incidents', () => {
+  const route = readFileSync(new URL('../app/api/incidents/[id]/tracking/route.ts', import.meta.url), 'utf8')
+
+  assert.match(route, /incident\.reporter_id === user\.id/)
+  assert.doesNotMatch(route, /incident\.reporter_id === profile\.id/)
+})

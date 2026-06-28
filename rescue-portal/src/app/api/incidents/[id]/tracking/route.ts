@@ -62,7 +62,7 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       .eq('user_id', user.id)
       .single()
 
-    const isReporter = profile && incident.reporter_id === profile.id
+    const isReporter = profile && incident.reporter_id === user.id
     const isPrivilegedStaff = profile && ['admin', 'dispatcher', 'staff', 'verifier'].includes(profile.role) && incident.organization_id === profile.organization_id
     const isSuperAdmin = profile?.role === 'super_admin'
     let isAssignedResponder = false
