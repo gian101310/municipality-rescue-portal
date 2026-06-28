@@ -33,7 +33,7 @@ test('responder status updates are restricted to incidents assigned to their uni
 
 test('tracking table does not expose every responder location to every authenticated user', () => {
   const migration = readFileSync(
-    new URL('../../supabase/migrations/20260627_responder_live_tracking.sql', import.meta.url),
+    new URL('../../supabase/migrations/20260627180000_responder_live_tracking.sql', import.meta.url),
     'utf8'
   )
 
