@@ -32,3 +32,12 @@ test('team dispatch renders the emergency type name instead of the joined object
   assert.match(teams, /incident\.emergency_type\?\.name/)
   assert.doesNotMatch(teams, /\{incident\.emergency_type \|\| incident\.type/)
 })
+
+test('team dispatch requests only dispatchable incidents and the API applies that filter', () => {
+  const teams = readFileSync(new URL('../app/admin/teams/page.tsx', import.meta.url), 'utf8')
+  const incidentsRoute = readFileSync(new URL('../app/api/admin/incidents/route.ts', import.meta.url), 'utf8')
+
+  assert.match(teams, /status=submitted,received,verification_pending,verified/)
+  assert.match(incidentsRoute, /nextUrl\.searchParams\.get\('status'\)/)
+  assert.match(incidentsRoute, /query = query\.in\('status', statuses\)/)
+})

@@ -132,7 +132,7 @@ export default function TeamsPage() {
   async function openDispatch(team: any) {
     setDispatchTeam(team); setSelectedIncidentId(''); setDispatching(false)
     // Load active/pending incidents
-    const response = await fetch('/api/admin/incidents?status=pending,acknowledged', { cache: 'no-store' })
+    const response = await fetch('/api/admin/incidents?status=submitted,received,verification_pending,verified', { cache: 'no-store' })
     const payload = await response.json().catch(() => ({}))
     setActiveIncidents(payload.incidents ?? [])
     setDispatchOpen(true)

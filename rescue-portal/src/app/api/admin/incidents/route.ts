@@ -1,7 +1,7 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, createClient } from '@/lib/supabase/server'
 import { attachEmergencyTypes } from '@/lib/incident-presentation'
-import type { RegistrationStatus, UserRole } from '@/lib/types'
+import type { IncidentStatus, RegistrationStatus, UserRole } from '@/lib/types'
 
 export const dynamic = 'force-dynamic'
 
@@ -13,6 +13,7 @@ type QueryResult<T> = {
 type SupabaseQueryBuilder = PromiseLike<QueryResult<unknown>> & {
   select(columns: string): SupabaseQueryBuilder
   eq(column: string, value: unknown): SupabaseQueryBuilder
+  in(column: string, values: unknown[]): SupabaseQueryBuilder
   order(column: string, options?: { ascending?: boolean }): SupabaseQueryBuilder
 }
 
@@ -38,6 +39,12 @@ type EmergencyTypeRow = {
 }
 
 const incidentReadRoles: UserRole[] = ['super_admin', 'admin', 'dispatcher', 'team_leader', 'responder', 'verifier', 'staff']
+const incidentStatuses = new Set<IncidentStatus>([
+  'submitted', 'received', 'verification_pending', 'verified', 'assigned', 'accepted',
+  'preparing', 'dispatched', 'on_the_way', 'arrived', 'operation_in_progress',
+  'transporting', 'resolved', 'closed', 'duplicate', 'invalid', 'false_alert',
+  'cancelled', 'unable_to_contact', 'transferred',
+])
 
 async function requireIncidentReader() {
   const supabase = await createClient()
@@ -66,7 +73,7 @@ async function requireIncidentReader() {
   return { profile }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const auth = await requireIncidentReader()
   if ('error' in auth) return auth.error
 
@@ -79,6 +86,17 @@ export async function GET() {
 
     if (auth.profile.role !== 'super_admin') {
       query = query.eq('organization_id', auth.profile.organization_id)
+    }
+
+    const statusParam = request.nextUrl.searchParams.get('status')
+    if (statusParam) {
+      const statuses = statusParam
+        .split(',')
+        .filter((status): status is IncidentStatus => incidentStatuses.has(status as IncidentStatus))
+      if (!statuses.length) {
+        return NextResponse.json({ message: 'No valid incident statuses supplied.' }, { status: 400 })
+      }
+      query = query.in('status', statuses)
     }
 
     const { data: incidents, error: incidentError } = await query as QueryResult<Record<string, unknown>[]>
@@ -99,4 +117,3 @@ export async function GET() {
     )
   }
 }
-
