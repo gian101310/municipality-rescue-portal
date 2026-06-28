@@ -25,3 +25,10 @@ test('production schema includes the emergency type description selected by inci
 
   assert.match(migration, /ADD COLUMN IF NOT EXISTS description TEXT/)
 })
+
+test('team dispatch renders the emergency type name instead of the joined object', () => {
+  const teams = readFileSync(new URL('../app/admin/teams/page.tsx', import.meta.url), 'utf8')
+
+  assert.match(teams, /incident\.emergency_type\?\.name/)
+  assert.doesNotMatch(teams, /\{incident\.emergency_type \|\| incident\.type/)
+})

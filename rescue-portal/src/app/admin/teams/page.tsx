@@ -594,7 +594,7 @@ export default function TeamsPage() {
                   >
                     <div className="flex items-start justify-between">
                       <div>
-                        <p className="text-sm text-white font-medium">{incident.emergency_type || incident.type || 'Emergency'}</p>
+                        <p className="text-sm text-white font-medium">{incident.emergency_type?.name || incident.type || 'Emergency'}</p>
                         <p className="text-xs text-slate-400 mt-0.5">{incident.reporter_name || 'Unknown'} · {incident.barangay || incident.address || '—'}</p>
                         <p className="text-xs text-slate-500 mt-0.5">{incident.description?.slice(0, 80) || 'No description'}</p>
                       </div>
