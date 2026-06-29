@@ -29,6 +29,7 @@ export default function ShiftSchedulePage() {
   const [shifts, setShifts] = useState<Record<string, Record<string, string>>>({})
   const [canEdit, setCanEdit] = useState(false)
   const [loading, setLoading] = useState(true)
+  const [savingCell, setSavingCell] = useState<string | null>(null)
 
   const now = new Date()
   const startOfWeek = new Date(now)
@@ -69,22 +70,32 @@ export default function ShiftSchedulePage() {
   }, [weekStart])
 
   async function cycleShift(unitId: string, shiftDate: string) {
-    if (!canEdit) return
+    const cellKey = `${unitId}:${shiftDate}`
+    if (!canEdit || savingCell) return
+    setSavingCell(cellKey)
     const current = shifts[unitId]?.[shiftDate]
     const order = ['day', 'swing', 'night', undefined]
     const nextShift = order[(order.indexOf(current) + 1) % order.length]
-    const response = await fetch('/api/admin/shifts', {
-      method: 'PUT', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ rescueUnitId: unitId, shiftDate, shiftType: nextShift ?? null }),
-    })
+    let response: Response
+    try {
+      response = await fetch('/api/admin/shifts', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ rescueUnitId: unitId, shiftDate, shiftType: nextShift ?? null }),
+      })
+    } catch {
+      setSavingCell(null)
+      toast.error('Unable to update shift. Check the connection and try again.')
+      return
+    }
     const payload = await response.json().catch(() => ({}))
-    if (!response.ok) { toast.error(payload?.message ?? 'Unable to update shift.'); return }
+    if (!response.ok) { toast.error(payload?.message ?? 'Unable to update shift.'); setSavingCell(null); return }
     setShifts((previous) => {
       const unitShifts = { ...(previous[unitId] ?? {}) }
       if (nextShift) unitShifts[shiftDate] = nextShift
       else delete unitShifts[shiftDate]
       return { ...previous, [unitId]: unitShifts }
     })
+    setSavingCell(null)
     toast.success('Shift saved')
   }
 
@@ -117,7 +128,7 @@ export default function ShiftSchedulePage() {
           <table className="w-full min-w-[760px] text-sm">
             <thead><tr className="border-b border-slate-700"><th className="text-left text-slate-400 font-medium py-3 px-4 w-48">Team</th>{DAYS_OF_WEEK.map((day, index) => <th key={day} className={`text-center py-3 px-2 ${dateKey(weekDates[index]) === todayKey ? 'bg-blue-600/10' : ''}`}><span className="text-xs font-medium text-slate-400">{day}</span><br /><span className="text-xs text-slate-500">{weekDates[index].getDate()}</span></th>)}</tr></thead>
             <tbody>
-              {units.map((unit) => <tr key={unit.id} className="border-b border-slate-800 hover:bg-slate-800/30"><td className="py-2 px-4"><div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${unit.status === 'available' ? 'bg-green-500' : unit.status === 'dispatched' ? 'bg-orange-500' : 'bg-slate-500'}`} /><span className="text-white font-medium text-xs">{unit.name}</span></div></td>{weekDates.map((date) => { const key = dateKey(date); const shift = SHIFT_TYPES.find((item) => item.id === shifts[unit.id]?.[key]); return <td key={key} className={`text-center py-2 px-1 ${key === todayKey ? 'bg-blue-600/10' : ''}`}><button type="button" disabled={!canEdit} onClick={() => void cycleShift(unit.id, key)} className={`w-full py-1.5 px-1 rounded text-xs font-medium border transition-colors disabled:cursor-default ${shift ? shift.color : 'bg-slate-800 text-slate-600 border-slate-700'}`}>{shift ? shift.id.charAt(0).toUpperCase() : '—'}</button></td> })}</tr>)}
+              {units.map((unit) => <tr key={unit.id} className="border-b border-slate-800 hover:bg-slate-800/30"><td className="py-2 px-4"><div className="flex items-center gap-2"><div className={`w-2 h-2 rounded-full ${unit.status === 'available' ? 'bg-green-500' : unit.status === 'dispatched' ? 'bg-orange-500' : 'bg-slate-500'}`} /><span className="text-white font-medium text-xs">{unit.name}</span></div></td>{weekDates.map((date) => { const key = dateKey(date); const cellKey = `${unit.id}:${key}`; const shift = SHIFT_TYPES.find((item) => item.id === shifts[unit.id]?.[key]); return <td key={key} className={`text-center py-2 px-1 ${key === todayKey ? 'bg-blue-600/10' : ''}`}><button type="button" disabled={!canEdit || savingCell !== null} onClick={() => void cycleShift(unit.id, key)} className={`w-full py-1.5 px-1 rounded text-xs font-medium border transition-colors disabled:cursor-default ${shift ? shift.color : 'bg-slate-800 text-slate-600 border-slate-700'}`}>{savingCell === cellKey ? '…' : shift ? shift.id.charAt(0).toUpperCase() : '—'}</button></td> })}</tr>)}
               {!loading && units.length === 0 && <tr><td colSpan={8} className="py-10 text-center text-slate-500">No active rescue teams found.</td></tr>}
               {loading && <tr><td colSpan={8} className="py-10 text-center text-slate-500">Loading shift schedule…</td></tr>}
             </tbody>
