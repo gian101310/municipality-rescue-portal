@@ -53,3 +53,9 @@ test('team member removal calls a real tenant-scoped endpoint', () => {
   assert.match(route, /export async function DELETE/)
   assert.match(route, /left_at/)
 })
+
+test('operations map consumes the live team API response', () => {
+  const page = readFileSync(new URL('../app/admin/map/page.tsx', import.meta.url), 'utf8')
+  assert.match(page, /payload\?\.teams/)
+  assert.doesNotMatch(page, /Team data will appear here|placeholder until teams/i)
+})

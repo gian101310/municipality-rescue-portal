@@ -121,7 +121,7 @@ export default function LiveMapPage() {
       const response = await fetch('/api/admin/teams', { cache: 'no-store' })
       const payload = await response.json().catch(() => ({}))
       if (!response.ok) throw new Error(payload?.message ?? 'Unable to load rescue teams.')
-      setRescueUnits((payload?.units ?? []) as RescueUnit[])
+      setRescueUnits((payload?.teams ?? []) as RescueUnit[])
     } catch (error) {
       if (!silent) toast.error(error instanceof Error ? error.message : 'Unable to load rescue teams.')
     }
