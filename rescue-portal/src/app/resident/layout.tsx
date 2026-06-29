@@ -17,9 +17,10 @@ import { DEMO_NOTIFICATIONS } from '@/lib/demo-data'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { isOwnerTestMode, withOwnerTestMode } from '@/lib/owner-test-mode'
-import { validateTrustedSession, clearTrustedSession } from '@/lib/trusted-session'
+import { clearTrustedSession } from '@/lib/trusted-session'
 import { useOfflineSos } from '@/hooks/use-offline-sos'
 import { OfflineSosBanner } from '@/components/offline-sos-banner'
+import { useSettings } from '@/lib/settings-context'
 
 const NAV_ITEMS = [
   { href: '/resident', label: 'Home', icon: Home, exact: true },
@@ -44,6 +45,7 @@ function ResidentLayoutContent({ children }: { children: React.ReactNode }) {
   const ownerTestMode = isOwnerTestMode(searchParams) && isSuperAdmin
   const unread = DEMO_NOTIFICATIONS.filter((n) => !n.is_read && n.user_id === 'uid-res-001').length
   const { online, pendingCount, smsFallbackRecord, dismissSmsFallback } = useOfflineSos()
+  const { settings } = useSettings()
 
   useEffect(() => {
     let cancelled = false
@@ -103,7 +105,7 @@ function ResidentLayoutContent({ children }: { children: React.ReactNode }) {
 
     void loadProfile()
     return () => { cancelled = true }
-  }, [])
+  }, [router])
 
   function residentHref(path: string) {
     return withOwnerTestMode(path, ownerTestMode)
@@ -124,6 +126,7 @@ function ResidentLayoutContent({ children }: { children: React.ReactNode }) {
       <OfflineSosBanner
         online={online}
         pendingCount={pendingCount}
+        emergencyHotline={settings.hotline}
         smsFallbackRecord={smsFallbackRecord}
         onDismissSmsFallback={dismissSmsFallback}
       />

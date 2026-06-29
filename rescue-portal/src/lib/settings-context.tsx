@@ -1,7 +1,6 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, type ReactNode } from 'react'
-import { DEMO_ORGANIZATION } from '@/lib/demo-data'
 
 interface PortalSettings {
   municipalityName: string
@@ -20,12 +19,12 @@ interface SettingsContextValue {
 const STORAGE_KEY = 'rescue_portal_settings'
 
 const DEFAULT_SETTINGS: PortalSettings = {
-  municipalityName: DEMO_ORGANIZATION.name,
-  hotline: DEMO_ORGANIZATION.emergency_hotline,
-  secondaryHotline: DEMO_ORGANIZATION.secondary_hotline ?? '',
-  email: DEMO_ORGANIZATION.email ?? '',
-  mapCenterLat: DEMO_ORGANIZATION.map_center.lat,
-  mapCenterLng: DEMO_ORGANIZATION.map_center.lng,
+  municipalityName: process.env.NEXT_PUBLIC_MUNICIPALITY_NAME ?? 'Emergency Rescue Portal',
+  hotline: process.env.NEXT_PUBLIC_EMERGENCY_HOTLINE ?? '911',
+  secondaryHotline: '',
+  email: '',
+  mapCenterLat: Number(process.env.NEXT_PUBLIC_MAP_CENTER_LAT ?? 14.5995),
+  mapCenterLng: Number(process.env.NEXT_PUBLIC_MAP_CENTER_LNG ?? 120.9842),
 }
 
 function loadSettings(): PortalSettings {
@@ -61,6 +60,27 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   // Listen for changes from other tabs/windows (e.g. admin updates settings)
   useEffect(() => {
+    let cancelled = false
+
+    async function loadOrganizationSettings() {
+      try {
+        const response = await fetch('/api/portal-settings', { cache: 'no-store' })
+        if (!response.ok) return
+        const payload = await response.json() as { settings?: Partial<PortalSettings> }
+        if (!cancelled && payload.settings) {
+          setSettings((previous) => {
+            const next = { ...previous, ...payload.settings }
+            saveSettings(next)
+            return next
+          })
+        }
+      } catch {
+        // Keep the environment-configured emergency number while offline.
+      }
+    }
+
+    void loadOrganizationSettings()
+
     function onStorage(e: StorageEvent) {
       if (e.key === STORAGE_KEY && e.newValue) {
         try {
@@ -69,7 +89,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       }
     }
     window.addEventListener('storage', onStorage)
-    return () => window.removeEventListener('storage', onStorage)
+    return () => {
+      cancelled = true
+      window.removeEventListener('storage', onStorage)
+    }
   }, [])
 
   return (

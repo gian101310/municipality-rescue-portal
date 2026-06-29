@@ -6,6 +6,7 @@ import type { OfflineSosRecord } from '@/lib/types'
 interface OfflineSosBannerProps {
   online: boolean
   pendingCount: number
+  emergencyHotline: string
   smsFallbackRecord: OfflineSosRecord | null
   onDismissSmsFallback: () => void
 }
@@ -13,6 +14,7 @@ interface OfflineSosBannerProps {
 export function OfflineSosBanner({
   online,
   pendingCount,
+  emergencyHotline,
   smsFallbackRecord,
   onDismissSmsFallback,
 }: OfflineSosBannerProps) {
@@ -24,8 +26,8 @@ export function OfflineSosBanner({
       `Type: ${smsFallbackRecord.emergency_type}. ` +
       `Time: ${new Date(smsFallbackRecord.created_timestamp).toLocaleString()}`
     )
-    // TODO: Replace with actual emergency number from org settings
-    const smsHref = `sms:?body=${smsBody}`
+    const hotlineNumber = emergencyHotline.replace(/[^0-9+]/g, '')
+    const smsHref = `sms:${hotlineNumber}?body=${smsBody}`
 
     return (
       <div className="bg-orange-600 px-4 py-3 text-white">
@@ -34,7 +36,7 @@ export function OfflineSosBanner({
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold">Still offline after 10+ minutes</p>
             <p className="text-xs mt-1 opacity-90">
-              Your SOS is queued and will send automatically when internet returns.
+              Your SOS has not yet been received by operations. It remains queued and will send automatically when internet returns.
               As a backup, you can send via SMS:
             </p>
             <div className="flex gap-2 mt-2">
@@ -43,6 +45,12 @@ export function OfflineSosBanner({
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-white text-orange-700 text-xs font-bold rounded-md"
               >
                 Send via SMS
+              </a>
+              <a
+                href={`tel:${hotlineNumber}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-orange-800 text-white text-xs font-bold rounded-md"
+              >
+                Call {emergencyHotline}
               </a>
               <button
                 onClick={onDismissSmsFallback}
@@ -64,7 +72,7 @@ export function OfflineSosBanner({
         <div className="flex items-center gap-2 justify-center max-w-2xl mx-auto">
           <WifiOff className="w-4 h-4" />
           <span className="text-xs font-semibold">
-            Offline — {pendingCount} SOS queued, will sync when internet returns
+            Offline — {pendingCount} SOS queued. Not yet received by operations.
           </span>
         </div>
       </div>

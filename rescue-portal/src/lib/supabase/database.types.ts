@@ -30,7 +30,16 @@ export type Database = {
       organization_geo_scopes: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown> }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      assign_incident_team: {
+        Args: { p_incident_id: string; p_rescue_unit_id: string; p_actor_profile_id: string }
+        Returns: Record<string, unknown>
+      }
+      create_resident_sos: {
+        Args: { p_payload: Record<string, unknown> }
+        Returns: Record<string, unknown>
+      }
+    }
     Enums: {
       user_role: 'super_admin' | 'admin' | 'dispatcher' | 'team_leader' | 'responder' | 'verifier' | 'staff' | 'resident'
       incident_status: 'submitted' | 'received' | 'verification_pending' | 'verified' | 'assigned' | 'accepted' | 'preparing' | 'dispatched' | 'on_the_way' | 'arrived' | 'operation_in_progress' | 'transporting' | 'resolved' | 'closed' | 'duplicate' | 'invalid' | 'false_alert' | 'cancelled' | 'unable_to_contact' | 'transferred'

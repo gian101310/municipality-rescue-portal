@@ -11,13 +11,16 @@
  */
 
 import type { OfflineSosRecord, OfflineSosStatus } from '@/lib/types'
+import {
+  canRetryOfflineSos,
+  isExpiredSyncedSos,
+  shouldPromptSmsFallback,
+} from '@/lib/offline-sos-policy'
 
 const DB_NAME = 'rescue_portal_offline'
 const DB_VERSION = 1
 const STORE_NAME = 'sos_queue'
-const MAX_RETRY_ATTEMPTS = 5
 const RETRY_INTERVAL_MS = 15_000 // 15 seconds between retries
-const SMS_FALLBACK_THRESHOLD_MS = 10 * 60 * 1000 // 10 minutes
 
 let dbPromise: Promise<IDBDatabase> | null = null
 
@@ -100,7 +103,7 @@ export async function getPendingSos(): Promise<OfflineSosRecord[]> {
     const index = store.index('sync_status')
 
     const results: OfflineSosRecord[] = []
-    const statuses: OfflineSosStatus[] = ['pending', 'queued_offline', 'failed']
+    const statuses: OfflineSosStatus[] = ['pending', 'queued_offline', 'syncing', 'failed']
 
     let completed = 0
     statuses.forEach(status => {
@@ -174,12 +177,21 @@ export async function getAllQueuedSos(): Promise<OfflineSosRecord[]> {
   })
 }
 
+async function cleanupExpiredSyncedSos(): Promise<void> {
+  const records = await getAllQueuedSos()
+  await Promise.all(
+    records.filter((record) => isExpiredSyncedSos(record)).map((record) => removeSyncedSos(record.local_sos_id))
+  )
+}
+
 // ── Sync Engine ────────────────────────────────────────────
 
 type SyncCallback = (record: OfflineSosRecord) => Promise<{ success: boolean; incidentId?: string }>
 
 let syncInterval: ReturnType<typeof setInterval> | null = null
 let onSmsFallback: ((record: OfflineSosRecord) => void) | null = null
+let onlineHandler: (() => void) | null = null
+let syncRunning = false
 
 /**
  * Start the auto-sync engine. Checks for pending items and retries on interval.
@@ -192,41 +204,50 @@ export function startSyncEngine(
   onSmsFallback = smsFallbackFn ?? null
 
   async function syncPending() {
-    if (!navigator.onLine) return
+    if (syncRunning) return
+    syncRunning = true
 
-    const pending = await getPendingSos()
-    for (const record of pending) {
-      if (record.sync_attempt_count >= MAX_RETRY_ATTEMPTS) {
-        await updateSosStatus(record.local_sos_id, { sync_status: 'failed' })
-        continue
-      }
+    try {
+      await cleanupExpiredSyncedSos()
+      const pending = await getPendingSos()
+      const online = navigator.onLine
+      for (const record of pending) {
+        if (shouldPromptSmsFallback(record) && onSmsFallback) {
+          onSmsFallback(record)
+          await updateSosStatus(record.local_sos_id, { sms_fallback_triggered: true })
+        }
 
-      // Check SMS fallback threshold
-      const elapsed = Date.now() - new Date(record.created_timestamp).getTime()
-      if (elapsed >= SMS_FALLBACK_THRESHOLD_MS && !record.sms_fallback_triggered && onSmsFallback) {
-        onSmsFallback(record)
-        await updateSosStatus(record.local_sos_id, { sms_fallback_triggered: true })
-      }
+        if (!canRetryOfflineSos(record, Date.now(), online)) continue
 
-      await updateSosStatus(record.local_sos_id, {
-        sync_status: 'syncing',
-        sync_attempt_count: record.sync_attempt_count + 1,
-        last_sync_attempt: new Date().toISOString(),
-      })
-
-      const result = await submitFn(record)
-
-      if (result.success) {
         await updateSosStatus(record.local_sos_id, {
-          sync_status: 'synced',
-          server_incident_id: result.incidentId,
+          sync_status: 'syncing',
+          sync_attempt_count: record.sync_attempt_count + 1,
+          last_sync_attempt: new Date().toISOString(),
         })
-        // Keep in DB for 24h for reference, then clean up
-      } else {
-        await updateSosStatus(record.local_sos_id, {
-          sync_status: record.sync_attempt_count + 1 >= MAX_RETRY_ATTEMPTS ? 'failed' : 'queued_offline',
-        })
+
+        let result: { success: boolean; incidentId?: string }
+        try {
+          result = await submitFn(record)
+        } catch {
+          result = { success: false }
+        }
+
+        if (result.success) {
+          await updateSosStatus(record.local_sos_id, {
+            sync_status: 'synced',
+            server_incident_id: result.incidentId,
+          })
+        } else {
+          await updateSosStatus(record.local_sos_id, {
+            sync_status: record.sync_attempt_count + 1 >= 5 ? 'failed' : 'queued_offline',
+          })
+        }
       }
+    } catch {
+      // IndexedDB can be temporarily unavailable (for example in private mode).
+      // The next interval or online event will retry without losing the record.
+    } finally {
+      syncRunning = false
     }
   }
 
@@ -238,7 +259,8 @@ export function startSyncEngine(
 
   // Also sync when coming back online
   if (typeof window !== 'undefined') {
-    window.addEventListener('online', () => void syncPending())
+    onlineHandler = () => void syncPending()
+    window.addEventListener('online', onlineHandler)
   }
 }
 
@@ -250,6 +272,11 @@ export function stopSyncEngine(): void {
     clearInterval(syncInterval)
     syncInterval = null
   }
+  if (typeof window !== 'undefined' && onlineHandler) {
+    window.removeEventListener('online', onlineHandler)
+    onlineHandler = null
+  }
+  onSmsFallback = null
 }
 
 // ── Network Status Helper ──────────────────────────────────
@@ -263,5 +290,5 @@ export function isOnline(): boolean {
  * Check if an SOS should trigger SMS fallback based on time elapsed.
  */
 export function shouldTriggerSmsFallback(createdTimestamp: string): boolean {
-  return Date.now() - new Date(createdTimestamp).getTime() >= SMS_FALLBACK_THRESHOLD_MS
+  return Date.now() - new Date(createdTimestamp).getTime() >= 10 * 60 * 1000
 }

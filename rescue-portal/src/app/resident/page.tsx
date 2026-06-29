@@ -95,38 +95,12 @@ function ResidentDashboardContent() {
     }
   }, [])
 
-  const startHold = useCallback(() => {
-    if (sendingSos) return
-    setHolding(true)
-    holdStartRef.current = Date.now()
-    // Haptic feedback on start
-    if (navigator.vibrate) navigator.vibrate(50)
-
-    holdTimerRef.current = setInterval(() => {
-      const elapsed = Date.now() - holdStartRef.current
-      const progress = Math.min((elapsed / HOLD_DURATION_MS) * 100, 100)
-      setHoldProgress(progress)
-
-      // Haptic pulse at 50%
-      if (progress >= 50 && progress < 55 && navigator.vibrate) {
-        navigator.vibrate(30)
-      }
-
-      if (progress >= 100) {
-        cancelHold()
-        // Strong haptic on trigger
-        if (navigator.vibrate) navigator.vibrate([100, 50, 100])
-        sendSos()
-      }
-    }, 50)
-  }, [sendingSos, cancelHold])
-
   // Cleanup on unmount
   useEffect(() => {
     return () => { if (holdTimerRef.current) clearInterval(holdTimerRef.current) }
   }, [])
 
-  function sendSos() {
+  const sendSos = useCallback(() => {
     if (!navigator.geolocation) {
       toast.error('This browser cannot share location. Call the emergency hotline now.')
       return
@@ -143,6 +117,9 @@ function ResidentDashboardContent() {
               latitude: position.coords.latitude,
               longitude: position.coords.longitude,
               gps_accuracy: position.coords.accuracy,
+              local_sos_id: crypto.randomUUID(),
+              created_timestamp: new Date().toISOString(),
+              network_status: 'online',
             }),
           })
           const payload = await response.json().catch(() => ({}))
@@ -165,7 +142,30 @@ function ResidentDashboardContent() {
       },
       { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     )
-  }
+  }, [ownerTestMode, router])
+
+  const startHold = useCallback(() => {
+    if (sendingSos) return
+    setHolding(true)
+    holdStartRef.current = Date.now()
+    if (navigator.vibrate) navigator.vibrate(50)
+
+    holdTimerRef.current = setInterval(() => {
+      const elapsed = Date.now() - holdStartRef.current
+      const progress = Math.min((elapsed / HOLD_DURATION_MS) * 100, 100)
+      setHoldProgress(progress)
+
+      if (progress >= 50 && progress < 55 && navigator.vibrate) {
+        navigator.vibrate(30)
+      }
+
+      if (progress >= 100) {
+        cancelHold()
+        if (navigator.vibrate) navigator.vibrate([100, 50, 100])
+        sendSos()
+      }
+    }, 50)
+  }, [sendingSos, cancelHold, sendSos])
 
   return (
     <div className="px-4 py-6 space-y-6">

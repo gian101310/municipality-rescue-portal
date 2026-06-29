@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { DEMO_ORGANIZATION } from '@/lib/demo-data'
 import {
   DEMO_TENANT_GEO_SCOPE,
   PH_LOCALITIES,
@@ -29,8 +28,6 @@ type QueryResult<T> = {
 type SupabaseQueryBuilder = {
   select(columns: string): SupabaseQueryBuilder
   eq(column: string, value: unknown): SupabaseQueryBuilder
-  order(column: string, options: { ascending: boolean }): SupabaseQueryBuilder
-  limit(count: number): SupabaseQueryBuilder
   upsert(values: Record<string, unknown>, options: { onConflict: string }): SupabaseQueryBuilder
   maybeSingle<T = Record<string, unknown>>(): Promise<QueryResult<T>>
   single<T = Record<string, unknown>>(): Promise<QueryResult<T>>
@@ -98,54 +95,25 @@ function normalizeScope(input: unknown): TenantGeographyScope {
   }
 }
 
-async function getOrganizationIdForCurrentUser() {
-  // Try to get the logged-in user's organization first
-  try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
+type CoverageProfile = {
+  role: string
+  organization_id: string | null
+  is_active: boolean
+}
 
-    if (user?.id) {
-      const admin = await createDataClient()
-      const { data: profile } = await admin
-        .from('user_profiles')
-        .select('organization_id')
-        .eq('user_id', user.id)
-        .maybeSingle() as QueryResult<{ organization_id?: string }>
+async function getCoverageProfile() {
+  const supabase = await createClient()
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  if (userError || !user) return null
 
-      if (profile?.organization_id) {
-        return String(profile.organization_id)
-      }
-    }
-  } catch {
-    // Fall through to default lookup
-  }
+  const { data: profile, error: profileError } = await supabase
+    .from('user_profiles')
+    .select('role, organization_id, is_active')
+    .eq('user_id', user.id)
+    .single() as QueryResult<CoverageProfile>
 
-  // Fallback: find by demo slug or first active org
-  const supabase = await createDataClient()
-
-  const bySlug = await supabase
-    .from('organizations')
-    .select('id')
-    .eq('slug', DEMO_ORGANIZATION.slug)
-    .maybeSingle()
-
-  if (bySlug.error) throw bySlug.error
-  const bySlugData = bySlug.data as { id?: string } | null
-  if (bySlugData?.id) return String(bySlugData.id)
-
-  const fallback = await supabase
-    .from('organizations')
-    .select('id')
-    .eq('is_active', true)
-    .order('created_at', { ascending: true })
-    .limit(1)
-    .maybeSingle()
-
-  if (fallback.error) throw fallback.error
-  const fallbackData = fallback.data as { id?: string } | null
-  if (fallbackData?.id) return String(fallbackData.id)
-
-  throw new Error('No active organization found for this deployment.')
+  if (profileError || !profile?.is_active || !profile.organization_id) return null
+  return profile
 }
 
 function serviceUnavailable(error: unknown) {
@@ -171,13 +139,17 @@ function getErrorMessage(error: unknown, fallback: string) {
 
 export async function GET() {
   try {
+    const profile = await getCoverageProfile()
+    if (!profile) {
+      return NextResponse.json({ message: 'Active staff access required.' }, { status: 403 })
+    }
+
     const supabase = await createDataClient()
-    const organizationId = await getOrganizationIdForCurrentUser()
 
     const { data, error } = await supabase
       .from('organization_geo_scopes')
       .select('scope_level, region_code, province_code, municipality_code')
-      .eq('organization_id', organizationId)
+      .eq('organization_id', profile.organization_id)
       .maybeSingle()
 
     if (error) throw error
@@ -194,16 +166,20 @@ export async function GET() {
 
 export async function PUT(request: Request) {
   try {
+    const profile = await getCoverageProfile()
+    if (!profile || profile.role !== 'super_admin' || !profile.is_active) {
+      return NextResponse.json({ message: 'Super admin access required.' }, { status: 403 })
+    }
+
     const body = await request.json()
     const scope = normalizeScope(body?.scope)
     const supabase = await createDataClient()
-    const organizationId = await getOrganizationIdForCurrentUser()
 
     const { data, error } = await supabase
       .from('organization_geo_scopes')
       .upsert(
         {
-          organization_id: organizationId,
+          organization_id: profile.organization_id,
           scope_level: scope.level,
           region_code: scope.regionCode ?? null,
           province_code: scope.provinceCode ?? null,
