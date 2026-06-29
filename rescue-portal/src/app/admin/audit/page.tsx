@@ -2,17 +2,15 @@
 
 import { useState, useEffect } from 'react'
 import { ChevronDown, ChevronRight, Filter, Download, Lock } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { DEMO_AUDIT_LOGS } from '@/lib/demo-data'
 import { formatDateTime } from '@/lib/utils'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
-import { createClient } from '@/lib/supabase/client'
-import type { AuditAction } from '@/lib/types'
+import type { AuditAction, AuditLog } from '@/lib/types'
 
 const ACTION_COLORS: Record<AuditAction, string> = {
   create: 'bg-green-900/30 text-green-400',
@@ -48,18 +46,24 @@ export default function AuditPage() {
   const [actionFilter, setActionFilter] = useState('all')
   const [expanded, setExpanded] = useState<string | null>(null)
   const [userRole, setUserRole] = useState<string>('')
+  const [logs, setLogs] = useState<AuditLog[]>([])
+  const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    async function loadRole() {
+    async function loadAudit() {
       try {
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return
-        const { data: profile } = await supabase.from('user_profiles').select('role').eq('user_id', user.id).single() as { data: { role: string } | null; error: unknown }
-        if (profile) setUserRole(profile.role)
-      } catch { /* silent */ }
+        const response = await fetch('/api/admin/audit', { cache: 'no-store' })
+        const payload = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(payload?.message ?? 'Unable to load audit logs.')
+        setLogs((payload.logs ?? []) as AuditLog[])
+        setUserRole(String(payload.role ?? ''))
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Unable to load audit logs.')
+      } finally {
+        setLoading(false)
+      }
     }
-    loadRole()
+    void loadAudit()
   }, [])
 
   const isAdmin = ADMIN_ROLES.has(userRole)
@@ -79,7 +83,7 @@ export default function AuditPage() {
     toast.success(`Exported ${filtered.length} audit log entries`)
   }
 
-  const filtered = DEMO_AUDIT_LOGS.filter((log) => {
+  const filtered = logs.filter((log) => {
     if (actionFilter !== 'all' && log.action !== actionFilter) return false
     if (search) {
       const q = search.toLowerCase()
@@ -218,10 +222,13 @@ export default function AuditPage() {
                     </>
                   )
                 })}
-                {filtered.length === 0 && (
+                {!loading && filtered.length === 0 && (
                   <tr>
                     <td colSpan={7} className="text-center py-12 text-slate-500">No audit logs found</td>
                   </tr>
+                )}
+                {loading && (
+                  <tr><td colSpan={7} className="text-center py-12 text-slate-500">Loading audit logs…</td></tr>
                 )}
               </tbody>
             </table>

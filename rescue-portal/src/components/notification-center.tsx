@@ -12,7 +12,6 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { formatRelativeTime } from '@/lib/utils'
-import { DEMO_NOTIFICATIONS } from '@/lib/demo-data'
 import { getStoredSoundPreference, playAdminNotificationSound } from '@/lib/notification-sound'
 import type { Notification, NotificationType } from '@/lib/types'
 import { cn } from '@/lib/utils'
@@ -34,14 +33,23 @@ function NotificationIcon({ type }: { type: NotificationType }) {
   }
 }
 
-interface NotificationCenterProps {
-  userId?: string
-}
+export function NotificationCenter() {
+  const [notifications, setNotifications] = useState<Notification[]>([])
 
-export function NotificationCenter({ userId }: NotificationCenterProps) {
-  const [notifications, setNotifications] = useState<Notification[]>(
-    DEMO_NOTIFICATIONS.filter((n) => !userId || n.user_id === userId || n.user_id === 'uid-disp')
-  )
+  useEffect(() => {
+    let cancelled = false
+    async function loadNotifications() {
+      try {
+        const response = await fetch('/api/notifications', { cache: 'no-store' })
+        if (!response.ok) return
+        const payload = await response.json() as { notifications?: Notification[] }
+        if (!cancelled) setNotifications(payload.notifications ?? [])
+      } catch { /* retry on the next interval */ }
+    }
+    void loadNotifications()
+    const interval = window.setInterval(loadNotifications, 30_000)
+    return () => { cancelled = true; window.clearInterval(interval) }
+  }, [])
 
   const unreadCount = notifications.filter((n) => !n.is_read).length
   const previousUnreadCount = useRef(unreadCount)
@@ -57,7 +65,8 @@ export function NotificationCenter({ userId }: NotificationCenterProps) {
     previousUnreadCount.current = unreadCount
   }, [unreadCount])
 
-  function markAsRead(id: string) {
+  async function markAsRead(id: string) {
+    await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id }) })
     setNotifications((prev) =>
       prev.map((n) =>
         n.id === id ? { ...n, is_read: true, read_at: new Date().toISOString() } : n
@@ -65,7 +74,8 @@ export function NotificationCenter({ userId }: NotificationCenterProps) {
     )
   }
 
-  function markAllRead() {
+  async function markAllRead() {
+    await fetch('/api/notifications', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ all: true }) })
     setNotifications((prev) =>
       prev.map((n) => ({ ...n, is_read: true, read_at: new Date().toISOString() }))
     )

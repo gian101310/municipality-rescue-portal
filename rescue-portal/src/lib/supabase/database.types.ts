@@ -28,6 +28,7 @@ export type Database = {
       false_alert_reviews: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown> }
       triage_answers: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown> }
       organization_geo_scopes: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown> }
+      rescue_unit_shifts: { Row: Record<string, unknown>; Insert: Record<string, unknown>; Update: Record<string, unknown> }
     }
     Views: Record<string, never>
     Functions: {

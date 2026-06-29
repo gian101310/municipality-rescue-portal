@@ -249,7 +249,11 @@ function EmergencyPageContent() {
             const fd = new FormData()
             fd.append('file', file)
             fd.append('incident_id', incidentId)
-            await fetch(withOwnerTestMode('/api/resident/incidents/attachments', ownerTestMode), { method: 'POST', body: fd })
+            const upload = await fetch(withOwnerTestMode('/api/resident/incidents/attachments', ownerTestMode), { method: 'POST', body: fd })
+            if (!upload.ok) {
+              const uploadError = await upload.json().catch(() => ({}))
+              throw new Error(uploadError?.error ?? 'Upload failed.')
+            }
           } catch {
             toast.error(`Failed to upload ${file.name}`)
           }

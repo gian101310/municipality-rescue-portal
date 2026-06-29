@@ -123,10 +123,10 @@ export default function TeamsPage() {
 
   async function removeMember(teamId: string, memberId: string, memberName: string) {
     if (!confirm(`Remove ${memberName} from this team?`)) return
-    // Use PATCH to deactivate the member
-    const response = await fetch(`/api/admin/teams/${teamId}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
-    // For now just reload — in a full implementation we'd have a DELETE /members/:id endpoint
-    toast.info(`${memberName} would be removed (pending member removal endpoint)`); void loadTeams()
+    const response = await fetch(`/api/admin/teams/${teamId}/members`, { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ memberId }) })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) { toast.error(payload?.message ?? 'Unable to remove team member.'); return }
+    toast.success(`${memberName} removed from the team`); void loadTeams()
   }
 
   async function openDispatch(team: any) {

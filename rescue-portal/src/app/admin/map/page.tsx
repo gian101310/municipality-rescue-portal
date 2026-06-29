@@ -10,7 +10,6 @@ import { MapView } from '@/components/map-view'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
-// Rescue units will come from real data in a future phase
 import { formatRelativeTime, getSeverityHexColor } from '@/lib/utils'
 import { isActiveStatus } from '@/lib/utils'
 import {
@@ -22,7 +21,7 @@ import {
 import { DEMO_TENANT_GEO_SCOPE } from '@/lib/philippines-geography'
 import type { TenantGeographyScope } from '@/lib/philippines-geography'
 import Link from 'next/link'
-import type { DemoIncident } from '@/lib/types'
+import type { DemoIncident, RescueUnit } from '@/lib/types'
 import { toast } from 'sonner'
 import { useRealtimeIncidents } from '@/lib/use-realtime-incidents'
 import { mergeLiveIncident } from '@/lib/live-incidents'
@@ -48,6 +47,7 @@ export default function LiveMapPage() {
   const [focusSource, setFocusSource] = useState('Loading focus')
   const [incidents, setIncidents] = useState<DemoIncident[]>([])
   const [loadingIncidents, setLoadingIncidents] = useState(true)
+  const [rescueUnits, setRescueUnits] = useState<RescueUnit[]>([])
 
   const activeIncidents = incidents.filter((i) => isActiveStatus(i.status))
   const filteredIncidents = activeIncidents.filter((i) =>
@@ -74,8 +74,15 @@ export default function LiveMapPage() {
     }
 
     async function loadFocus() {
-      const result = await loadCoverageLock()
-      await applyScope(result.scope)
+      try {
+        const result = await loadCoverageLock()
+        await applyScope(result.scope)
+      } catch (error) {
+        if (!cancelled) {
+          setFocusSource('Coverage unavailable')
+          toast.error(error instanceof Error ? error.message : 'Coverage lock is unavailable.')
+        }
+      }
     }
 
     function handleCoverageChange(event: Event) {
@@ -109,12 +116,22 @@ export default function LiveMapPage() {
     }
   }
 
+  const fetchRescueUnits = async (silent = false) => {
+    try {
+      const response = await fetch('/api/admin/teams', { cache: 'no-store' })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload?.message ?? 'Unable to load rescue teams.')
+      setRescueUnits((payload?.units ?? []) as RescueUnit[])
+    } catch (error) {
+      if (!silent) toast.error(error instanceof Error ? error.message : 'Unable to load rescue teams.')
+    }
+  }
+
   useEffect(() => {
-    fetchIncidents()
+    const initialLoad = window.setTimeout(() => { void Promise.all([fetchIncidents(), fetchRescueUnits()]) }, 0)
     // Auto-refresh every 10 seconds
-    const interval = setInterval(() => fetchIncidents(true), 10000)
-    return () => clearInterval(interval)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const interval = setInterval(() => { void fetchIncidents(true); void fetchRescueUnits(true) }, 10000)
+    return () => { window.clearTimeout(initialLoad); clearInterval(interval) }
   }, [])
 
   const { isConnected: realtimeConnected } = useRealtimeIncidents({
@@ -149,11 +166,18 @@ export default function LiveMapPage() {
       label: inc.reference_number,
       severity: inc.severity,
     })),
-  ], [buyerDetails.locationName, filteredIncidents, mapCenter.lat, mapCenter.lng])
+    ...rescueUnits.filter((unit) => typeof unit.current_lat === 'number' && typeof unit.current_lng === 'number').map((unit) => ({
+      id: `unit:${unit.id}`,
+      lat: unit.current_lat as number,
+      lng: unit.current_lng as number,
+      color: '#22c55e',
+      label: `${unit.name} · ${unit.status.replaceAll('_', ' ')}`,
+    })),
+  ], [buyerDetails.locationName, filteredIncidents, mapCenter.lat, mapCenter.lng, rescueUnits])
 
   async function handleRefresh() {
     setRefreshing(true)
-    await fetchIncidents()
+    await Promise.all([fetchIncidents(), fetchRescueUnits()])
     setRefreshing(false)
   }
 
@@ -318,13 +342,20 @@ export default function LiveMapPage() {
             </CardContent>
           </Card>
 
-          {/* Rescue units — placeholder until teams feature is wired */}
           <Card className="bg-slate-900 border-slate-700">
             <CardHeader className="pb-2 pt-3 px-3">
               <CardTitle className="text-sm text-slate-300">Rescue Units</CardTitle>
             </CardHeader>
             <CardContent className="px-3 pb-3">
-              <p className="text-xs text-slate-500 text-center py-4">Team data will appear here once rescue units are registered.</p>
+              <div className="space-y-2">
+                {rescueUnits.map((unit) => (
+                  <div key={unit.id} className="rounded-md border border-slate-700 bg-slate-800/60 p-2">
+                    <div className="flex items-center justify-between gap-2"><p className="text-xs font-semibold text-slate-200 truncate">{unit.name}</p><span className="text-[10px] uppercase text-slate-400">{unit.status.replaceAll('_', ' ')}</span></div>
+                    <p className="mt-1 text-[11px] text-slate-500">{unit.last_location_update ? `GPS ${formatRelativeTime(unit.last_location_update)}` : 'Waiting for responder GPS'}</p>
+                  </div>
+                ))}
+                {rescueUnits.length === 0 && <p className="text-xs text-slate-500 text-center py-4">No active rescue teams registered.</p>}
+              </div>
             </CardContent>
           </Card>
         </div>

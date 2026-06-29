@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import {
-  DEMO_TENANT_GEO_SCOPE,
   PH_LOCALITIES,
   PH_PROVINCES,
   PH_REGIONS,
@@ -52,8 +51,8 @@ async function createDataClient() {
   return await createAdminClient() as unknown as SupabaseDataClient
 }
 
-function rowToScope(row: CoverageLockRow | null): TenantGeographyScope {
-  if (!row?.scope_level) return DEMO_TENANT_GEO_SCOPE
+function rowToScope(row: CoverageLockRow): TenantGeographyScope {
+  if (!row.scope_level) throw new Error('Coverage lock is not configured.')
 
   return {
     level: row.scope_level,
@@ -121,8 +120,6 @@ function serviceUnavailable(error: unknown) {
 
   return NextResponse.json(
     {
-      scope: DEMO_TENANT_GEO_SCOPE,
-      persistence: 'demo',
       message,
     },
     { status: 503 }
@@ -153,9 +150,10 @@ export async function GET() {
       .maybeSingle()
 
     if (error) throw error
+    if (!data) return NextResponse.json({ message: 'Coverage lock is not configured.' }, { status: 404 })
 
     return NextResponse.json({
-      scope: rowToScope(data as CoverageLockRow | null),
+      scope: rowToScope(data as CoverageLockRow),
       persistence: 'supabase',
       psgcVersion: PSGC_VERSION_LABEL,
     })

@@ -53,7 +53,7 @@ export default function SettingsPage() {
   const { isUnlocked } = useMasterKey()
   const [showToken, setShowToken] = useState(false)
   const [savingCoverage, setSavingCoverage] = useState(false)
-  const [coveragePersistence, setCoveragePersistence] = useState<'checking' | 'supabase' | 'demo'>('checking')
+  const [coveragePersistence, setCoveragePersistence] = useState<'checking' | 'supabase' | 'unavailable'>('checking')
   const [profileRole, setProfileRole] = useState<string | null>(null)
   const [orgName, setOrgName] = useState(settings.municipalityName || DEMO_ORGANIZATION.name)
   const [hotline, setHotline] = useState(settings.hotline || DEMO_ORGANIZATION.emergency_hotline)
@@ -118,10 +118,10 @@ export default function SettingsPage() {
     } finally { setCsvImporting(false) }
   }
 
-  useEffect(() => { void loadBarangays() }, [])
+  useEffect(() => { const timer = window.setTimeout(() => { void loadBarangays() }, 0); return () => window.clearTimeout(timer) }, [])
   async function loadEmergencyTypes() { const response = await fetch('/api/admin/emergency-types'); const payload = await response.json().catch(() => ({})); if (response.ok) setEmergencyTypes(payload.emergencyTypes ?? []) }
   async function addEmergencyType() { const name = window.prompt('Emergency type name')?.trim(); if (!name) return; const response = await fetch('/api/admin/emergency-types', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }) }); const payload = await response.json().catch(() => ({})); if (!response.ok) return toast.error(payload.message ?? 'Unable to add emergency type.'); toast.success('Custom emergency type added'); void loadEmergencyTypes() }
-  useEffect(() => { void loadEmergencyTypes() }, [])
+  useEffect(() => { const timer = window.setTimeout(() => { void loadEmergencyTypes() }, 0); return () => window.clearTimeout(timer) }, [])
 
   const currentScope = makeTenantScope(
     scopeLevel,
@@ -194,11 +194,17 @@ export default function SettingsPage() {
     }
 
     async function loadSavedCoverageLock() {
-      const result = await loadCoverageLock()
-      if (cancelled) return
-
-      applyCoverageScope(result.scope)
-      setCoveragePersistence(result.persistence)
+      try {
+        const result = await loadCoverageLock()
+        if (cancelled) return
+        applyCoverageScope(result.scope)
+        setCoveragePersistence(result.persistence)
+      } catch (error) {
+        if (!cancelled) {
+          setCoveragePersistence('unavailable')
+          toast.error(error instanceof Error ? error.message : 'Coverage lock is unavailable.')
+        }
+      }
     }
 
     async function loadOrgSettings() {
@@ -206,6 +212,10 @@ export default function SettingsPage() {
       const payload = await res.json().catch(() => ({}))
       if (cancelled || !res.ok) return
       const s = payload.settings
+      if (s?.name) setOrgName(s.name)
+      if (s?.emergency_hotline) setHotline(s.emergency_hotline)
+      setSecondaryHotline(s?.secondary_hotline ?? '')
+      setEmail(s?.email ?? '')
       if (s?.branding?.localDescription) setLocalDescription(s.branding.localDescription)
       if (s?.branding?.dialect) setDialect(s.branding.dialect)
     }
@@ -260,9 +270,7 @@ export default function SettingsPage() {
       const result = await saveCoverageLock(currentScope)
       applyCoverageScope(result.scope)
       setCoveragePersistence(result.persistence)
-      toast.success(result.persistence === 'supabase'
-        ? 'Coverage lock saved to Supabase'
-        : 'Coverage lock saved for testing')
+      toast.success('Coverage lock saved to Supabase')
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Unable to save coverage lock.')
     } finally {
@@ -496,7 +504,7 @@ export default function SettingsPage() {
                     ? 'Checking...'
                     : coveragePersistence === 'supabase'
                     ? 'Supabase persisted'
-                    : 'Demo fallback'}
+                    : 'Unavailable — not saved'}
                 </p>
               </div>
 

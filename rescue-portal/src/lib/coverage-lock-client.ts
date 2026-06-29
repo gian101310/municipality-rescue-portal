@@ -3,7 +3,6 @@
 import {
   COVERAGE_LOCK_GEOCODE_STORAGE_KEY,
   COVERAGE_LOCK_STORAGE_KEY,
-  DEMO_TENANT_GEO_SCOPE,
   getCountryForScope,
   getFallbackMapCenter,
   getScopeGeocodeQuery,
@@ -13,7 +12,7 @@ import type { TenantGeographyScope } from '@/lib/philippines-geography'
 
 export const COVERAGE_LOCK_CHANGED_EVENT = 'coverage-lock-changed'
 
-export type CoveragePersistence = 'checking' | 'supabase' | 'demo'
+export type CoveragePersistence = 'checking' | 'supabase' | 'unavailable'
 
 export function readLocalCoverageLock() {
   try {
@@ -30,50 +29,25 @@ export function writeLocalCoverageLock(scope: TenantGeographyScope) {
 }
 
 export async function loadCoverageLock() {
-  try {
-    const response = await fetch('/api/coverage-lock', { cache: 'no-store' })
-    const payload = await response.json()
-
-    if (response.ok && payload.scope) {
-      return {
-        scope: payload.scope as TenantGeographyScope,
-        persistence: 'supabase' as CoveragePersistence,
-      }
-    }
-  } catch {
-    // Local fallback below keeps the demo usable without configured Supabase.
-  }
-
-  return {
-    scope: readLocalCoverageLock() ?? DEMO_TENANT_GEO_SCOPE,
-    persistence: 'demo' as CoveragePersistence,
-  }
+  const response = await fetch('/api/coverage-lock', { cache: 'no-store' })
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok || !payload.scope) throw new Error(payload.message ?? 'Coverage lock is not configured.')
+  writeLocalCoverageLock(payload.scope as TenantGeographyScope)
+  return { scope: payload.scope as TenantGeographyScope, persistence: 'supabase' as CoveragePersistence }
 }
 
 export async function saveCoverageLock(scope: TenantGeographyScope) {
-  try {
-    const response = await fetch('/api/coverage-lock', {
+  const response = await fetch('/api/coverage-lock', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ scope }),
     })
-    const payload = await response.json()
+  const payload = await response.json().catch(() => ({}))
 
-    if (!response.ok) {
-      throw new Error(payload.message ?? 'Unable to save coverage lock.')
-    }
+  if (!response.ok) throw new Error(payload.message ?? 'Unable to save coverage lock.')
 
-    return {
-      scope: payload.scope as TenantGeographyScope,
-      persistence: 'supabase' as CoveragePersistence,
-    }
-  } catch {
-    writeLocalCoverageLock(scope)
-    return {
-      scope,
-      persistence: 'demo' as CoveragePersistence,
-    }
-  }
+  writeLocalCoverageLock(payload.scope as TenantGeographyScope)
+  return { scope: payload.scope as TenantGeographyScope, persistence: 'supabase' as CoveragePersistence }
 }
 
 export function getBuyerDetails(scope: TenantGeographyScope) {

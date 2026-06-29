@@ -13,7 +13,6 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { DemoBanner } from '@/components/demo-banner'
 import { LanguageSwitcher } from '@/components/language-switcher'
-import { DEMO_NOTIFICATIONS } from '@/lib/demo-data'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { isOwnerTestMode, withOwnerTestMode } from '@/lib/owner-test-mode'
@@ -43,7 +42,7 @@ function ResidentLayoutContent({ children }: { children: React.ReactNode }) {
   const searchParams = useSearchParams()
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
   const ownerTestMode = isOwnerTestMode(searchParams) && isSuperAdmin
-  const unread = DEMO_NOTIFICATIONS.filter((n) => !n.is_read && n.user_id === 'uid-res-001').length
+  const [unread, setUnread] = useState(0)
   const { online, pendingCount, smsFallbackRecord, dismissSmsFallback } = useOfflineSos()
   const { settings } = useSettings()
 
@@ -106,6 +105,21 @@ function ResidentLayoutContent({ children }: { children: React.ReactNode }) {
     void loadProfile()
     return () => { cancelled = true }
   }, [router])
+
+  useEffect(() => {
+    let cancelled = false
+    async function loadUnread() {
+      try {
+        const response = await fetch('/api/notifications', { cache: 'no-store' })
+        if (!response.ok) return
+        const payload = await response.json() as { notifications?: Array<{ is_read: boolean }> }
+        if (!cancelled) setUnread((payload.notifications ?? []).filter((item) => !item.is_read).length)
+      } catch { /* retry later */ }
+    }
+    void loadUnread()
+    const interval = window.setInterval(loadUnread, 30_000)
+    return () => { cancelled = true; window.clearInterval(interval) }
+  }, [])
 
   function residentHref(path: string) {
     return withOwnerTestMode(path, ownerTestMode)
