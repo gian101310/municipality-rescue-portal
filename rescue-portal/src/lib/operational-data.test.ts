@@ -73,4 +73,7 @@ test('organization settings contain no simulated controls and persist editable f
   assert.match(settingsRoute, /map_center_lat:/)
   assert.match(logoRoute, /\.storage\s*\.from\('organization-assets'\)\s*\.upload/)
   assert.match(logoRoute, /logo_url/)
+
+  const coverageApplication = page.match(/function applyCoverageScope[\s\S]*?\n  }/)?.[0] ?? ''
+  assert.doesNotMatch(coverageApplication, /setOrgName/)
 })

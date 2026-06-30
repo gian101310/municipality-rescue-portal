@@ -167,7 +167,6 @@ export default function SettingsPage() {
     setScopeRegionCode(scope.regionCode ?? details.region?.code ?? '')
     setScopeProvinceCode(scope.provinceCode ?? details.province?.code ?? '')
     setScopeMunicipalityCode(scope.municipalityCode ?? '')
-    setOrgName(details.organizationName)
     setProvince(details.provinceName || 'Philippines')
     setRegion(details.regionName || 'Philippines')
     setMunicipality(details.municipalityName || '')
