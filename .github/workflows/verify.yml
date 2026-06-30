@@ -26,7 +26,8 @@ jobs:
           node-version: 22
           cache: npm
           cache-dependency-path: rescue-portal/package-lock.json
-      - run: npm ci
+      - run: npm ci --legacy-peer-deps
+      - run: npm audit --omit=dev --audit-level=moderate
       - run: npm test
       - run: npm run lint
       - run: npm run build
