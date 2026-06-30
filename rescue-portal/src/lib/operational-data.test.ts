@@ -77,3 +77,45 @@ test('organization settings contain no simulated controls and persist editable f
   const coverageApplication = page.match(/function applyCoverageScope[\s\S]*?\n  }/)?.[0] ?? ''
   assert.doesNotMatch(coverageApplication, /setOrgName/)
 })
+
+test('dispatch does not advertise or confirm unsupported municipality transfers', () => {
+  const page = readFileSync(new URL('../app/dispatch/page.tsx', import.meta.url), 'utf8')
+
+  assert.doesNotMatch(page, /transferToMunicipality|Transfer to (Nearest|Another) Municipality/)
+  assert.doesNotMatch(page, /Transfer request sent|Incident forwarded|\bBETA\b/)
+})
+
+test('resident verification describes only identity data that was actually submitted', () => {
+  const page = readFileSync(new URL('../app/admin/verification/page.tsx', import.meta.url), 'utf8')
+
+  assert.doesNotMatch(page, /ID scan would be shown here in production/)
+  assert.match(page, /No ID document was uploaded/)
+})
+
+test('incident internal notes are saved through a tenant-scoped endpoint', () => {
+  const page = readFileSync(new URL('../app/admin/incidents/[id]/page.tsx', import.meta.url), 'utf8')
+  const route = readFileSync(new URL('../app/api/admin/incidents/[id]/notes/route.ts', import.meta.url), 'utf8')
+
+  assert.match(page, /fetch\(`\/api\/admin\/incidents\/\$\{incident\.id\}\/notes`/)
+  assert.match(page, /method: 'POST'/)
+  assert.match(route, /organization_id/)
+  assert.match(route, /\.from\('incident_notes'\)/)
+  assert.match(route, /is_internal: true/)
+  assert.doesNotMatch(page, /function handleAddNote\(\) \{\s*if \(!note\.trim\(\)\) return\s*toast\.success/s)
+})
+
+test('QR posters never render a decorative non-scannable fallback', () => {
+  const page = readFileSync(new URL('../app/admin/qr-posters/page.tsx', import.meta.url), 'utf8')
+
+  assert.doesNotMatch(page, /generateQRMatrix|QRCodeSVG/)
+  assert.match(page, /QRCode\.toDataURL/)
+  assert.match(page, /Generating secure QR code/)
+})
+
+test('incident detail loads the assigned rescue unit from live tenant data', () => {
+  const page = readFileSync(new URL('../app/admin/incidents/[id]/page.tsx', import.meta.url), 'utf8')
+
+  assert.doesNotMatch(page, /const assignedUnit = null/)
+  assert.match(page, /fetch\('\/api\/admin\/teams'/)
+  assert.match(page, /setAssignedUnit/)
+})

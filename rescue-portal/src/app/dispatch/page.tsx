@@ -5,7 +5,7 @@ import {
   MapPin, Phone, CheckCircle2, Truck,
   Loader2, Siren, XCircle, ChevronRight,
   Radio, Lock, Flag, Navigation,
-  ClipboardCheck, ArrowRightLeft, Building2, Search, Users,
+  ClipboardCheck, Users,
 } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -17,7 +17,6 @@ import { EmergencyTypeIcon } from '@/components/emergency-type-icon'
 import { RescueTrackingMap } from '@/components/rescue-tracking-map'
 import type { IncidentStatus, SeverityLevel } from '@/lib/types'
 import { buildStatusUpdateRequest } from '@/lib/incident-status-actions'
-import { MUNICIPALITY_REGISTRY } from '@/lib/lgu-directory'
 import { toast } from 'sonner'
 
 type Incident = {
@@ -71,10 +70,6 @@ export default function DispatchPage() {
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
   const [tab, setTab] = useState('pending')
-  const [showTransferModal, setShowTransferModal] = useState(false)
-  const [transferSearch, setTransferSearch] = useState('')
-  const [transferring, setTransferring] = useState(false)
-
   // Team dispatch selection
   const [showTeamPicker, setShowTeamPicker] = useState(false)
   const [teamPickerIncidentId, setTeamPickerIncidentId] = useState<string | null>(null)
@@ -172,39 +167,6 @@ export default function DispatchPage() {
       setAssigningTeamId(null)
     }
   }
-
-  async function transferToMunicipality(incidentId: string, municipalityId: string, municipalityName: string) {
-    setTransferring(true)
-    try {
-      // In production, this calls an API that forwards the incident to the target municipality's tenant
-      // For beta, we mark it as forwarded and log it
-      const res = await fetch(`/api/admin/incidents/${incidentId}/status`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'forwarded', forwarded_to: municipalityName }),
-      })
-      if (!res.ok) {
-        // If API doesn't support 'forwarded' status yet, just mark as note
-        toast.success(`📤 Transfer request sent to ${municipalityName} Dispatch Ops`)
-      } else {
-        toast.success(`📤 Incident forwarded to ${municipalityName} Dispatch`)
-      }
-      setShowTransferModal(false)
-      setTransferSearch('')
-      await fetchIncidents()
-    } catch {
-      toast.success(`📤 Transfer request sent to ${municipalityName} Dispatch Ops (beta)`)
-      setShowTransferModal(false)
-    } finally {
-      setTransferring(false)
-    }
-  }
-
-  const filteredMunicipalities = MUNICIPALITY_REGISTRY.filter(m =>
-    m.name.toLowerCase().includes(transferSearch.toLowerCase()) ||
-    m.province.toLowerCase().includes(transferSearch.toLowerCase()) ||
-    m.region.toLowerCase().includes(transferSearch.toLowerCase())
-  )
 
   // Categorize
   const pendingDispatch = incidents.filter(i => ['submitted', 'received', 'verified'].includes(i.status))
@@ -345,28 +307,7 @@ export default function DispatchPage() {
                 <Users className="w-5 h-5 mr-2" />
                 Select Team & Dispatch
               </Button>
-              <Button
-                onClick={() => setShowTransferModal(true)}
-                variant="outline"
-                className="w-full h-12 border-amber-600/50 text-amber-400 hover:bg-amber-900/20 hover:text-amber-300 font-medium"
-              >
-                <ArrowRightLeft className="w-4 h-4 mr-2" />
-                Transfer to Nearest Municipality
-              </Button>
             </>
-          )}
-
-          {/* Active missions can also be transferred */}
-          {['assigned', 'accepted', 'dispatched', 'on_the_way'].includes(inc.status) && (
-            <Button
-              onClick={() => setShowTransferModal(true)}
-              variant="outline"
-              size="sm"
-              className="w-full border-amber-600/50 text-amber-400 hover:bg-amber-900/20 hover:text-amber-300 text-xs"
-            >
-              <ArrowRightLeft className="w-3.5 h-3.5 mr-1" />
-              Transfer to Another Municipality
-            </Button>
           )}
 
           {inc.status === 'resolved' && (
@@ -506,72 +447,6 @@ export default function DispatchPage() {
           </div>
         )}
 
-        {/* Transfer Modal */}
-        {showTransferModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-            <div className="w-full max-w-md bg-slate-900 border border-slate-700 rounded-xl shadow-2xl overflow-hidden">
-              <div className="p-4 border-b border-slate-700 bg-slate-800">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <ArrowRightLeft className="w-5 h-5 text-amber-400" />
-                    <h3 className="text-white font-bold text-sm">Transfer to Municipality</h3>
-                  </div>
-                  <button onClick={() => { setShowTransferModal(false); setTransferSearch('') }} className="text-slate-400 hover:text-white text-lg">✕</button>
-                </div>
-                <p className="text-xs text-slate-400 mt-1">Forward this SOS to another municipality&apos;s dispatch team</p>
-              </div>
-              <div className="p-3 border-b border-slate-700">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" />
-                  <input
-                    type="text"
-                    placeholder="Search municipality, province, or region..."
-                    value={transferSearch}
-                    onChange={(e) => setTransferSearch(e.target.value)}
-                    className="w-full pl-9 pr-3 py-2.5 bg-slate-800 border border-slate-600 rounded-lg text-sm text-white placeholder:text-slate-500 focus:outline-none focus:ring-2 focus:ring-amber-500/50 focus:border-amber-500"
-                    autoFocus
-                  />
-                </div>
-              </div>
-              <div className="max-h-[300px] overflow-y-auto p-2 space-y-1">
-                {filteredMunicipalities.length === 0 ? (
-                  <div className="text-center py-6">
-                    <Building2 className="w-8 h-8 text-slate-600 mx-auto mb-2" />
-                    <p className="text-sm text-slate-400">No municipality found</p>
-                    <p className="text-xs text-slate-500">Try a different search term</p>
-                  </div>
-                ) : (
-                  filteredMunicipalities.map(m => (
-                    <button
-                      key={m.id}
-                      onClick={() => transferToMunicipality(inc.id, m.id, m.name)}
-                      disabled={transferring || m.status === 'offline'}
-                      className="w-full flex items-center gap-3 p-3 rounded-lg hover:bg-slate-800 transition-colors text-left disabled:opacity-40 disabled:cursor-not-allowed"
-                    >
-                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${m.status === 'active' ? 'bg-green-900/30' : 'bg-amber-900/30'}`}>
-                        <Building2 className={`w-4 h-4 ${m.status === 'active' ? 'text-green-400' : 'text-amber-400'}`} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm text-white font-medium truncate">{m.name}</p>
-                          <span className={`w-2 h-2 rounded-full shrink-0 ${m.status === 'active' ? 'bg-green-400' : m.status === 'onboarding' ? 'bg-amber-400' : 'bg-slate-600'}`} />
-                        </div>
-                        <p className="text-xs text-slate-400">{m.province} · {m.region}</p>
-                        {m.dispatch_phone && <p className="text-xs text-slate-500">{m.dispatch_phone}</p>}
-                      </div>
-                      <span className={`text-[9px] font-bold uppercase px-2 py-0.5 rounded ${m.status === 'active' ? 'bg-green-900/50 text-green-400' : 'bg-amber-900/50 text-amber-400'}`}>
-                        {m.status === 'active' ? 'ONLINE' : 'BETA'}
-                      </span>
-                    </button>
-                  ))
-                )}
-              </div>
-              <div className="p-3 border-t border-slate-700 bg-slate-800/50">
-                <p className="text-[10px] text-slate-500 text-center">🟢 Online = can receive forwarded SOS · 🟡 Beta = contact via phone</p>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     )
   }

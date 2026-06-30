@@ -39,15 +39,26 @@ const ALL_STATUSES: IncidentStatus[] = [
   'false_alert', 'cancelled', 'unable_to_contact'
 ]
 
+type InternalNote = {
+  id: string
+  note: string
+  user_name: string
+  user_role: string
+  created_at: string
+}
+
 export default function IncidentDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const [incident, setIncident] = useState<DemoIncident | null>(null)
   const [loadingIncident, setLoadingIncident] = useState(true)
   const [note, setNote] = useState('')
+  const [internalNotes, setInternalNotes] = useState<InternalNote[]>([])
+  const [savingNote, setSavingNote] = useState(false)
   const [newStatus, setNewStatus] = useState<IncidentStatus | ''>('')
   const [statusReason, setStatusReason] = useState('')
   const [showTeamDialog, setShowTeamDialog] = useState(false)
   const [availableTeams, setAvailableTeams] = useState<Array<{ id: string; name: string; status: string; team_leader_name?: string; contact_number?: string }>>([])
+  const [assignedUnit, setAssignedUnit] = useState<RescueUnit | null>(null)
   const [loadingTeams, setLoadingTeams] = useState(false)
   const [assigningTeamId, setAssigningTeamId] = useState<string | null>(null)
 
@@ -55,7 +66,11 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
     let cancelled = false
     async function load() {
       try {
-        const response = await fetch('/api/admin/incidents', { cache: 'no-store' })
+        const [response, notesResponse, teamsResponse] = await Promise.all([
+          fetch('/api/admin/incidents', { cache: 'no-store' }),
+          fetch(`/api/admin/incidents/${id}/notes`, { cache: 'no-store' }),
+          fetch('/api/admin/teams', { cache: 'no-store' }),
+        ])
         const payload = await response.json().catch(() => ({}))
 
         if (!response.ok) {
@@ -63,7 +78,14 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
         }
 
         const realIncident = ((payload?.incidents ?? []) as DemoIncident[]).find((item) => item.id === id)
-        if (!cancelled) setIncident(realIncident ?? null)
+        const notesPayload = await notesResponse.json().catch(() => ({}))
+        const teamsPayload = await teamsResponse.json().catch(() => ({}))
+        if (!cancelled) {
+          setIncident(realIncident ?? null)
+          setInternalNotes(notesResponse.ok ? (notesPayload.notes ?? []) : [])
+          const teams = teamsResponse.ok ? (teamsPayload.teams ?? []) as RescueUnit[] : []
+          setAssignedUnit(realIncident?.assigned_unit_id ? teams.find((team) => team.id === realIncident.assigned_unit_id) ?? null : null)
+        }
       } catch {
         if (!cancelled) setIncident(null)
       } finally {
@@ -94,10 +116,6 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
       </div>
     )
   }
-
-  // Reporter info comes from the incident itself (reporter_name, reporter_phone)
-  // Assigned unit info will be loaded from real data when teams feature is built
-  const assignedUnit = null as RescueUnit | null
 
   const mapMarker = getIncidentDetailMarker({
     id: incident.id,
@@ -176,6 +194,7 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
       const payload = await response.json().catch(() => ({}))
       if (!response.ok) return toast.error(payload.message ?? 'Unable to assign rescue team.')
       setIncident((prev) => prev ? { ...prev, ...payload.incident, emergency_type: prev.emergency_type } as DemoIncident : prev)
+      if (payload.team) setAssignedUnit(payload.team as RescueUnit)
       toast.success(`Assigned ${payload.team?.name ?? 'team'}`)
       setShowTeamDialog(false)
     } catch {
@@ -185,10 +204,25 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
     }
   }
 
-  function handleAddNote() {
-    if (!note.trim()) return
-    toast.success('Note added')
-    setNote('')
+  async function handleAddNote() {
+    if (!incident || !note.trim()) return
+    setSavingNote(true)
+    try {
+      const response = await fetch(`/api/admin/incidents/${incident.id}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ note }),
+      })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(payload.message ?? 'Unable to save note.')
+      setInternalNotes((current) => [payload.note as InternalNote, ...current])
+      setNote('')
+      toast.success('Note saved')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to save note.')
+    } finally {
+      setSavingNote(false)
+    }
   }
 
   function copyPhone() {
@@ -436,10 +470,23 @@ export default function IncidentDetailPage({ params }: { params: Promise<{ id: s
                   onChange={(e) => setNote(e.target.value)}
                   className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500 min-h-[80px]"
                 />
-                <Button size="sm" onClick={handleAddNote} disabled={!note.trim()} className="bg-blue-600 hover:bg-blue-700 text-white">
+                <Button size="sm" onClick={handleAddNote} disabled={!note.trim() || savingNote} className="bg-blue-600 hover:bg-blue-700 text-white">
                   <Send className="w-3.5 h-3.5 mr-1" /> Add Note
                 </Button>
               </div>
+              {internalNotes.length > 0 && (
+                <div className="space-y-2">
+                  {internalNotes.map((entry) => (
+                    <div key={entry.id} className="bg-slate-800 rounded-lg p-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-xs font-medium text-slate-300">{entry.user_name} · {entry.user_role.replace(/_/g, ' ')}</p>
+                        <p className="text-[11px] text-slate-500">{formatRelativeTime(entry.created_at)}</p>
+                      </div>
+                      <p className="text-sm text-slate-200 mt-1 whitespace-pre-wrap break-words">{entry.note}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
               {incident.resolution_notes && (
                 <div className="bg-slate-800 rounded-lg p-3">
                   <p className="text-xs text-slate-500 mb-1">Resolution Notes</p>
