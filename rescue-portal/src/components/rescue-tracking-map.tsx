@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { Navigation, Clock, Truck, Loader2 } from 'lucide-react'
+import { Navigation, Clock, Truck, Loader2, AlertTriangle } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { formatGpsAge } from '@/lib/tracking-estimate'
 
 export interface TrackingData {
   responder_assigned: boolean
@@ -21,6 +22,10 @@ export interface TrackingData {
   distance_display: string | null
   eta_minutes: number | null
   last_updated: string | null
+  is_stale: boolean
+  gps_age_seconds: number | null
+  estimate_source: 'road_route' | 'approximate' | null
+  estimate_note: string | null
 }
 
 interface RescueTrackingMapProps {
@@ -32,6 +37,12 @@ interface RescueTrackingMapProps {
   className?: string
   /** Dark mode for dispatch page */
   dark?: boolean
+}
+
+function escapeMapText(value: string) {
+  return value.replace(/[&<>"']/g, (character) => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;',
+  })[character] ?? character)
 }
 
 export function RescueTrackingMap({
@@ -121,6 +132,7 @@ export function RescueTrackingMap({
         const respLat = tracking.responder_location.latitude
         const respLng = tracking.responder_location.longitude
         const heading = tracking.responder_location.heading ?? 0
+        const safeUnitName = escapeMapText(tracking.unit_name ?? 'Rescue Team')
 
         const rescueIcon = L.divIcon({
           html: `<div style="background:#2563eb;width:28px;height:28px;border-radius:50%;border:3px solid white;box-shadow:0 2px 8px rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;transform:rotate(${heading}deg)">
@@ -137,7 +149,7 @@ export function RescueTrackingMap({
         } else {
           responderMarkerRef.current = L.marker([respLat, respLng], { icon: rescueIcon })
             .addTo(map)
-            .bindPopup(`<b class="text-blue-600">${tracking.unit_name ?? 'Rescue Team'}</b><br>En route to scene`)
+            .bindPopup(`<b class="text-blue-600">${safeUnitName}</b><br>${tracking.is_stale ? 'Last known position — GPS delayed' : 'En route to scene'}`)
         }
 
         // Route line (dashed)
@@ -193,7 +205,7 @@ export function RescueTrackingMap({
   if (variant === 'compact') {
     return (
       <div className={cn('rounded-xl overflow-hidden border-2', className,
-        tracking.responder_location ? 'border-blue-400/50 bg-blue-50' : 'border-slate-200 bg-slate-50'
+        tracking.is_stale && tracking.responder_location ? 'border-amber-400/60 bg-amber-50' : tracking.responder_location ? 'border-blue-400/50 bg-blue-50' : 'border-slate-200 bg-slate-50'
       )}>
         {/* Leaflet CSS */}
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
@@ -205,9 +217,9 @@ export function RescueTrackingMap({
 
         <div className="p-4 space-y-3">
           <div className="flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-blue-500 animate-pulse" />
-            <span className="text-sm font-semibold text-blue-700">
-              {tracking.unit_name ?? 'Rescue Team'} is responding
+            <div className={cn('w-2.5 h-2.5 rounded-full', tracking.is_stale ? 'bg-amber-500' : 'bg-blue-500 animate-pulse')} />
+            <span className={cn('text-sm font-semibold', tracking.is_stale ? 'text-amber-800' : 'text-blue-700')}>
+              {tracking.unit_name ?? 'Rescue Team'} {tracking.is_stale ? '— GPS signal delayed' : 'is responding'}
             </span>
           </div>
 
@@ -237,9 +249,18 @@ export function RescueTrackingMap({
             </div>
           )}
 
+          {tracking.is_stale && tracking.responder_location && (
+            <div className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-100 p-3 text-amber-900">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p className="text-xs">GPS signal delayed. This is the last known position; ETA will resume after a new update.</p>
+            </div>
+          )}
+
+          {tracking.estimate_note && <p className="text-[10px] text-slate-500 text-center">{tracking.estimate_note}</p>}
+
           {tracking.last_updated && (
             <p className="text-[10px] text-slate-400 text-center">
-              Last updated: {new Date(tracking.last_updated).toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true })}
+              GPS updated {formatGpsAge(tracking.gps_age_seconds)}
             </p>
           )}
         </div>
@@ -276,6 +297,11 @@ export function RescueTrackingMap({
 
         {/* Distance & ETA */}
         <div className="ml-auto flex items-center gap-3">
+          {tracking.is_stale && tracking.responder_location && (
+            <span className={cn('inline-flex items-center gap-1 font-medium', dark ? 'text-amber-400' : 'text-amber-700')}>
+              <AlertTriangle className="h-3.5 w-3.5" /> GPS delayed ({formatGpsAge(tracking.gps_age_seconds)})
+            </span>
+          )}
           {tracking.distance_display && (
             <span className={cn('font-semibold', dark ? 'text-blue-400' : 'text-blue-600')}>
               {tracking.distance_display}

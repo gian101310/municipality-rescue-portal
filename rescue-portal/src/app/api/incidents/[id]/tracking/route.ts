@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient, createAdminClient } from '@/lib/supabase/server'
+import { getGpsFreshness } from '@/lib/tracking-estimate'
 
 /**
  * Haversine distance between two coordinates in meters
@@ -24,6 +25,28 @@ function haversineDistance(lat1: number, lon1: number, lat2: number, lon2: numbe
 function estimateETA(distanceMeters: number, speedMps?: number | null): number {
   const avgSpeedMps = speedMps && speedMps > 1 ? speedMps : (30 * 1000 / 3600) // 30 km/h default
   return Math.max(1, Math.round((distanceMeters / avgSpeedMps) / 60))
+}
+
+async function getDrivingEstimate(from: { latitude: number; longitude: number }, to: { latitude: number; longitude: number }) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 2500)
+  try {
+    const coordinates = `${from.longitude},${from.latitude};${to.longitude},${to.latitude}`
+    const response = await fetch(`https://router.project-osrm.org/route/v1/driving/${coordinates}?overview=false&steps=false`, {
+      signal: controller.signal,
+      headers: { Accept: 'application/json', 'User-Agent': 'rescue-portal.ph/1.0' },
+      cache: 'no-store',
+    })
+    if (!response.ok) return null
+    const payload = await response.json() as { routes?: Array<{ distance?: number; duration?: number }> }
+    const route = payload.routes?.[0]
+    if (!Number.isFinite(route?.distance) || !Number.isFinite(route?.duration)) return null
+    return { distanceMeters: Math.round(route!.distance!), etaMinutes: Math.max(1, Math.ceil(route!.duration! / 60)) }
+  } catch {
+    return null
+  } finally {
+    clearTimeout(timeout)
+  }
 }
 
 /**
@@ -101,35 +124,48 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
       .single()
 
     if (!latestLocation) {
+      const hasIncidentCoordinates = Number.isFinite(incident.latitude) && Number.isFinite(incident.longitude)
       return NextResponse.json({
         tracking: {
           responder_assigned: true,
           unit_name: incident.assigned_unit_name ?? null,
           responder_location: null,
-          incident_location: {
+          incident_location: hasIncidentCoordinates ? {
             latitude: incident.latitude,
             longitude: incident.longitude,
-          },
+          } : null,
           distance_meters: null,
           distance_display: null,
           eta_minutes: null,
           last_updated: null,
+          is_stale: true,
+          gps_age_seconds: null,
+          estimate_source: null,
+          estimate_note: 'Waiting for the rescue team to share live GPS.',
         },
       })
     }
 
-    // Calculate distance and ETA
+    // Prefer a road route for fresh GPS. Never present an ETA from delayed GPS as current.
     const hasIncidentCoordinates = Number.isFinite(incident.latitude) && Number.isFinite(incident.longitude)
-    const distanceMeters = hasIncidentCoordinates
+    const directDistance = hasIncidentCoordinates
       ? haversineDistance(
           latestLocation.latitude, latestLocation.longitude,
           incident.latitude, incident.longitude
         )
       : null
-
-    const etaMinutes = distanceMeters != null
-      ? estimateETA(distanceMeters, latestLocation.speed)
+    const freshness = getGpsFreshness(latestLocation.created_at)
+    const roadEstimate = !freshness.isStale && hasIncidentCoordinates
+      ? await getDrivingEstimate(
+          { latitude: latestLocation.latitude, longitude: latestLocation.longitude },
+          { latitude: incident.latitude, longitude: incident.longitude }
+        )
       : null
+    const distanceMeters = roadEstimate?.distanceMeters ?? (directDistance != null ? Math.round(directDistance * 1.25) : null)
+    const etaMinutes = freshness.isStale
+      ? null
+      : roadEstimate?.etaMinutes ?? (distanceMeters != null ? estimateETA(distanceMeters, latestLocation.speed) : null)
+    const estimateSource = roadEstimate ? 'road_route' : distanceMeters != null ? 'approximate' : null
 
     let distanceDisplay: string | null = null
     if (distanceMeters != null) {
@@ -148,14 +184,24 @@ export async function GET(_request: Request, context: { params: Promise<{ id: st
           heading: latestLocation.heading,
           speed: latestLocation.speed,
         },
-        incident_location: {
+        incident_location: hasIncidentCoordinates ? {
           latitude: incident.latitude,
           longitude: incident.longitude,
-        },
+        } : null,
         distance_meters: distanceMeters != null ? Math.round(distanceMeters) : null,
         distance_display: distanceDisplay,
         eta_minutes: etaMinutes,
         last_updated: latestLocation.created_at,
+        is_stale: freshness.isStale,
+        gps_age_seconds: freshness.ageSeconds,
+        estimate_source: estimateSource,
+        estimate_note: freshness.isStale
+          ? 'GPS signal delayed. Distance uses the last known position and ETA is paused.'
+          : roadEstimate
+          ? 'Distance and ETA follow the current road route.'
+          : distanceMeters != null
+          ? 'Approximate distance and ETA while road routing is unavailable.'
+          : 'Incident coordinates are unavailable.',
       },
     })
   } catch (err) {
