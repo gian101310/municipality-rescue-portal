@@ -20,3 +20,10 @@ test('tracking uses road routing when live and labels fallback and stale estimat
   assert.match(component, /estimate_note/)
   assert.match(component, /escapeMapText/)
 })
+
+test('precise responder locations have an automatic retention job', () => {
+  const migration = readFileSync(new URL('../../supabase/migrations/20260630144500_schedule_location_retention.sql', import.meta.url), 'utf8')
+  assert.match(migration, /created_at < NOW\(\) - INTERVAL '30 days'/i)
+  assert.match(migration, /cron\.schedule/i)
+  assert.match(migration, /REVOKE ALL ON FUNCTION public\.purge_expired_responder_locations/i)
+})
