@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync, readdirSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import test from 'node:test'
 
 function source(path: string) {
@@ -7,7 +7,7 @@ function source(path: string) {
 }
 
 test('operational mission pages visibly report refresh failures', () => {
-  for (const path of ['../app/dispatch/page.tsx', '../app/responder/page.tsx', '../app/rescue-team/page.tsx']) {
+  for (const path of ['../app/dispatch/page.tsx', '../app/rescue-team/page.tsx']) {
     const page = source(path)
     assert.match(page, /dataError/)
     assert.match(page, /Live updates are delayed/)
@@ -48,4 +48,19 @@ test('global error page does not claim nonexistent external logging', () => {
   const page = source('../app/error.tsx')
   assert.doesNotMatch(page, /This has been logged/)
   assert.match(page, /Error ID/)
+})
+
+test('legacy responder URL redirects to the canonical rescue-team portal', () => {
+  const page = source('../app/responder/page.tsx')
+  assert.match(page, /redirect\(['"]\/rescue-team['"]\)/)
+  assert.doesNotMatch(page, /setInterval|navigator\.geolocation|\/api\/responder\/location/)
+})
+
+test('unused production demo fixture bundle is removed', () => {
+  assert.equal(existsSync(new URL('./demo-data.ts', import.meta.url)), false)
+})
+
+test('generated Android build output is excluded from source linting', () => {
+  const config = source('../../eslint.config.mjs')
+  assert.match(config, /android\/\*\*\/build\/\*\*/)
 })
