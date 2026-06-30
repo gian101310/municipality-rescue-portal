@@ -1,5 +1,9 @@
 import type { NextConfig } from "next";
 
+const scriptSrc = process.env.NODE_ENV === "development"
+  ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+  : "script-src 'self' 'unsafe-inline'";
+
 const nextConfig: NextConfig = {
   headers: async () => [
     {
@@ -34,8 +38,7 @@ const nextConfig: NextConfig = {
           key: "Content-Security-Policy",
           value: [
             "default-src 'self'",
-            // Scripts: self + inline (Next.js requires it) + eval for dev
-            "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+            scriptSrc,
             // Styles: self + inline (Tailwind/styled-jsx) + Leaflet CSS
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://cdnjs.cloudflare.com",
             // Fonts

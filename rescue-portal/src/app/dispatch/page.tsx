@@ -67,6 +67,7 @@ function formatTime(dateStr: string | null | undefined) {
 export default function DispatchPage() {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(true)
+  const [dataError, setDataError] = useState('')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
   const [tab, setTab] = useState('pending')
@@ -80,10 +81,13 @@ export default function DispatchPage() {
   const fetchIncidents = useCallback(async () => {
     try {
       const res = await fetch('/api/admin/incidents', { cache: 'no-store' })
-      if (!res.ok) return
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.message ?? 'Unable to refresh incidents.')
       setIncidents((data.incidents ?? data ?? []) as Incident[])
-    } catch { /* silent */ } finally {
+      setDataError('')
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to refresh incidents.')
+    } finally {
       setLoading(false)
     }
   }, [])
@@ -188,6 +192,7 @@ export default function DispatchPage() {
     const inc = incidents.find(i => i.id === selectedIncident.id) ?? selectedIncident
     return (
       <div className="p-4 max-w-2xl mx-auto space-y-4">
+        {dataError && <div role="alert" className="rounded-lg border border-amber-500/40 bg-amber-950/40 p-3 text-sm text-amber-200">Live updates are delayed: {dataError}</div>}
         <Button variant="ghost" onClick={() => setSelectedIncident(null)} className="text-slate-400 hover:text-white text-sm -ml-2">
           ← Back
         </Button>
@@ -454,6 +459,7 @@ export default function DispatchPage() {
   // Main Dashboard with Tabs
   return (
     <div className="p-4 max-w-2xl mx-auto space-y-4">
+      {dataError && <div role="alert" className="rounded-lg border border-amber-500/40 bg-amber-950/40 p-3 text-sm text-amber-200">Live updates are delayed: {dataError}</div>}
       {/* Stats */}
       <div className="grid grid-cols-4 gap-2">
         <Card className="bg-slate-900 border-slate-700">

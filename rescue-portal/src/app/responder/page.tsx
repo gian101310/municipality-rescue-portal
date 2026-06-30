@@ -42,17 +42,21 @@ export default function ResponderPage() {
   const [gpsTracking, setGpsTracking] = useState(false)
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(true)
+  const [dataError, setDataError] = useState('')
   const [updatingStatus, setUpdatingStatus] = useState(false)
   const gpsIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const fetchIncidents = useCallback(async () => {
     try {
       const res = await fetch('/api/responder/incidents', { cache: 'no-store' })
-      if (!res.ok) return
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.message ?? 'Unable to refresh assignments.')
       const list = (data.incidents ?? data ?? []) as Incident[]
       setIncidents(list)
-    } catch { /* silent */ } finally {
+      setDataError('')
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to refresh assignments.')
+    } finally {
       setLoading(false)
     }
   }, [])
@@ -140,6 +144,7 @@ export default function ResponderPage() {
 
   return (
     <div className="p-4 space-y-4 max-w-lg mx-auto pb-20">
+      {dataError && <div role="alert" className="rounded-lg border border-amber-500/40 bg-amber-950/40 p-3 text-sm text-amber-200">Live updates are delayed: {dataError}</div>}
       {/* Status Toggle */}
       <Card className="bg-slate-900 border-slate-700">
         <CardContent className="p-4">

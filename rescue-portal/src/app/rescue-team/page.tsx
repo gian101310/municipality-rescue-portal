@@ -54,6 +54,7 @@ function timeAgo(dateStr: string) {
 export default function RescueTeamPage() {
   const [incidents, setIncidents] = useState<Incident[]>([])
   const [loading, setLoading] = useState(true)
+  const [dataError, setDataError] = useState('')
   const [updatingId, setUpdatingId] = useState<string | null>(null)
   const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
   const [prevIncomingCount, setPrevIncomingCount] = useState(0)
@@ -64,8 +65,8 @@ export default function RescueTeamPage() {
   const fetchIncidents = useCallback(async () => {
     try {
       const res = await fetch('/api/responder/incidents', { cache: 'no-store' })
-      if (!res.ok) return
-      const data = await res.json()
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.message ?? 'Unable to refresh assignments.')
       const list = (data.incidents ?? data ?? []) as Incident[]
       setIncidents(list)
       setUnitConfigured(data.unitConfigured !== false)
@@ -82,7 +83,10 @@ export default function RescueTeamPage() {
         } catch {}
       }
       setPrevIncomingCount(incomingCount)
-    } catch { /* silent */ } finally {
+      setDataError('')
+    } catch (error) {
+      setDataError(error instanceof Error ? error.message : 'Unable to refresh assignments.')
+    } finally {
       setLoading(false)
     }
   }, [prevIncomingCount])
@@ -190,6 +194,7 @@ export default function RescueTeamPage() {
     const inc = incidents.find(i => i.id === selectedIncident.id) ?? selectedIncident
     return (
       <div className="p-4 max-w-lg mx-auto space-y-4">
+        {dataError && <div role="alert" className="rounded-lg border border-amber-500/40 bg-amber-950/40 p-3 text-sm text-amber-200">Live updates are delayed: {dataError}</div>}
         <Button
           variant="ghost"
           onClick={() => setSelectedIncident(null)}
@@ -363,6 +368,7 @@ export default function RescueTeamPage() {
   // Main Dashboard
   return (
     <div className="p-4 max-w-lg mx-auto space-y-5">
+      {dataError && <div role="alert" className="rounded-lg border border-amber-500/40 bg-amber-950/40 p-3 text-sm text-amber-200">Live updates are delayed: {dataError}</div>}
       {/* Stats Bar */}
       <div className="grid grid-cols-3 gap-3">
         <Card className="bg-slate-900 border-slate-700">

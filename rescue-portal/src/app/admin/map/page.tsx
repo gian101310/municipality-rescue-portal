@@ -18,7 +18,6 @@ import {
   loadCoverageLock,
   resolveCoverageMapFocus,
 } from '@/lib/coverage-lock-client'
-import { DEMO_TENANT_GEO_SCOPE } from '@/lib/philippines-geography'
 import type { TenantGeographyScope } from '@/lib/philippines-geography'
 import Link from 'next/link'
 import type { DemoIncident, RescueUnit } from '@/lib/types'
@@ -41,7 +40,7 @@ export default function LiveMapPage() {
   const [selectedIncident, setSelectedIncident] = useState<DemoIncident | null>(null)
   const [filterSeverity, setFilterSeverity] = useState<string>('all')
   const [refreshing, setRefreshing] = useState(false)
-  const [coverageScope, setCoverageScope] = useState<TenantGeographyScope>(DEMO_TENANT_GEO_SCOPE)
+  const [coverageScope, setCoverageScope] = useState<TenantGeographyScope | null>(null)
   const [mapCenter, setMapCenter] = useState({ lat: 12.8797, lng: 121.7740 })
   const [mapZoom, setMapZoom] = useState(6)
   const [focusSource, setFocusSource] = useState('Loading focus')
@@ -54,7 +53,7 @@ export default function LiveMapPage() {
     filterSeverity === 'all' || i.severity === filterSeverity
   )
 
-  const buyerDetails = getBuyerDetails(coverageScope)
+  const coverageLocationName = coverageScope ? getBuyerDetails(coverageScope).locationName : 'configured coverage'
 
   useEffect(() => {
     let cancelled = false
@@ -151,13 +150,13 @@ export default function LiveMapPage() {
   })
 
   const markers = useMemo(() => [
-    {
+    ...(coverageScope ? [{
       id: 'coverage-focus',
       lat: mapCenter.lat,
       lng: mapCenter.lng,
       color: '#38bdf8',
-      label: `Focus: ${buyerDetails.locationName}`,
-    },
+      label: `Focus: ${coverageLocationName}`,
+    }] : []),
     ...filteredIncidents.map((inc) => ({
       id: inc.id,
       lat: typeof inc.latitude === 'number' ? inc.latitude : mapCenter.lat + deterministicOffset(inc.id, 'lat'),
@@ -173,7 +172,7 @@ export default function LiveMapPage() {
       color: '#22c55e',
       label: `${unit.name} · ${unit.status.replaceAll('_', ' ')}`,
     })),
-  ], [buyerDetails.locationName, filteredIncidents, mapCenter.lat, mapCenter.lng, rescueUnits])
+  ], [coverageLocationName, coverageScope, filteredIncidents, mapCenter.lat, mapCenter.lng, rescueUnits])
 
   async function handleRefresh() {
     setRefreshing(true)
@@ -191,7 +190,7 @@ export default function LiveMapPage() {
             Live Incident Map
           </h1>
           <p className="text-slate-400 text-sm mt-0.5">
-            Focused on {buyerDetails.locationName}
+            {coverageScope ? `Focused on ${coverageLocationName}` : 'Loading configured coverage'}
           </p>
         </div>
         <div className="flex items-center gap-2">

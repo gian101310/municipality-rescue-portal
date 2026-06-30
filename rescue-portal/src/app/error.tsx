@@ -12,7 +12,6 @@ export default function GlobalError({
   reset: () => void
 }) {
   useEffect(() => {
-    // Log to console in production — swap with a real error reporter later
     console.error('[GlobalError]', error)
   }, [error])
 
@@ -25,7 +24,7 @@ export default function GlobalError({
         <div>
           <h1 className="text-2xl font-bold text-white mb-2">Something went wrong</h1>
           <p className="text-slate-400 text-sm">
-            An unexpected error occurred. This has been logged and will be investigated.
+            An unexpected error occurred. Please try again. If it continues, contact support and include the Error ID below.
           </p>
           {error.digest && (
             <p className="text-slate-600 text-xs mt-2 font-mono">

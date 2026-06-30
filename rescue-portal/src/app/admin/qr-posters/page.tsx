@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import { Printer, MapPin, Shield, Loader2 } from 'lucide-react'
+import { useState, useRef, useEffect, useCallback } from 'react'
+import { Printer, MapPin, Shield, Loader2, AlertTriangle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -19,24 +19,37 @@ export default function QRPostersPage() {
   const [customMessage, setCustomMessage] = useState('')
   const [posterStyle, setPosterStyle] = useState<'standard' | 'emergency'>('standard')
   const [qrImage, setQrImage] = useState('')
+  const [qrError, setQrError] = useState('')
   const [municipalityName, setMunicipalityName] = useState(settings.municipalityName)
   const posterRef = useRef<HTMLDivElement>(null)
 
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://www.rescue-portal.ph'
   const emergencyUrl = `${baseUrl}/scan`
 
-  useEffect(() => { void (async () => {
-    const response = await fetch('/api/admin/qr-context')
-    const payload = await response.json().catch(() => ({}))
-    if (response.ok) {
-      setMunicipalityName(payload.organization?.name ?? municipalityName)
-      const url = `${baseUrl}/scan?municipality=${encodeURIComponent(payload.organizationId)}`
-      setQrImage(await QRCode.toDataURL(url, { width: 600, margin: 2 }))
+  const generateQr = useCallback(async () => {
+    setQrError('')
+    setQrImage('')
+    try {
+      const response = await fetch('/api/admin/qr-context', { cache: 'no-store' })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok || !payload.organizationId) {
+        throw new Error(payload.message ?? 'Unable to load the municipality QR configuration.')
+      }
+      setMunicipalityName(payload.organization?.name ?? settings.municipalityName)
+      const url = `${window.location.origin}/scan?municipality=${encodeURIComponent(payload.organizationId)}`
+      setQrImage(await QRCode.toDataURL(url, { width: 600, margin: 2, errorCorrectionLevel: 'M' }))
       const names = (payload.barangays ?? []).map((b: { name: string }) => b.name)
       setBarangayList(names)
       if (names.length > 0) setSelectedBarangay(names[0])
+    } catch (error) {
+      setQrError(error instanceof Error ? error.message : 'Unable to generate the QR code.')
     }
-  })() }, [])
+  }, [settings.municipalityName])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void generateQr() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [generateQr])
 
   const title = posterTitle || `${settings.municipalityName} Emergency Rescue`
 
@@ -53,7 +66,7 @@ export default function QRPostersPage() {
           <p className="text-slate-400 text-sm">Generate printable QR posters for barangay halls and public spaces</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800" onClick={handlePrint}>
+          <Button variant="outline" disabled={!qrImage} className="border-slate-600 text-slate-300 hover:bg-slate-800" onClick={handlePrint}>
             <Printer className="w-4 h-4 mr-1" /> Print
           </Button>
         </div>
@@ -150,6 +163,14 @@ export default function QRPostersPage() {
               <div className="inline-block p-4 bg-white border-4 border-slate-900 rounded-xl mb-4">
                 {qrImage ? (
                   <img src={qrImage} alt={`QR code for ${municipalityName}`} width={200} height={200} />
+                ) : qrError ? (
+                  <div className="w-[200px] h-[200px] flex flex-col items-center justify-center gap-3 text-red-700 px-3">
+                    <AlertTriangle className="w-7 h-7" />
+                    <span className="text-xs">{qrError}</span>
+                    <Button type="button" size="sm" variant="outline" onClick={() => void generateQr()}>
+                      Retry QR generation
+                    </Button>
+                  </div>
                 ) : (
                   <div className="w-[200px] h-[200px] flex flex-col items-center justify-center gap-2 text-slate-500">
                     <Loader2 className="w-7 h-7 animate-spin" />
