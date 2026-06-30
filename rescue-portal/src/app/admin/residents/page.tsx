@@ -84,7 +84,8 @@ export default function ResidentsPage() {
   }, [])
 
   useEffect(() => {
-    void fetchResidents()
+    const timer = window.setTimeout(() => { void fetchResidents() }, 0)
+    return () => window.clearTimeout(timer)
   }, [fetchResidents])
 
   async function createManualResident() {

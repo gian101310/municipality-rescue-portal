@@ -76,7 +76,10 @@ export default function TeamsPage() {
     setTeams(payload.teams ?? [])
   }
 
-  useEffect(() => { void loadTeams() }, [])
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void loadTeams() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   async function handleCreateTeam() {
     if (!newTeam.name.trim() || !newTeam.code.trim()) return toast.error('Team name and code are required.')

@@ -56,9 +56,12 @@ export default function StaffPortalPage() {
   }, [])
 
   useEffect(() => {
-    fetchIncidents()
+    const initialFetch = window.setTimeout(() => { void fetchIncidents() }, 0)
     const interval = setInterval(fetchIncidents, 30000)
-    return () => clearInterval(interval)
+    return () => {
+      window.clearTimeout(initialFetch)
+      clearInterval(interval)
+    }
   }, [fetchIncidents])
 
   const active = incidents.filter(i => !['closed', 'cancelled', 'false_alert', 'invalid', 'duplicate'].includes(i.status))

@@ -58,7 +58,10 @@ export default function HealthPage() {
     }
   }
 
-  useEffect(() => { void runHealthCheck() }, [])
+  useEffect(() => {
+    const timer = window.setTimeout(() => { void runHealthCheck() }, 0)
+    return () => window.clearTimeout(timer)
+  }, [])
 
   const allHealthy = services.length > 0 && services.every(s => s.status === 'healthy')
   const hasDown = services.some(s => s.status === 'down')

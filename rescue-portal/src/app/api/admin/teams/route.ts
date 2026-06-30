@@ -15,7 +15,9 @@ export async function GET() {
   const profile = await staff()
   if (!profile) return NextResponse.json({ message: 'Team management access required.' }, { status: 403 })
   const admin = await createAdminClient() as any
-  let { data: teams, error } = await admin.from('rescue_units').select('*').eq('organization_id', profile.organization_id).order('created_at')
+  const result = await admin.from('rescue_units').select('*').eq('organization_id', profile.organization_id).order('created_at')
+  let teams = result.data
+  const { error } = result
   if (error) return NextResponse.json({ message: error.message }, { status: 500 })
   if (!teams?.length) {
     const seeded = await admin.from('rescue_units').insert(buildStarterTeams(profile.organization_id)).select('*')

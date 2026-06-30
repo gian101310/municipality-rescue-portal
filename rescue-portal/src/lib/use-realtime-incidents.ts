@@ -21,12 +21,14 @@ export function useRealtimeIncidents(options: UseRealtimeIncidentsOptions): { is
   // Keep callbacks in refs so channel doesn't need to re-subscribe on every render
   const onNewRef = useRef(onNewIncident)
   const onUpdateRef = useRef(onIncidentUpdate)
-  onNewRef.current = onNewIncident
-  onUpdateRef.current = onIncidentUpdate
+
+  useEffect(() => {
+    onNewRef.current = onNewIncident
+    onUpdateRef.current = onIncidentUpdate
+  }, [onNewIncident, onIncidentUpdate])
 
   useEffect(() => {
     if (!enabled) {
-      setIsConnected(false)
       return
     }
 
@@ -61,5 +63,5 @@ export function useRealtimeIncidents(options: UseRealtimeIncidentsOptions): { is
     }
   }, [enabled])
 
-  return { isConnected }
+  return { isConnected: enabled && isConnected }
 }
