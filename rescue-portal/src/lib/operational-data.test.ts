@@ -59,3 +59,18 @@ test('operations map consumes the live team API response', () => {
   assert.match(page, /payload\?\.teams/)
   assert.doesNotMatch(page, /Team data will appear here|placeholder until teams/i)
 })
+
+test('organization settings contain no simulated controls and persist editable fields', () => {
+  const page = readFileSync(new URL('../app/admin/settings/page.tsx', import.meta.url), 'utf8')
+  const settingsRoute = readFileSync(new URL('../app/api/admin/organization-settings/route.ts', import.meta.url), 'utf8')
+  const logoRoute = readFileSync(new URL('../app/api/admin/organization-logo/route.ts', import.meta.url), 'utf8')
+
+  assert.doesNotMatch(page, /Demo:|ABCDefGHIjklMNOpqRSTuvWXyz|-1001000000001/)
+  assert.doesNotMatch(page, /Click to upload organization logo/)
+  assert.match(page, /\/api\/admin\/organization-logo/)
+  assert.match(settingsRoute, /const name = String\(body\.name/)
+  assert.match(settingsRoute, /email:/)
+  assert.match(settingsRoute, /map_center_lat:/)
+  assert.match(logoRoute, /\.storage\s*\.from\('organization-assets'\)\s*\.upload/)
+  assert.match(logoRoute, /logo_url/)
+})

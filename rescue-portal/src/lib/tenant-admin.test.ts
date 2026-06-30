@@ -188,8 +188,6 @@ test('getSettingsTabsForRole hides coverage lock from municipality admins', () =
     'operations_staff',
     'emergency_types',
     'barangays',
-    'telegram',
-    'notifications',
   ])
 })
 

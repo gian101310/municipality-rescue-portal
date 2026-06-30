@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Save, Plus, Edit2, Eye, EyeOff, Upload, Trash2, X, Check, Download } from 'lucide-react'
+import { Save, Plus, Edit2, Upload, Trash2, X, Check, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -11,9 +11,7 @@ import { Switch } from '@/components/ui/switch'
 import { Badge } from '@/components/ui/badge'
 import { Separator } from '@/components/ui/separator'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { DEMO_ORGANIZATION } from '@/lib/demo-data'
 import {
-  DEMO_TENANT_GEO_SCOPE,
   PH_LOCALITIES,
   PH_PROVINCES,
   PH_REGIONS,
@@ -51,25 +49,26 @@ const SCOPE_LEVEL_LABELS: Record<GeoScopeLevel, string> = {
 export default function SettingsPage() {
   const { settings, updateSettings } = useSettings()
   const { isUnlocked } = useMasterKey()
-  const [showToken, setShowToken] = useState(false)
   const [savingCoverage, setSavingCoverage] = useState(false)
   const [coveragePersistence, setCoveragePersistence] = useState<'checking' | 'supabase' | 'unavailable'>('checking')
   const [profileRole, setProfileRole] = useState<string | null>(null)
-  const [orgName, setOrgName] = useState(settings.municipalityName || DEMO_ORGANIZATION.name)
-  const [hotline, setHotline] = useState(settings.hotline || DEMO_ORGANIZATION.emergency_hotline)
-  const [secondaryHotline, setSecondaryHotline] = useState(settings.secondaryHotline || DEMO_ORGANIZATION.secondary_hotline || '')
+  const [orgName, setOrgName] = useState(settings.municipalityName)
+  const [hotline, setHotline] = useState(settings.hotline)
+  const [secondaryHotline, setSecondaryHotline] = useState(settings.secondaryHotline)
   const [localDescription, setLocalDescription] = useState('')
   const [dialect, setDialect] = useState('')
-  const [email, setEmail] = useState(settings.email || DEMO_ORGANIZATION.email || '')
-  const [province, setProvince] = useState(DEMO_ORGANIZATION.province)
-  const [region, setRegion] = useState(DEMO_ORGANIZATION.region)
-  const [municipality, setMunicipality] = useState('Bayani')
-  const [mapLat, setMapLat] = useState(String(settings.mapCenterLat || DEMO_ORGANIZATION.map_center.lat))
-  const [mapLng, setMapLng] = useState(String(settings.mapCenterLng || DEMO_ORGANIZATION.map_center.lng))
-  const [scopeLevel, setScopeLevel] = useState<GeoScopeLevel>(DEMO_TENANT_GEO_SCOPE.level)
-  const [scopeRegionCode, setScopeRegionCode] = useState(DEMO_TENANT_GEO_SCOPE.regionCode ?? '')
-  const [scopeProvinceCode, setScopeProvinceCode] = useState(DEMO_TENANT_GEO_SCOPE.provinceCode ?? '')
-  const [scopeMunicipalityCode, setScopeMunicipalityCode] = useState(DEMO_TENANT_GEO_SCOPE.municipalityCode ?? '')
+  const [email, setEmail] = useState(settings.email)
+  const [province, setProvince] = useState('')
+  const [region, setRegion] = useState('')
+  const [municipality, setMunicipality] = useState('')
+  const [mapLat, setMapLat] = useState(String(settings.mapCenterLat))
+  const [mapLng, setMapLng] = useState(String(settings.mapCenterLng))
+  const [scopeLevel, setScopeLevel] = useState<GeoScopeLevel>('country')
+  const [scopeRegionCode, setScopeRegionCode] = useState('')
+  const [scopeProvinceCode, setScopeProvinceCode] = useState('')
+  const [scopeMunicipalityCode, setScopeMunicipalityCode] = useState('')
+  const [logoUrl, setLogoUrl] = useState<string | null>(null)
+  const [logoUploading, setLogoUploading] = useState(false)
   const [barangays, setBarangays] = useState<Array<{ id: string; name: string; captain_name: string | null; captain_phone: string | null }>>([])
   const [emergencyTypes, setEmergencyTypes] = useState<Array<{ id: string; name: string; icon: string; color: string; is_active: boolean; organization_id: string | null }>>([])
 
@@ -213,9 +212,14 @@ export default function SettingsPage() {
       if (cancelled || !res.ok) return
       const s = payload.settings
       if (s?.name) setOrgName(s.name)
+      setProvince(s?.province ?? '')
+      setRegion(s?.region ?? '')
       if (s?.emergency_hotline) setHotline(s.emergency_hotline)
       setSecondaryHotline(s?.secondary_hotline ?? '')
       setEmail(s?.email ?? '')
+      setMapLat(String(s?.map_center_lat ?? settings.mapCenterLat))
+      setMapLng(String(s?.map_center_lng ?? settings.mapCenterLng))
+      setLogoUrl(s?.logo_url ?? null)
       if (s?.branding?.localDescription) setLocalDescription(s.branding.localDescription)
       if (s?.branding?.dialect) setDialect(s.branding.dialect)
     }
@@ -227,7 +231,37 @@ export default function SettingsPage() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [settings.mapCenterLat, settings.mapCenterLng])
+
+  async function uploadLogo(file: File) {
+    if (!canEditSettings) return toast.error('Admin access is required to update the logo.')
+    setLogoUploading(true)
+    try {
+      const form = new FormData()
+      form.append('logo', file)
+      const response = await fetch('/api/admin/organization-logo', { method: 'POST', body: form })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) return toast.error(payload.message ?? 'Unable to upload the logo.')
+      setLogoUrl(payload.logo_url)
+      toast.success('Organization logo updated')
+    } finally {
+      setLogoUploading(false)
+    }
+  }
+
+  async function removeLogo() {
+    if (!canEditSettings) return
+    setLogoUploading(true)
+    try {
+      const response = await fetch('/api/admin/organization-logo', { method: 'DELETE' })
+      const payload = await response.json().catch(() => ({}))
+      if (!response.ok) return toast.error(payload.message ?? 'Unable to remove the logo.')
+      setLogoUrl(null)
+      toast.success('Organization logo removed')
+    } finally {
+      setLogoUploading(false)
+    }
+  }
 
   async function save() {
     if (!canEditSettings) {
@@ -243,8 +277,9 @@ export default function SettingsPage() {
       mapCenterLat: parseFloat(mapLat) || 0,
       mapCenterLng: parseFloat(mapLng) || 0,
     })
-    const response = await fetch('/api/admin/organization-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ emergency_hotline: hotline, secondary_hotline: secondaryHotline, localDescription, dialect }) })
-    if (!response.ok) return toast.error('Unable to save municipal contact settings.')
+    const response = await fetch('/api/admin/organization-settings', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: orgName, emergency_hotline: hotline, secondary_hotline: secondaryHotline, email, map_center_lat: Number(mapLat), map_center_lng: Number(mapLng), localDescription, dialect }) })
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) return toast.error(payload.message ?? 'Unable to save municipal contact settings.')
     toast.success('Municipal contact settings saved')
   }
 
@@ -309,15 +344,15 @@ export default function SettingsPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-slate-300">Province</Label>
-                  <Input value={province} onChange={(e) => setProvince(e.target.value)} className="bg-slate-800 border-slate-600 text-white" />
+                  <Input value={province} readOnly className="bg-slate-800 border-slate-600 text-slate-400 cursor-not-allowed" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-slate-300">Region</Label>
-                  <Input value={region} onChange={(e) => setRegion(e.target.value)} className="bg-slate-800 border-slate-600 text-white" />
+                  <Input value={region} readOnly className="bg-slate-800 border-slate-600 text-slate-400 cursor-not-allowed" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-slate-300">City / Municipality</Label>
-                  <Input value={municipality} onChange={(e) => setMunicipality(e.target.value)} placeholder="Entire province / region" className="bg-slate-800 border-slate-600 text-white placeholder:text-slate-500" />
+                  <Input value={municipality} readOnly placeholder="Entire province / region" className="bg-slate-800 border-slate-600 text-slate-400 placeholder:text-slate-500 cursor-not-allowed" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-slate-300">Emergency Hotline</Label>
@@ -350,11 +385,11 @@ export default function SettingsPage() {
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1.5">
                   <Label className="text-slate-300">Map Center Latitude</Label>
-                  <Input value={mapLat} onChange={(e) => setMapLat(e.target.value)} type="number" className="bg-slate-800 border-slate-600 text-white" />
+                  <Input value={mapLat} readOnly type="number" className="bg-slate-800 border-slate-600 text-slate-400 cursor-not-allowed" />
                 </div>
                 <div className="space-y-1.5">
                   <Label className="text-slate-300">Map Center Longitude</Label>
-                  <Input value={mapLng} onChange={(e) => setMapLng(e.target.value)} type="number" className="bg-slate-800 border-slate-600 text-white" />
+                  <Input value={mapLng} readOnly type="number" className="bg-slate-800 border-slate-600 text-slate-400 cursor-not-allowed" />
                 </div>
               </div>
               <div className="rounded-lg border border-blue-500/20 bg-blue-500/10 p-3">
@@ -363,9 +398,23 @@ export default function SettingsPage() {
                   Save a region, province, or city/municipality in Coverage Lock to update these General details and the live map focus.
                 </p>
               </div>
-              <div className="border-2 border-dashed border-slate-700 rounded-lg p-8 text-center">
-                <p className="text-slate-500 text-sm">Logo Upload</p>
-                <p className="text-slate-600 text-xs mt-1">Click to upload organization logo (PNG, SVG)</p>
+              <div className="border-2 border-dashed border-slate-700 rounded-lg p-5 flex flex-col sm:flex-row items-center gap-4">
+                <div
+                  aria-label="Organization logo preview"
+                  className="h-20 w-20 shrink-0 rounded-xl border border-slate-700 bg-slate-800 bg-contain bg-center bg-no-repeat"
+                  style={logoUrl ? { backgroundImage: `url(${logoUrl})` } : undefined}
+                />
+                <div className="flex-1 text-center sm:text-left">
+                  <p className="text-slate-300 text-sm font-medium">Organization logo</p>
+                  <p className="text-slate-500 text-xs mt-1">PNG, JPEG, or WebP up to 2 MB.</p>
+                  <div className="mt-3 flex flex-wrap justify-center sm:justify-start gap-2">
+                    <Button disabled={!canEditSettings || logoUploading} size="sm" variant="outline" className="border-slate-600 text-slate-300" render={<label htmlFor="organization-logo" />}>
+                      <Upload className="w-4 h-4 mr-1" /> {logoUploading ? 'Uploading…' : 'Choose logo'}
+                    </Button>
+                    {logoUrl && <Button disabled={!canEditSettings || logoUploading} size="sm" variant="ghost" className="text-red-400" onClick={() => void removeLogo()}><Trash2 className="w-4 h-4 mr-1" /> Remove</Button>}
+                  </div>
+                  <input id="organization-logo" type="file" accept="image/png,image/jpeg,image/webp" className="hidden" disabled={!canEditSettings || logoUploading} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadLogo(file); event.currentTarget.value = '' }} />
+                </div>
               </div>
               <Button onClick={save} disabled={!canEditSettings} className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">
                 <Save className="w-4 h-4 mr-1" /> Save Changes
@@ -659,87 +708,6 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
 
-        {/* Telegram */}
-        <TabsContent value="telegram" className="mt-4">
-          <Card className="bg-slate-900 border-slate-700">
-            <CardHeader>
-              <CardTitle className="text-white text-base">Telegram Integration</CardTitle>
-              <CardDescription className="text-slate-400">Configure Telegram bot for team notifications.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-1.5">
-                <Label className="text-slate-300">Bot Token</Label>
-                <div className="relative">
-                  <Input
-                    type={showToken ? 'text' : 'password'}
-                    defaultValue="1234567890:ABCDefGHIjklMNOpqRSTuvWXyz"
-                    className="bg-slate-800 border-slate-600 text-white pr-10"
-                  />
-                  <button
-                    onClick={() => setShowToken(!showToken)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
-                  >
-                    {showToken ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <p className="text-xs text-slate-500">Get your bot token from @BotFather on Telegram</p>
-              </div>
-              <Separator className="bg-slate-800" />
-              <div>
-                <p className="text-sm text-slate-300 mb-2">Team Chat IDs</p>
-                <div className="space-y-2">
-                  {['-1001000000001', '-1001000000002', '-1001000000003', '-1001000000004'].map((id, idx) => (
-                    <div key={id} className="flex items-center gap-3 p-2.5 bg-slate-800 rounded-lg">
-                      <span className="text-xs font-mono text-slate-300">{id}</span>
-                      <span className="text-xs text-slate-500">Team {['Alpha', 'Bravo', 'Charlie', 'Delta'][idx]}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-              <div className="flex gap-2">
-                <Button onClick={() => toast.success('Demo: Test message sent to all chats')} className="bg-blue-600 hover:bg-blue-700 text-white">
-                  Test Connection
-                </Button>
-                <Button onClick={save} disabled={!canEditSettings} variant="outline" className="border-slate-600 text-slate-300 hover:bg-slate-800 disabled:opacity-50">
-                  <Save className="w-4 h-4 mr-1" /> Save
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Notifications */}
-        <TabsContent value="notifications" className="mt-4">
-          <Card className="bg-slate-900 border-slate-700">
-            <CardHeader>
-              <CardTitle className="text-white text-base">Notification Settings</CardTitle>
-              <CardDescription className="text-slate-400">Configure when and how notifications are sent.</CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {[
-                { label: 'New incident submitted', desc: 'Alert dispatchers when a new incident is received', on: true },
-                { label: 'Critical incident alert', desc: 'Send urgent notifications for critical severity incidents', on: true },
-                { label: 'Team dispatch confirmation', desc: 'Notify reporter when a rescue team is dispatched', on: true },
-                { label: 'Incident resolved', desc: 'Notify reporter when their incident is resolved', on: true },
-                { label: 'Registration approved', desc: 'Notify resident when their account is verified', on: true },
-                { label: 'Registration rejected', desc: 'Notify resident when their account is rejected', on: false },
-                { label: 'Team status updates', desc: 'Notify dispatcher when team status changes', on: true },
-                { label: 'System health alerts', desc: 'Alert admins when system health degrades', on: false },
-              ].map((item) => (
-                <div key={item.label} className="flex items-start justify-between gap-4">
-                  <div>
-                    <p className="text-sm text-white">{item.label}</p>
-                    <p className="text-xs text-slate-400">{item.desc}</p>
-                  </div>
-                  <Switch defaultChecked={item.on} disabled={!canEditSettings} onCheckedChange={() => toast.info('Demo: Toggle notification')} />
-                </div>
-              ))}
-              <Button onClick={save} disabled={!canEditSettings} className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">
-                <Save className="w-4 h-4 mr-1" /> Save Preferences
-              </Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
       </Tabs>
     </div>
   )
