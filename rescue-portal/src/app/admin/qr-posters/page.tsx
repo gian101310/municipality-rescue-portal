@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef, useCallback, useEffect } from 'react'
-import { QrCode, Download, Printer, MapPin, Shield } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Printer, MapPin, Shield, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -10,77 +10,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useSettings } from '@/lib/settings-context'
 import { toast } from 'sonner'
 import QRCode from 'qrcode'
-
-function generateQRMatrix(data: string): boolean[][] {
-  // This is a simplified visual representation — in production use a real QR lib
-  const size = 25
-  const matrix: boolean[][] = Array.from({ length: size }, () => Array(size).fill(false))
-
-  // Generate deterministic pattern from data
-  let hash = 0
-  for (let i = 0; i < data.length; i++) {
-    hash = ((hash << 5) - hash + data.charCodeAt(i)) | 0
-  }
-
-  // Finder patterns (3 corners)
-  const addFinder = (ox: number, oy: number) => {
-    for (let y = 0; y < 7; y++) {
-      for (let x = 0; x < 7; x++) {
-        const isBorder = y === 0 || y === 6 || x === 0 || x === 6
-        const isInner = y >= 2 && y <= 4 && x >= 2 && x <= 4
-        matrix[oy + y][ox + x] = isBorder || isInner
-      }
-    }
-  }
-  addFinder(0, 0)
-  addFinder(size - 7, 0)
-  addFinder(0, size - 7)
-
-  // Timing patterns
-  for (let i = 7; i < size - 7; i++) {
-    matrix[6][i] = i % 2 === 0
-    matrix[i][6] = i % 2 === 0
-  }
-
-  // Data modules — seeded from hash
-  let seed = Math.abs(hash)
-  for (let y = 0; y < size; y++) {
-    for (let x = 0; x < size; x++) {
-      if (matrix[y][x]) continue
-      if ((x < 8 && y < 8) || (x >= size - 8 && y < 8) || (x < 8 && y >= size - 8)) continue
-      if (x === 6 || y === 6) continue
-      seed = (seed * 1103515245 + 12345) & 0x7fffffff
-      matrix[y][x] = seed % 3 !== 0
-    }
-  }
-
-  return matrix
-}
-
-function QRCodeSVG({ data, size = 200 }: { data: string; size?: number }) {
-  const matrix = generateQRMatrix(data)
-  const cellSize = size / matrix.length
-
-  return (
-    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} xmlns="http://www.w3.org/2000/svg">
-      <rect width={size} height={size} fill="white" />
-      {matrix.map((row, y) =>
-        row.map((cell, x) =>
-          cell ? (
-            <rect
-              key={`${x}-${y}`}
-              x={x * cellSize}
-              y={y * cellSize}
-              width={cellSize + 0.5}
-              height={cellSize + 0.5}
-              fill="black"
-            />
-          ) : null
-        )
-      )}
-    </svg>
-  )
-}
 
 export default function QRPostersPage() {
   const { settings } = useSettings()
@@ -219,7 +148,14 @@ export default function QRPostersPage() {
 
               {/* QR Code */}
               <div className="inline-block p-4 bg-white border-4 border-slate-900 rounded-xl mb-4">
-                {qrImage ? <img src={qrImage} alt={`QR code for ${municipalityName}`} width={200} height={200} /> : <QRCodeSVG data={emergencyUrl} size={200} />}
+                {qrImage ? (
+                  <img src={qrImage} alt={`QR code for ${municipalityName}`} width={200} height={200} />
+                ) : (
+                  <div className="w-[200px] h-[200px] flex flex-col items-center justify-center gap-2 text-slate-500">
+                    <Loader2 className="w-7 h-7 animate-spin" />
+                    <span className="text-xs">Generating secure QR code…</span>
+                  </div>
+                )}
               </div>
 
               <p className="text-lg font-bold text-slate-800 mb-1">

@@ -359,8 +359,8 @@ export default function VerificationPage() {
                     <span className="text-sm font-mono text-slate-200">{selected.id_number ? maskIdNumber(selected.id_number) : '—'}</span>
                   </div>
                 </div>
-                <div className="mt-2 p-3 border-2 border-dashed border-slate-700 rounded-lg text-center">
-                  <p className="text-xs text-slate-500">ID scan would be shown here in production</p>
+                <div className="mt-2 p-3 border border-slate-700 rounded-lg text-center bg-slate-800/40">
+                  <p className="text-xs text-slate-500">No ID document was uploaded. Verify the submitted details using the municipality&apos;s approved identity-check process.</p>
                 </div>
               </div>
 
