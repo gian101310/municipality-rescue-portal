@@ -162,6 +162,8 @@ export default function QRPostersPage() {
               {/* QR Code */}
               <div className="inline-block p-4 bg-white border-4 border-slate-900 rounded-xl mb-4">
                 {qrImage ? (
+                  // Generated data URLs must remain unchanged so printed QR modules stay exact.
+                  // eslint-disable-next-line @next/next/no-img-element
                   <img src={qrImage} alt={`QR code for ${municipalityName}`} width={200} height={200} />
                 ) : qrError ? (
                   <div className="w-[200px] h-[200px] flex flex-col items-center justify-center gap-3 text-red-700 px-3">

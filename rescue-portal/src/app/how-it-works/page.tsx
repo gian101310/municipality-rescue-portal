@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { ArrowLeft, ArrowRight, ChevronLeft, ChevronRight, Shield } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 const slides = [

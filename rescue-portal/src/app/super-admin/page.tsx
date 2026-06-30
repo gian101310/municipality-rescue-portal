@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label'
 import { toast } from 'sonner'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
-import { PH_LOCALITIES, PH_PROVINCES, getLocalityLabel, getRegionsForCountry, getProvincesForCountry, getLocalitiesForCountry, isUAECode } from '@/lib/philippines-geography'
+import { PH_LOCALITIES, PH_PROVINCES, getLocalityLabel, getProvincesForCountry, getLocalitiesForCountry, isUAECode } from '@/lib/philippines-geography'
 
 type TenantPlan = 'starter' | 'professional' | 'enterprise' | 'one_time'
 type TenantStatus = 'trial' | 'active' | 'suspended' | 'cancelled'

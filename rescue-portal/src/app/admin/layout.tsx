@@ -37,7 +37,6 @@ import {
   loadCoverageLock,
 } from '@/lib/coverage-lock-client'
 import type { TenantGeographyScope } from '@/lib/philippines-geography'
-import { createClient } from '@/lib/supabase/client'
 
 type DashboardStats = {
   active_incidents: number

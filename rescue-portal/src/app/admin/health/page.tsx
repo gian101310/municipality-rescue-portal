@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { CheckCircle2, AlertTriangle, RefreshCw, Database, Radio, Map, Shield, Users, Siren, Building2, MapPin } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -38,9 +38,9 @@ export default function HealthPage() {
   const [stats, setStats] = useState<Stats | null>(null)
   const [checkedAt, setCheckedAt] = useState<string | null>(null)
   const [checking, setChecking] = useState(false)
-  const [initialLoad, setInitialLoad] = useState(true)
+  const initialLoadRef = useRef(true)
 
-  async function runHealthCheck() {
+  const runHealthCheck = useCallback(async () => {
     setChecking(true)
     try {
       const response = await fetch('/api/admin/health', { cache: 'no-store' })
@@ -49,19 +49,19 @@ export default function HealthPage() {
       setServices(payload.services ?? [])
       setStats(payload.stats ?? null)
       setCheckedAt(payload.checkedAt ?? new Date().toISOString())
-      if (!initialLoad) toast.success('Health check completed')
+      if (!initialLoadRef.current) toast.success('Health check completed')
     } catch {
       toast.error('Unable to reach health endpoint.')
     } finally {
       setChecking(false)
-      setInitialLoad(false)
+      initialLoadRef.current = false
     }
-  }
+  }, [])
 
   useEffect(() => {
     const timer = window.setTimeout(() => { void runHealthCheck() }, 0)
     return () => window.clearTimeout(timer)
-  }, [])
+  }, [runHealthCheck])
 
   const allHealthy = services.length > 0 && services.every(s => s.status === 'healthy')
   const hasDown = services.some(s => s.status === 'down')

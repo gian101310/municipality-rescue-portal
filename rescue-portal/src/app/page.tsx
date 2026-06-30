@@ -1,14 +1,12 @@
 import Link from 'next/link'
 import {
   Activity,
-  ArrowRight,
   Bell,
   CheckCircle2,
   ClipboardCheck,
   FileText,
   Lock,
   MapPin,
-  Phone,
   QrCode,
   Radio,
   Shield,

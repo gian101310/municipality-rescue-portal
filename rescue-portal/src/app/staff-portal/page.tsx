@@ -2,10 +2,9 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import {
-  AlertTriangle, MapPin, Clock, Loader2, Radio, Eye,
-  ChevronRight, Shield, Users, BarChart3,
+  AlertTriangle, Loader2, Eye, Shield, BarChart3,
 } from 'lucide-react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { SeverityBadge } from '@/components/severity-badge'
 import { IncidentStatusBadge } from '@/components/incident-status-badge'
@@ -66,12 +65,6 @@ export default function StaffPortalPage() {
 
   const active = incidents.filter(i => !['closed', 'cancelled', 'false_alert', 'invalid', 'duplicate'].includes(i.status))
   const resolved = incidents.filter(i => ['closed', 'resolved'].includes(i.status))
-
-  // Count by status
-  const statusCounts = incidents.reduce<Record<string, number>>((acc, i) => {
-    acc[i.status] = (acc[i.status] ?? 0) + 1
-    return acc
-  }, {})
 
   if (loading) {
     return (

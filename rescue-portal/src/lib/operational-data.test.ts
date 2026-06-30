@@ -50,6 +50,7 @@ test('team member removal calls a real tenant-scoped endpoint', () => {
   const route = readFileSync(new URL('../app/api/admin/teams/[id]/members/route.ts', import.meta.url), 'utf8')
   assert.doesNotMatch(page, /would be removed|pending member removal endpoint/)
   assert.match(page, /method: 'DELETE'/)
+  assert.match(page, /onClick=\{\(\) => void removeMember\(unit\.id, m\.id, m\.user_name/)
   assert.match(route, /export async function DELETE/)
   assert.match(route, /left_at/)
 })

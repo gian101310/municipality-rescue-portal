@@ -4,7 +4,7 @@ import { useState, useMemo } from 'react'
 import Link from 'next/link'
 import { ArrowLeft, Phone, Search, Shield, Flame, Siren, Building2, Radio, MapPin } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { PROVINCES, REGION_HOTLINES } from '@/lib/hotline-data'
+import { PROVINCES } from '@/lib/hotline-data'
 
 
 /* ------------------------------------------------------------------ */

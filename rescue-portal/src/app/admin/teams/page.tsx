@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Users, Phone, MapPin, Plus, ChevronDown, ChevronUp, Calendar, UserPlus, UserMinus, Send, X, Check, Edit2 } from 'lucide-react'
+import { Phone, MapPin, Plus, ChevronDown, ChevronUp, Calendar, UserPlus, UserMinus, Send, X, Check, Edit2 } from 'lucide-react'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
@@ -273,6 +273,16 @@ export default function TeamsPage() {
                                 {POSITION_LABELS[m.role] || m.role}
                               </Badge>
                             </div>
+                            <Button
+                              type="button"
+                              size="icon"
+                              variant="ghost"
+                              aria-label={`Remove ${m.user_name || 'member'} from ${unit.name}`}
+                              className="h-7 w-7 text-slate-500 hover:text-red-400"
+                              onClick={() => void removeMember(unit.id, m.id, m.user_name || 'member')}
+                            >
+                              <UserMinus className="w-3.5 h-3.5" />
+                            </Button>
                           </div>
                         ))}
                       </div>
