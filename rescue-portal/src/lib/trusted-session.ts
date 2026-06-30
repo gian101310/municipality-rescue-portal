@@ -1,31 +1,13 @@
-/**
- * Trusted Resident Session — 90-day persistent login
- *
- * Flow:
- * 1. Resident logs in → prompted with "Trust this device?"
- * 2. If yes → a trusted_sessions row is created, token stored in localStorage
- * 3. On return visit, if Supabase session expired but trusted token exists:
- *    - Validate token against DB
- *    - Refresh the Supabase session silently
- * 4. Token auto-refreshes on each visit (sliding window)
- * 5. Residents can revoke sessions from their profile
- */
-
-import type { SupabaseBrowserClient } from '@/lib/supabase/client'
+/** Browser storage and API helpers for the optional trusted-resident-device flow. */
 
 const TRUSTED_TOKEN_KEY = 'rp_trusted_session'
-const TRUSTED_EXPIRY_DAYS = 90
+const TRUSTED_COOKIE_FLAG = 'rp_ts'
 
 interface StoredTrustedSession {
   token: string
   userId: string
   expiresAt: string
 }
-
-// ── Cookie flag helpers ────────────────────────────────────
-// A lightweight cookie tells proxy.ts that a trusted session exists.
-// The actual token stays in localStorage (not exposed to the server).
-const TRUSTED_COOKIE_FLAG = 'rp_ts'
 
 function setTrustedCookieFlag(expiresAt: Date) {
   if (typeof document === 'undefined') return
@@ -38,31 +20,28 @@ function clearTrustedCookieFlag() {
   document.cookie = `${TRUSTED_COOKIE_FLAG}=; path=/; max-age=0; SameSite=Lax; Secure`
 }
 
-// ── Local storage helpers ──────────────────────────────────
-
 export function getStoredTrustedSession(): StoredTrustedSession | null {
   if (typeof window === 'undefined') return null
   try {
     const raw = localStorage.getItem(TRUSTED_TOKEN_KEY)
     if (!raw) return null
     const parsed = JSON.parse(raw) as StoredTrustedSession
-    if (new Date(parsed.expiresAt) < new Date()) {
-      localStorage.removeItem(TRUSTED_TOKEN_KEY)
-      clearTrustedCookieFlag()
+    if (!parsed.token || !parsed.userId || new Date(parsed.expiresAt) <= new Date()) {
+      clearTrustedSession()
       return null
     }
     return parsed
   } catch {
-    localStorage.removeItem(TRUSTED_TOKEN_KEY)
-    clearTrustedCookieFlag()
+    clearTrustedSession()
     return null
   }
 }
 
-function storeTrustedSession(session: StoredTrustedSession) {
+export function updateStoredTrustedSession(token: string, userId: string, expiresAt: string) {
   if (typeof window === 'undefined') return
+  const session = { token, userId, expiresAt }
   localStorage.setItem(TRUSTED_TOKEN_KEY, JSON.stringify(session))
-  setTrustedCookieFlag(new Date(session.expiresAt))
+  setTrustedCookieFlag(new Date(expiresAt))
 }
 
 export function clearTrustedSession() {
@@ -71,30 +50,8 @@ export function clearTrustedSession() {
   clearTrustedCookieFlag()
 }
 
-// ── Device fingerprint (lightweight, non-invasive) ─────────
-
-function getDeviceFingerprint(): string {
-  if (typeof window === 'undefined') return 'server'
-  const nav = window.navigator
-  const parts = [
-    nav.userAgent,
-    nav.language,
-    screen.width + 'x' + screen.height,
-    Intl.DateTimeFormat().resolvedOptions().timeZone,
-  ]
-  // Simple hash
-  let hash = 0
-  const str = parts.join('|')
-  for (let i = 0; i < str.length; i++) {
-    const ch = str.charCodeAt(i)
-    hash = ((hash << 5) - hash) + ch
-    hash |= 0
-  }
-  return 'df_' + Math.abs(hash).toString(36)
-}
-
-function getDeviceName(): string {
-  if (typeof window === 'undefined') return 'Unknown'
+function getDeviceName() {
+  if (typeof window === 'undefined') return 'Web Browser'
   const ua = navigator.userAgent
   if (/iPhone/i.test(ua)) return 'iPhone'
   if (/iPad/i.test(ua)) return 'iPad'
@@ -105,145 +62,58 @@ function getDeviceName(): string {
   return 'Web Browser'
 }
 
-// ── Core API ───────────────────────────────────────────────
-
-/**
- * Create a trusted session after successful resident login.
- * Stores the token locally and inserts a row in trusted_sessions.
- */
-export async function createTrustedSession(
-  supabase: SupabaseBrowserClient,
-  userId: string
-): Promise<{ success: boolean; error?: string }> {
-  const token = crypto.randomUUID()
-  const expiresAt = new Date()
-  expiresAt.setDate(expiresAt.getDate() + TRUSTED_EXPIRY_DAYS)
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- trusted_sessions not in generated types yet
-  const { error } = await (supabase.from('trusted_sessions') as any).insert({
-    user_id: userId,
-    session_token: token,
-    device_fingerprint: getDeviceFingerprint(),
-    device_name: getDeviceName(),
-    platform: 'web',
-    user_agent: typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 500) : null,
-    expires_at: expiresAt.toISOString(),
-    last_refreshed_at: new Date().toISOString(),
+export async function createTrustedSession(userId: string): Promise<{ success: boolean; error?: string }> {
+  const response = await fetch('/api/auth/trusted-session', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ deviceName: getDeviceName(), platform: 'web' }),
   })
-
-  if (error) {
-    return { success: false, error: error.message }
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok || !payload.token || !payload.expiresAt) {
+    return { success: false, error: payload.message ?? 'Unable to trust this device.' }
   }
-
-  storeTrustedSession({
-    token,
-    userId,
-    expiresAt: expiresAt.toISOString(),
-  })
-
+  updateStoredTrustedSession(payload.token, payload.userId ?? userId, payload.expiresAt)
   return { success: true }
 }
 
-/**
- * Validate and refresh a trusted session.
- * Returns the user_id if valid, null if expired/revoked.
- */
-export async function validateTrustedSession(
-  supabase: SupabaseBrowserClient
-): Promise<{ userId: string } | null> {
+export async function validateTrustedSession(): Promise<{ userId: string } | null> {
   const stored = getStoredTrustedSession()
   if (!stored) return null
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any -- trusted_sessions not in generated types yet
-  const tsTable = supabase.from('trusted_sessions') as any
-  const { data, error } = await tsTable
-    .select('id, user_id, expires_at, is_revoked')
-    .eq('session_token', stored.token)
-    .eq('is_revoked', false)
-    .single()
-
-  if (error || !data) {
-    clearTrustedSession()
-    return null
-  }
-
-  const row = data as { id: string; user_id: string; expires_at: string; is_revoked: boolean }
-
-  if (new Date(row.expires_at) < new Date()) {
-    clearTrustedSession()
-    return null
-  }
-
-  // Sliding window refresh: extend by 90 days on each validated visit
-  const newExpiry = new Date()
-  newExpiry.setDate(newExpiry.getDate() + TRUSTED_EXPIRY_DAYS)
-
-  await tsTable
-    .update({
-      last_refreshed_at: new Date().toISOString(),
-      expires_at: newExpiry.toISOString(),
-    })
-    .eq('id', row.id)
-
-  // Update local storage with new expiry
-  storeTrustedSession({
-    ...stored,
-    expiresAt: newExpiry.toISOString(),
+  const response = await fetch('/api/auth/trusted-session-refresh', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: stored.token }),
   })
-
-  return { userId: row.user_id }
+  const payload = await response.json().catch(() => ({}))
+  if (!response.ok || !payload.trusted_token || !payload.expires_at) {
+    clearTrustedSession()
+    return null
+  }
+  updateStoredTrustedSession(payload.trusted_token, payload.user_id ?? stored.userId, payload.expires_at)
+  return { userId: payload.user_id ?? stored.userId }
 }
 
-/**
- * Revoke a specific trusted session.
- */
-export async function revokeTrustedSession(
-  supabase: SupabaseBrowserClient,
-  sessionId: string
-): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (supabase.from('trusted_sessions') as any)
-    .update({ is_revoked: true, revoked_reason: 'user_revoked' })
-    .eq('id', sessionId)
+export async function revokeTrustedSession(sessionId: string): Promise<void> {
+  const response = await fetch('/api/auth/trusted-session', {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId }),
+  })
+  if (!response.ok) throw new Error('Unable to revoke trusted device.')
 }
 
-/**
- * Revoke ALL trusted sessions for the current user (e.g., on password change or logout-all).
- */
-export async function revokeAllTrustedSessions(
-  supabase: SupabaseBrowserClient,
-  userId: string
-): Promise<void> {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  await (supabase.from('trusted_sessions') as any)
-    .update({ is_revoked: true, revoked_reason: 'revoke_all' })
-    .eq('user_id', userId)
-    .eq('is_revoked', false)
-
+export async function revokeAllTrustedSessions(): Promise<void> {
+  const response = await fetch('/api/auth/trusted-session', {
+    method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ all: true }),
+  })
+  if (!response.ok) throw new Error('Unable to revoke trusted devices.')
   clearTrustedSession()
 }
 
-/**
- * List active trusted sessions for a user (for profile management UI).
- */
-export async function listTrustedSessions(
-  supabase: SupabaseBrowserClient,
-  userId: string
-) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data, error } = await (supabase.from('trusted_sessions') as any)
-    .select('id, device_name, platform, last_refreshed_at, expires_at, created_at')
-    .eq('user_id', userId)
-    .eq('is_revoked', false)
-    .gt('expires_at', new Date().toISOString())
-    .order('last_refreshed_at', { ascending: false })
-
-  return { sessions: data ?? [], error }
+export async function listTrustedSessions() {
+  const response = await fetch('/api/auth/trusted-session', { cache: 'no-store' })
+  const payload = await response.json().catch(() => ({}))
+  return { sessions: response.ok ? payload.sessions ?? [] : [], error: response.ok ? null : new Error(payload.message ?? 'Unable to load trusted devices.') }
 }
 
-/**
- * Check if current device has a trusted session stored.
- */
-export function hasTrustedSession(): boolean {
+export function hasTrustedSession() {
   return getStoredTrustedSession() !== null
 }

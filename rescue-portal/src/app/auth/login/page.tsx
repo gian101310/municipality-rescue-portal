@@ -109,7 +109,7 @@ function LoginContent() {
       } else if (profile.role === 'resident') {
         // Create trusted session for residents if opted in
         if (trustDevice) {
-          await createTrustedSession(supabase, authData.user.id)
+          await createTrustedSession(authData.user.id)
         }
         toast.success('Signed in successfully')
         router.push('/resident')

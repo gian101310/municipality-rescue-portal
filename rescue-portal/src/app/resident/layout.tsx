@@ -16,7 +16,7 @@ import { LanguageSwitcher } from '@/components/language-switcher'
 import { cn } from '@/lib/utils'
 import { createClient } from '@/lib/supabase/client'
 import { isOwnerTestMode, withOwnerTestMode } from '@/lib/owner-test-mode'
-import { clearTrustedSession } from '@/lib/trusted-session'
+import { clearTrustedSession, updateStoredTrustedSession } from '@/lib/trusted-session'
 import { useOfflineSos } from '@/hooks/use-offline-sos'
 import { OfflineSosBanner } from '@/components/offline-sos-banner'
 import { useSettings } from '@/lib/settings-context'
@@ -66,6 +66,9 @@ function ResidentLayoutContent({ children }: { children: React.ReactNode }) {
             })
             if (res.ok) {
               const payload = await res.json()
+              if (payload.trusted_token && payload.expires_at) {
+                updateStoredTrustedSession(payload.trusted_token, payload.user_id ?? stored.userId, payload.expires_at)
+              }
               // Use verifyOtp to establish a fresh Supabase session
               const { error: verifyError } = await supabase.auth.verifyOtp({
                 token_hash: payload.token_hash,
